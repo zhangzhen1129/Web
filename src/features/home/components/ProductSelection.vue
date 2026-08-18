@@ -1,5 +1,7 @@
 <script setup>
 import { computed } from 'vue'
+import minusIcon from '../../../assets/home/minus.svg'
+import plusIcon from '../../../assets/home/plus.svg'
 
 const props = defineProps({ product: { type: Object, required: true } })
 const emit = defineEmits(['select-amount', 'select-term'])
@@ -17,9 +19,9 @@ function choose(option) {
     <section class="amount-card" :aria-label="product.amountLabelText">
       <h2>{{ product.amountLabelText }}</h2>
       <div class="amount-card__controls">
-        <button class="round-control" type="button" :disabled="!previous" aria-label="Previous option" @click="choose(previous)">−</button>
+        <button class="round-control" type="button" :disabled="!previous" aria-label="Previous option" @click="choose(previous)"><img :src="minusIcon" alt="" /></button>
         <strong class="amount-card__value">{{ product.amountOptions[selectedIndex].text }}</strong>
-        <button class="round-control" type="button" :disabled="!next" aria-label="Next option" @click="choose(next)">＋</button>
+        <button class="round-control" type="button" :disabled="!next" aria-label="Next option" @click="choose(next)"><img :src="plusIcon" alt="" /></button>
       </div>
     </section>
     <section class="term-card" :aria-label="product.termLabelText">

@@ -1,7 +1,7 @@
 <script setup>
-import HomePage from './features/home/views/HomePage.vue'
+import MainTabShell from './features/shell/MainTabShell.vue'
 </script>
 
 <template>
-  <HomePage />
+  <MainTabShell />
 </template>
