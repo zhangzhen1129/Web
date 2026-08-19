@@ -11,7 +11,7 @@ export const ROUTE_PATH = Object.freeze({
 
 export const router = createRouter({
   history: createWebHashHistory(),
-  scrollBehavior: () => ({ left: 0, top: 0 }),
+  scrollBehavior: () => undefined,
   routes: [
     { path: '/', redirect: ROUTE_PATH.HOME },
     {

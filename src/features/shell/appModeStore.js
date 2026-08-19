@@ -2,6 +2,7 @@ import { reactive, readonly } from 'vue'
 
 export const APP_MODE = Object.freeze({
   CASH_LOAN: '0',
+  MULTI_PUSH: '1',
   REPAYMENT_VISIBLE: '2',
   REPAYMENT_HIDDEN: '3',
 })
@@ -19,6 +20,7 @@ function dispatchAppModeEvent(name, detail) {
 function normalizeAppMode(value) {
   const normalized = String(value ?? '').trim()
   if (normalized === APP_MODE.CASH_LOAN
+    || normalized === APP_MODE.MULTI_PUSH
     || normalized === APP_MODE.REPAYMENT_VISIBLE
     || normalized === APP_MODE.REPAYMENT_HIDDEN) {
     return normalized
@@ -42,7 +44,7 @@ export function setAppMode(value) {
 }
 
 export function shouldShowRepaymentTab(mode = state.mode) {
-  return mode === APP_MODE.REPAYMENT_VISIBLE
+  return mode === APP_MODE.REPAYMENT_VISIBLE || mode === APP_MODE.MULTI_PUSH
 }
 
 export function readInitialAppMode(candidate) {
