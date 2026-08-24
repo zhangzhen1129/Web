@@ -1,9 +1,11 @@
 <script setup>
 import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref } from 'vue'
-import { Loading, PullRefresh } from 'vant'
+import { Loading, PullRefresh, Skeleton } from 'vant'
 import { useRoute } from 'vue-router'
 import 'vant/es/pull-refresh/style'
-import { createHomeController, createNoopPageLoadingAdapter } from '../index.js'
+import 'vant/es/skeleton/style'
+import { createHomeController } from '../index.js'
+import { createNativePageLoadingAdapter } from '../pageLoadingPort.js'
 import { createLocalHomeViewProvider } from '../providers/localHomeViewProvider.js'
 import CreditSummary from '../components/CreditSummary.vue'
 import HomeBroadcast from '../components/HomeBroadcast.vue'
@@ -20,7 +22,7 @@ defineOptions({ name: 'HomePage' })
 const viewProvider = ref(null)
 const route = useRoute()
 const controller = createHomeController({
-  loadingPort: createNoopPageLoadingAdapter(),
+  loadingPort: createNativePageLoadingAdapter(),
   onOperation(operation) {
     window.dispatchEvent(new CustomEvent('dinero-pro:home-operation', { detail: operation }))
     viewProvider.value?.handleOperation(operation)
@@ -50,6 +52,7 @@ function readHashQueryParam(key) {
 }
 
 let unsubscribe
+let hasBeenActivated = false
 
 function refresh() {
   if (state.value.isRefreshPending) return
@@ -70,6 +73,8 @@ function handleVisibilityChange() {
 
 onActivated(() => {
   controller.show()
+  if (hasBeenActivated) viewProvider.value?.reload?.()
+  hasBeenActivated = true
 })
 
 onDeactivated(() => {
@@ -99,13 +104,37 @@ onBeforeUnmount(() => {
   document.removeEventListener('visibilitychange', handleVisibilityChange)
   if (window.updateHomeView === controller.updateHomeView) delete window.updateHomeView
   unsubscribe?.()
+  viewProvider.value?.destroy?.()
   controller.destroy()
+  hasBeenActivated = false
 })
 </script>
 
 <template>
+  <main
+    v-if="state.pageStatus === 'loading'"
+    class="home-page home-page--loading"
+    aria-busy="true"
+  >
+    <div class="home-page__frame">
+      <Loading
+        v-if="isRefreshing"
+        class="home-page__refresh-indicator"
+        type="spinner"
+        size=".8rem"
+        aria-label="Refreshing"
+      />
+      <Skeleton
+        class="home-page__skeleton"
+        :class="{ 'home-page__skeleton--refreshing': isRefreshing }"
+        :row="15"
+        :title="false"
+        animate
+      />
+    </div>
+  </main>
   <MultiPushHome
-    v-if="isMultiPush"
+    v-else-if="isMultiPush"
     :data="multiPushData"
     @action="handleMultiPushAction"
   />
@@ -125,7 +154,7 @@ onBeforeUnmount(() => {
     <template #loading>
       <Loading type="spinner" size=".8rem" />
     </template>
-    <main class="home-page" :class="`home-page--${mode}`">
+    <main class="home-page" :class="`home-page--${mode}`" :aria-busy="state.pageStatus === 'loading'">
       <div class="home-page__frame">
         <HomeBroadcast :item="broadcastItem" />
 

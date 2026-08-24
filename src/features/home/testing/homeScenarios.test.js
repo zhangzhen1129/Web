@@ -54,6 +54,69 @@ test('local provider supplies exact amount and term choices', () => {
   assert.equal(selection.selectedTermKey, 'term-91')
 })
 
+test('local provider exposes loading before initial and return content models and cleans its timer', () => {
+  const scheduledCallbacks = []
+  const clearedTimers = []
+  const controller = createHomeController()
+  const provider = createLocalHomeViewProvider(controller, {
+    initialMode: 'apply',
+    schedule(callback) {
+      scheduledCallbacks.push(callback)
+      return `initial-loading-timer-${scheduledCallbacks.length}`
+    },
+    clearSchedule(timerId) {
+      clearedTimers.push(timerId)
+    },
+  })
+
+  provider.start()
+  assert.equal(controller.getState().pageStatus, 'loading')
+  scheduledCallbacks[0]()
+  assert.equal(controller.getState().pageStatus, 'content')
+
+  provider.reload()
+  assert.equal(controller.getState().pageStatus, 'loading')
+  scheduledCallbacks[1]()
+  assert.equal(controller.getState().pageStatus, 'content')
+
+  provider.reload()
+  provider.destroy()
+  assert.deepEqual(clearedTimers, ['initial-loading-timer-3'])
+  controller.destroy()
+})
+
+test('local provider switches pull refresh from content to an associated skeleton before completion', () => {
+  const scheduledCallbacks = []
+  let provider
+  const controller = createHomeController({
+    createRequestId: (() => { let sequence = 0; return () => `refresh-operation-${++sequence}` })(),
+    onOperation(operation) {
+      provider.handleOperation(operation)
+    },
+  })
+  provider = createLocalHomeViewProvider(controller, {
+    initialMode: 'apply',
+    initialLoading: false,
+    schedule(callback) {
+      scheduledCallbacks.push(callback)
+      return `refresh-loading-timer-${scheduledCallbacks.length}`
+    },
+    clearSchedule() {},
+  })
+
+  provider.start()
+  assert.equal(controller.getState().pageStatus, 'content')
+  const refreshOperationId = controller.refresh()
+  assert.equal(controller.getState().pageStatus, 'loading')
+  assert.equal(controller.getState().sourceOperationId, refreshOperationId)
+  assert.equal(controller.getState().viewData, null)
+  scheduledCallbacks[0]()
+  assert.equal(controller.getState().pageStatus, 'content')
+  assert.equal(controller.getState().isRefreshPending, false)
+  provider.destroy()
+  controller.destroy()
+})
+
 test('local provider reflects amount steps and term selection through new view models', () => {
   const operations = []
   let provider
@@ -64,7 +127,7 @@ test('local provider reflects amount steps and term selection through new view m
       provider.handleOperation(operation)
     },
   })
-  provider = createLocalHomeViewProvider(controller, { initialMode: 'apply', schedule: () => 0 })
+  provider = createLocalHomeViewProvider(controller, { initialMode: 'apply', initialLoading: false, schedule: () => 0 })
   provider.start()
 
   assert.equal(controller.getState().viewData.productSelection.selectedAmountKey, 'amount-5000')
@@ -94,7 +157,7 @@ test('local provider reflects amount steps and term selection through new view m
 test('local provider keeps product selections isolated by view mode', () => {
   let provider
   const controller = createHomeController({ onOperation: (operation) => provider.handleOperation(operation) })
-  provider = createLocalHomeViewProvider(controller, { initialMode: 'apply', schedule: () => 0 })
+  provider = createLocalHomeViewProvider(controller, { initialMode: 'apply', initialLoading: false, schedule: () => 0 })
   provider.start()
   controller.selectAmount('amount-1200')
   controller.selectTerm('term-120')

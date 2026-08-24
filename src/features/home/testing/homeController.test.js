@@ -293,7 +293,7 @@ test('PageLoadingPort show and hide are deduplicated and preserve the opening re
   assert.deepEqual(loadingPort.calls.slice(-2), [['show', 'loading-3'], ['hide', 'loading-3']])
 })
 
-test('refresh completion only responds to the active source operation id', () => {
+test('refresh keeps its pending operation through the associated skeleton and only accepts its completion', () => {
   const operations = []
   const controller = createHomeController({
     onOperation: (operation) => operations.push(operation),
@@ -308,10 +308,12 @@ test('refresh completion only responds to the active source operation id', () =>
   controller.updateHomeView(contentPayload('model-stale', { sourceOperationId: 'old-operation' }))
   assert.equal(controller.getState().isRefreshPending, true)
 
-  controller.updateHomeView(contentPayload('model-refreshing', {
+  controller.updateHomeView({
+    requestId: 'model-refresh-loading',
     sourceOperationId: 'operation-1',
-    pageStatus: PAGE_STATUS.REFRESHING,
-  }))
+    pageStatus: PAGE_STATUS.LOADING,
+  })
+  assert.equal(controller.getState().pageStatus, PAGE_STATUS.LOADING)
   assert.equal(controller.getState().isRefreshPending, true)
 
   controller.updateHomeView(contentPayload('model-complete', { sourceOperationId: 'operation-1' }))

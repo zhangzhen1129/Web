@@ -90,8 +90,12 @@ export function createLocalContentPayload(viewMode, requestId, selection = {}) {
   }
 }
 
-export function createLocalLoadingPayload(requestId) {
-  return { requestId, pageStatus: 'loading' }
+export function createLocalLoadingPayload(requestId, sourceOperationId) {
+  return {
+    requestId,
+    ...(sourceOperationId ? { sourceOperationId } : {}),
+    pageStatus: 'loading',
+  }
 }
 
 export function createLocalErrorPayload(requestId) {
