@@ -26,17 +26,22 @@
   overflow-y: visible;
 }
 
+.home-page__error-overlay {
+  position: absolute;
+  right: .41026rem;
+  bottom: calc(2.76923rem + env(safe-area-inset-bottom));
+  left: .41026rem;
+  z-index: 1;
+  padding: .30769rem;
+  border-radius: .20513rem;
+  background: rgba(255,255,255,.9);
+  color: #b42318;
+  text-align: center;
+}
+
 .home-page__skeleton {
   min-height: calc(100dvh - 3.2rem);
   padding: .51282rem .41026rem calc(2.76923rem + env(safe-area-inset-bottom));
-}
-
-.home-page__refresh-indicator {
-  position: absolute;
-  z-index: 1;
-  top: .51282rem;
-  left: 50%;
-  transform: translateX(-50%);
 }
 
 .home-page__skeleton--refreshing {
@@ -78,6 +83,9 @@
 }
 
 .home-broadcast__text {
+  display: block;
+  min-width: 0;
+  flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -234,9 +242,7 @@
 .amount-card__value,
 .credit-summary__available > strong {
   overflow: hidden;
-  background: linear-gradient(90deg, var(--home-blue), var(--home-indigo));
-  background-clip: text;
-  color: transparent;
+  color: var(--home-blue);
   font-size: clamp(.82051rem, 10vw, 1.02564rem);
   font-weight: 400;
   line-height: 1.23077rem;

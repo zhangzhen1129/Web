@@ -1,7 +1,6 @@
 <script setup>
-import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref } from 'vue'
+import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue'
 import { Loading, PullRefresh, Skeleton } from 'vant'
-import { useRoute } from 'vue-router'
 import 'vant/es/pull-refresh/style'
 import 'vant/es/skeleton/style'
 import { createHomeController } from '../index.js'
@@ -14,13 +13,14 @@ import HomePrimaryAction from '../components/HomePrimaryAction.vue'
 import HomeSteps from '../components/HomeSteps.vue'
 import ProductSelection from '../components/ProductSelection.vue'
 import MultiPushHome from '../components/MultiPushHome.vue'
-import { createLocalMultiPushHomeViewData } from '../providers/localMultiPushHomeViewData.js'
 import { APP_MODE, appModeState } from '../../shell/appModeStore.js'
+import { useGlobalStore } from '../../../shared/globalStore/globalStore.js'
+import { requestNativeToken } from '../../../shared/globalStore/nativeTokenBootstrap.js'
 
 defineOptions({ name: 'HomePage' })
 
 const viewProvider = ref(null)
-const route = useRoute()
+const globalStore = useGlobalStore()
 const controller = createHomeController({
   loadingPort: createNativePageLoadingAdapter(),
   onOperation(operation) {
@@ -35,21 +35,9 @@ const state = ref(controller.getState())
 const isRefreshing = ref(false)
 const mode = computed(() => state.value.viewMode || 'apply')
 const data = computed(() => state.value.viewData)
+const multiPushData = computed(() => state.value.multiPushViewData)
 const broadcastItem = computed(() => data.value?.broadcast?.items?.[state.value.broadcastIndex] || null)
-const isMultiPush = computed(() => appModeState.mode === APP_MODE.MULTI_PUSH)
-const multiPushScenario = computed(() => import.meta.env.DEV
-  ? readHashQueryParam('scenario')
-  : null)
-const multiPushData = computed(() => (import.meta.env.DEV
-  ? createLocalMultiPushHomeViewData(multiPushScenario.value)
-  : null))
-
-function readHashQueryParam(key) {
-  const searchValue = new URLSearchParams(window.location.search).get(key)
-  if (searchValue) return searchValue
-  const hashQuery = window.location.hash.includes('?') ? window.location.hash.split('?').slice(1).join('?') : ''
-  return new URLSearchParams(hashQuery).get(key)
-}
+const isMultiPush = computed(() => state.value.homeMode === 'multi_push')
 
 let unsubscribe
 let hasBeenActivated = false
@@ -62,9 +50,9 @@ function refresh() {
 
 function selectAmount(amountKey) { controller.selectAmount(amountKey) }
 function selectTerm(termKey) { controller.selectTerm(termKey) }
-function retry() { controller.retry() }
 function handleMultiPushAction(action) {
-  window.dispatchEvent(new CustomEvent('dinero-pro:multi-push-action', { detail: action }))
+  if (action?.type === 'RETRY') return controller.retry()
+  if (action?.type === 'APPLY' || action?.type === 'REPAY') controller.primaryAction()
 }
 function handleVisibilityChange() {
   if (document.hidden) controller.hide()
@@ -82,6 +70,7 @@ onDeactivated(() => {
 })
 
 onMounted(async () => {
+  requestNativeToken(globalStore)
   unsubscribe = controller.subscribe((nextState) => {
     state.value = nextState
     if (!nextState.isRefreshPending && nextState.pageStatus !== 'refreshing') isRefreshing.value = false
@@ -91,9 +80,7 @@ onMounted(async () => {
   window.addEventListener('pagehide', controller.hide)
   window.addEventListener('pageshow', controller.show)
   document.addEventListener('visibilitychange', handleVisibilityChange)
-  const requestedMode = import.meta.env.DEV
-    ? route.query.scenario
-    : 'apply'
+  const requestedMode = appModeState.mode === APP_MODE.MULTI_PUSH ? 'multi_push' : 'apply'
   viewProvider.value = createLocalHomeViewProvider(controller, { initialMode: requestedMode })
   viewProvider.value.start()
 })
@@ -108,38 +95,14 @@ onBeforeUnmount(() => {
   controller.destroy()
   hasBeenActivated = false
 })
+
+watch(() => appModeState.mode, (nextMode) => {
+  viewProvider.value?.setHomeMode(nextMode === APP_MODE.MULTI_PUSH ? 'multi_push' : 'apply')
+})
 </script>
 
 <template>
-  <main
-    v-if="state.pageStatus === 'loading'"
-    class="home-page home-page--loading"
-    aria-busy="true"
-  >
-    <div class="home-page__frame">
-      <Loading
-        v-if="isRefreshing"
-        class="home-page__refresh-indicator"
-        type="spinner"
-        size=".8rem"
-        aria-label="Refreshing"
-      />
-      <Skeleton
-        class="home-page__skeleton"
-        :class="{ 'home-page__skeleton--refreshing': isRefreshing }"
-        :row="15"
-        :title="false"
-        animate
-      />
-    </div>
-  </main>
-  <MultiPushHome
-    v-else-if="isMultiPush"
-    :data="multiPushData"
-    @action="handleMultiPushAction"
-  />
   <PullRefresh
-    v-else
     v-model="isRefreshing"
     :head-height="52"
     :pull-distance="72"
@@ -154,16 +117,28 @@ onBeforeUnmount(() => {
     <template #loading>
       <Loading type="spinner" size=".8rem" />
     </template>
-    <main class="home-page" :class="`home-page--${mode}`" :aria-busy="state.pageStatus === 'loading'">
+    <main v-if="state.pageStatus === 'loading' || state.pageStatus === 'error'" class="home-page home-page--loading" aria-busy="true">
+      <div class="home-page__frame">
+        <Skeleton
+          class="home-page__skeleton"
+          :class="{ 'home-page__skeleton--refreshing': isRefreshing }"
+          :row="15"
+          :title="false"
+          animate
+        />
+        <HomeError v-if="state.pageStatus === 'error' && state.errorData" class="home-page__error-overlay" :error="state.errorData" />
+      </div>
+    </main>
+    <MultiPushHome
+      v-else-if="isMultiPush"
+      :data="multiPushData"
+      @action="handleMultiPushAction"
+    />
+    <main v-else class="home-page" :class="`home-page--${mode}`" :aria-busy="false">
       <div class="home-page__frame">
         <HomeBroadcast :item="broadcastItem" />
 
-        <div v-if="state.pageStatus === 'error'" class="home-page__state">
-          <HomeError v-if="state.errorData" :error="state.errorData" :pending="state.isRetryPending" @retry="retry" />
-          <div v-else class="home-error-symbol" role="alert" :data-diagnostic-code="state.diagnosticCode" aria-label="Error">!</div>
-        </div>
-
-        <template v-else-if="data">
+        <template v-if="data">
           <div class="home-page__content">
             <HomeSteps :title="data.titleText" :steps="data.steps" />
             <ProductSelection

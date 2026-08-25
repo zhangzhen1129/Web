@@ -18,12 +18,12 @@ const steps = Object.freeze([
 ])
 
 const state = computed(() => getMultiPushHomeState(props.data))
-const isActionEnabled = computed(() => props.data?.primaryAction === 'APPLY' || props.data?.primaryAction === 'REPAY')
+const isActionEnabled = computed(() => props.data?.primaryAction === 'apply' || props.data?.primaryAction === 'repay')
 const productText = computed(() => `${props.data?.availableProductCount ?? 0} productos`)
 
 function emitAction() {
   if (!isActionEnabled.value) return
-  emit('action', { type: props.data.primaryAction, products: props.data.products })
+  emit('action', { type: props.data.primaryAction.toUpperCase(), products: props.data.products })
 }
 </script>
 
@@ -73,7 +73,7 @@ function emitAction() {
 .multi-push-home .home-steps { margin-bottom: .41026rem; }
 .multi-push-credit { position: relative; min-height: 3.69231rem; padding: .58974rem; border: .02564rem solid #dbeafe; border-radius: .41026rem; background: #f0f7ff; text-align: center; }
 .multi-push-credit h1 { margin: 0; color: #333; font-size: .51282rem; font-weight: 500; line-height: .61538rem; }
-.multi-push-credit strong { display: block; margin-top: .61538rem; background: linear-gradient(90deg, #155dfc, #4f39f6); background-clip: text; color: transparent; font-size: 1.02564rem; font-weight: 400; line-height: 1.23077rem; white-space: nowrap; }
+.multi-push-credit strong { display: block; margin-top: .61538rem; color: #155dfc; font-size: 1.02564rem; font-weight: 400; line-height: 1.23077rem; white-space: nowrap; }
 .multi-push-credit__lock { position: absolute; top: .71795rem; right: .61538rem; width: .41026rem; height: .41026rem; }
 .multi-push-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .25641rem; margin-top: .41026rem; }
 .multi-push-summary div, .multi-push-products { min-height: 1.84615rem; border: .02564rem solid #e5e7eb; border-radius: .41026rem; background: #fff; }

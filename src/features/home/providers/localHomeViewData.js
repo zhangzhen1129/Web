@@ -84,6 +84,7 @@ export function createLocalContentPayload(viewMode, requestId, selection = {}) {
     : undefined
   return {
     requestId,
+    homeMode: 'cash_loan',
     pageStatus: 'content',
     viewMode,
     viewData: { ...common, ...modes[viewMode], ...(productSelection ? { productSelection } : {}) },

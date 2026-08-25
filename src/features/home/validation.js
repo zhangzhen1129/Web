@@ -1,4 +1,4 @@
-import { OPERATION_TYPE, PAGE_STATUS, VIEW_MODE } from './constants.js'
+import { HOME_MODE, OPERATION_TYPE, PAGE_STATUS, VIEW_MODE } from './constants.js'
 
 const PAGE_STATUSES = new Set(Object.values(PAGE_STATUS))
 const VIEW_MODES = new Set(Object.values(VIEW_MODE))
@@ -6,6 +6,8 @@ const OPERATION_TYPES = new Set(Object.values(OPERATION_TYPE))
 const NOTICE_TONES = new Set(['info', 'success', 'warning', 'error'])
 const REQUIRED_TAB_KEYS = new Set(['home', 'account'])
 const TAB_KEYS = new Set(['home', 'repayment', 'account'])
+const HOME_MODES = new Set(Object.values(HOME_MODE))
+const MULTI_PUSH_ACTIONS = new Set(['apply', 'repay', 'processing'])
 
 function isRecord(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -237,6 +239,35 @@ function validateErrorData(value, path, issues) {
   else if (hasOwn(value, 'retryText')) addIssue(issues, `${path}.retryText`, 'unexpected_field')
 }
 
+function validateMultiPushProduct(value, path, issues) {
+  const keys = new Set(['id', 'name', 'imageUrl', 'iconUrl', 'interestText', 'companyName', 'amountRangeText', 'minAmount', 'maxAmount', 'isReloan'])
+  if (!validateExactKeys(value, keys, path, issues)) return
+  for (const key of ['id', 'name', 'interestText', 'companyName', 'amountRangeText']) validateRequiredString(value[key], `${path}.${key}`, issues)
+  for (const key of ['imageUrl', 'iconUrl']) validateOptionalString(value[key], `${path}.${key}`, issues)
+  if (typeof value.minAmount !== 'number' || !Number.isFinite(value.minAmount)) addIssue(issues, `${path}.minAmount`, 'required_number')
+  if (typeof value.maxAmount !== 'number' || !Number.isFinite(value.maxAmount)) addIssue(issues, `${path}.maxAmount`, 'required_number')
+  validateBoolean(value.isReloan, `${path}.isReloan`, issues)
+}
+
+function validateMultiPushViewData(value, path, issues) {
+  const keys = new Set(['availableProductCount', 'activeLoanCount', 'allProcessing', 'availableAmount', 'totalCredit', 'usedCredit', 'locked', 'primaryButtonText', 'primaryAction', 'statusDescription', 'products', 'tabs'])
+  if (!validateExactKeys(value, keys, path, issues)) return
+  for (const key of ['availableAmount', 'totalCredit', 'usedCredit', 'primaryButtonText', 'statusDescription']) validateRequiredString(value[key], `${path}.${key}`, issues)
+  for (const key of ['availableProductCount', 'activeLoanCount']) {
+    if (!Number.isInteger(value[key]) || value[key] < 0) addIssue(issues, `${path}.${key}`, 'invalid_non_negative_integer')
+  }
+  validateBoolean(value.allProcessing, `${path}.allProcessing`, issues)
+  validateBoolean(value.locked, `${path}.locked`, issues)
+  if (!MULTI_PUSH_ACTIONS.has(value.primaryAction)) addIssue(issues, `${path}.primaryAction`, 'invalid_enum')
+  validateArray(value.products, `${path}.products`, issues, validateMultiPushProduct)
+  validateTabs(value.tabs, `${path}.tabs`, issues)
+  const hasAvailable = value.availableProductCount > 0
+  const hasActive = value.activeLoanCount > 0
+  const validState = (hasAvailable && (hasActive || value.products.length > 0)) || (!hasAvailable && hasActive && value.products.length === 0) || (!hasAvailable && !hasActive && value.allProcessing)
+  if (!validState) addIssue(issues, path, 'invalid_multi_push_state')
+  if (value.primaryAction === 'processing' && (hasAvailable || hasActive)) addIssue(issues, `${path}.primaryAction`, 'processing_state_mismatch')
+}
+
 function rejectPresentFields(value, fields, issues) {
   fields.forEach((field) => {
     if (hasOwn(value, field)) addIssue(issues, `payload.${field}`, 'unexpected_field')
@@ -245,7 +276,7 @@ function rejectPresentFields(value, fields, issues) {
 
 export function validateHomeViewPayload(payload) {
   const issues = []
-  const keys = new Set(['requestId', 'sourceOperationId', 'pageStatus', 'viewMode', 'viewData', 'errorData'])
+  const keys = new Set(['requestId', 'sourceOperationId', 'pageStatus', 'homeMode', 'viewMode', 'viewData', 'multiPushViewData', 'errorData'])
   if (!validateExactKeys(payload, keys, 'payload', issues)) return issues
 
   validateRequiredString(payload.requestId, 'payload.requestId', issues)
@@ -253,16 +284,25 @@ export function validateHomeViewPayload(payload) {
   if (!PAGE_STATUSES.has(payload.pageStatus)) addIssue(issues, 'payload.pageStatus', 'invalid_enum')
 
   if (payload.pageStatus === PAGE_STATUS.CONTENT || payload.pageStatus === PAGE_STATUS.REFRESHING) {
-    if (!VIEW_MODES.has(payload.viewMode)) addIssue(issues, 'payload.viewMode', 'invalid_enum')
-    if (!hasOwn(payload, 'viewData')) addIssue(issues, 'payload.viewData', 'required_field')
-    else validateHomeViewData(payload.viewData, 'payload.viewData', issues)
-    rejectPresentFields(payload, ['errorData'], issues)
+    // Accept legacy cash-loan payloads while the upstream adapter migrates to homeMode.
+    const homeMode = payload.homeMode ?? (hasOwn(payload, 'viewData') ? HOME_MODE.CASH_LOAN : null)
+    if (!HOME_MODES.has(homeMode)) addIssue(issues, 'payload.homeMode', 'invalid_enum')
+    if (homeMode === HOME_MODE.CASH_LOAN) {
+      if (!VIEW_MODES.has(payload.viewMode)) addIssue(issues, 'payload.viewMode', 'invalid_enum')
+      if (!hasOwn(payload, 'viewData')) addIssue(issues, 'payload.viewData', 'required_field')
+      else validateHomeViewData(payload.viewData, 'payload.viewData', issues)
+      rejectPresentFields(payload, ['multiPushViewData', 'errorData'], issues)
+    } else if (homeMode === HOME_MODE.MULTI_PUSH) {
+      if (!hasOwn(payload, 'multiPushViewData')) addIssue(issues, 'payload.multiPushViewData', 'required_field')
+      else validateMultiPushViewData(payload.multiPushViewData, 'payload.multiPushViewData', issues)
+      rejectPresentFields(payload, ['viewMode', 'viewData', 'errorData'], issues)
+    }
   } else if (payload.pageStatus === PAGE_STATUS.ERROR) {
     if (!hasOwn(payload, 'errorData')) addIssue(issues, 'payload.errorData', 'required_field')
     else validateErrorData(payload.errorData, 'payload.errorData', issues)
-    rejectPresentFields(payload, ['viewMode', 'viewData'], issues)
+    rejectPresentFields(payload, ['homeMode', 'viewMode', 'viewData', 'multiPushViewData'], issues)
   } else if (payload.pageStatus === PAGE_STATUS.LOADING) {
-    rejectPresentFields(payload, ['viewMode', 'viewData', 'errorData'], issues)
+    rejectPresentFields(payload, ['homeMode', 'viewMode', 'viewData', 'multiPushViewData', 'errorData'], issues)
   }
 
   return issues

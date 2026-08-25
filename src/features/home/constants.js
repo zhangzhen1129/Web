@@ -11,6 +11,15 @@ export const VIEW_MODE = Object.freeze({
   DISBURSING: 'disbursing',
   REPAYING: 'repaying',
   REJECTED: 'rejected',
+  AVAILABLE_ONLY: 'available_only',
+  ACTIVE_ONLY: 'active_only',
+  PROCESSING_ONLY: 'processing_only',
+  AVAILABLE_AND_ACTIVE: 'available_and_active',
+})
+
+export const HOME_MODE = Object.freeze({
+  CASH_LOAN: 'cash_loan',
+  MULTI_PUSH: 'multi_push',
 })
 
 export const OPERATION_TYPE = Object.freeze({

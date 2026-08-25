@@ -1,4 +1,4 @@
-import { BROADCAST_INTERVAL_MS, OPERATION_TYPE, PAGE_STATUS } from './constants.js'
+import { BROADCAST_INTERVAL_MS, HOME_MODE, OPERATION_TYPE, PAGE_STATUS } from './constants.js'
 import { assertPageLoadingPort, createNoopPageLoadingAdapter } from './pageLoadingPort.js'
 import { cloneValue, validateHomeOperation, validateHomeViewPayload } from './validation.js'
 
@@ -25,7 +25,9 @@ function createInitialState() {
     sourceOperationId: null,
     pageStatus: 'idle',
     viewMode: null,
+    homeMode: null,
     viewData: null,
+    multiPushViewData: null,
     errorData: null,
     diagnosticCode: null,
     broadcastIndex: 0,
@@ -36,7 +38,7 @@ function createInitialState() {
   }
 }
 
-function createDiagnostic(code, issues = []) {
+  function createDiagnostic(code, issues = []) {
   return Object.freeze({ code, issues: issues.map((issue) => ({ ...issue })) })
 }
 
@@ -53,6 +55,15 @@ export function createHomeController(options = {}) {
     throw new TypeError('clock must provide setInterval() and clearInterval() methods')
   }
 
+  function getMultiPushViewMode(viewData) {
+    if (!viewData) return null
+    if (viewData.availableProductCount > 0 && viewData.activeLoanCount > 0) return 'available_and_active'
+    if (viewData.availableProductCount > 0) return 'available_only'
+    if (viewData.activeLoanCount > 0) return 'active_only'
+    if (viewData.allProcessing) return 'processing_only'
+    return null
+  }
+
   let state = createInitialState()
   let lastViewMode = null
   let activeLoadingRequestId = null
@@ -62,6 +73,7 @@ export function createHomeController(options = {}) {
   const listeners = new Set()
   const modelRequestIds = new Set()
   const operationRequestIds = new Set()
+  const pendingOperationIds = new Set()
 
   function getState() {
     return cloneValue(state)
@@ -115,8 +127,8 @@ export function createHomeController(options = {}) {
     loadingPort.hide(requestId)
   }
 
-  function enterInvalidModelState(issues) {
-    hideLoading()
+  function enterInvalidModelState(issues, requestId = state.requestId ?? `invalid-${Date.now()}`) {
+    if (activeLoadingRequestId === null) showLoading(requestId)
     stopBroadcast()
     state = {
       ...state,
@@ -125,6 +137,8 @@ export function createHomeController(options = {}) {
       pageStatus: PAGE_STATUS.ERROR,
       viewMode: lastViewMode,
       viewData: null,
+      homeMode: null,
+      multiPushViewData: null,
       errorData: null,
       diagnosticCode: 'INVALID_HOME_VIEW',
       broadcastIndex: 0,
@@ -135,6 +149,7 @@ export function createHomeController(options = {}) {
 
   function settlePendingOperations(payload) {
     const isTerminal = payload.pageStatus === PAGE_STATUS.CONTENT || payload.pageStatus === PAGE_STATUS.ERROR
+    if (payload.sourceOperationId && isTerminal) pendingOperationIds.delete(payload.sourceOperationId)
     if (payload.sourceOperationId === refreshOperationId && isTerminal) refreshOperationId = null
     if (payload.sourceOperationId === retryOperationId) retryOperationId = null
   }
@@ -150,15 +165,21 @@ export function createHomeController(options = {}) {
       issues.push({ path: 'payload.requestId', code: 'duplicate_request_id' })
     }
     if (issues.length > 0) {
-      enterInvalidModelState(issues)
+      enterInvalidModelState(issues, payload?.requestId)
+      return
+    }
+
+    if (payload.sourceOperationId && !pendingOperationIds.has(payload.sourceOperationId)) {
+      report('STALE_HOME_VIEW', [{ path: 'payload.sourceOperationId', code: 'operation_not_pending' }])
       return
     }
 
     modelRequestIds.add(payload.requestId)
     settlePendingOperations(payload)
     if (payload.viewMode) lastViewMode = payload.viewMode
+    if (payload.multiPushViewData) lastViewMode = getMultiPushViewMode(payload.multiPushViewData)
 
-    if (payload.pageStatus === PAGE_STATUS.LOADING) showLoading(payload.requestId)
+    if (payload.pageStatus === PAGE_STATUS.LOADING || payload.pageStatus === PAGE_STATUS.ERROR) showLoading(payload.requestId)
     else hideLoading()
 
     state = {
@@ -167,7 +188,9 @@ export function createHomeController(options = {}) {
       sourceOperationId: payload.sourceOperationId ?? null,
       pageStatus: payload.pageStatus,
       viewMode: payload.viewMode ?? lastViewMode,
+      homeMode: payload.homeMode ?? (payload.multiPushViewData ? HOME_MODE.MULTI_PUSH : HOME_MODE.CASH_LOAN),
       viewData: payload.viewData ? cloneValue(payload.viewData) : null,
+      multiPushViewData: payload.multiPushViewData ? cloneValue(payload.multiPushViewData) : null,
       errorData: payload.errorData ? cloneValue(payload.errorData) : null,
       diagnosticCode: null,
       broadcastIndex: 0,
@@ -189,8 +212,11 @@ export function createHomeController(options = {}) {
     if (operation.type === OPERATION_TYPE.SELECT_AMOUNT) return optionIsEnabled('amount', operation.data.amountKey)
     if (operation.type === OPERATION_TYPE.SELECT_TERM) return optionIsEnabled('term', operation.data.termKey)
     if (operation.type === OPERATION_TYPE.PRIMARY_ACTION) {
-      const action = state.viewData?.primaryAction
+      const action = state.homeMode === HOME_MODE.MULTI_PUSH
+        ? { enabled: state.multiPushViewData?.primaryAction !== 'processing', loading: false }
+        : state.viewData?.primaryAction
       if (!action?.enabled || action.loading) return false
+      if (state.homeMode === HOME_MODE.MULTI_PUSH) return operation.data === undefined
       const selection = state.viewData?.productSelection
       if (!selection) return operation.data === undefined
       return operation.data?.amountKey === selection.selectedAmountKey
@@ -223,6 +249,7 @@ export function createHomeController(options = {}) {
     if (operation.type === OPERATION_TYPE.RETRY && retryOperationId !== null) return
 
     operationRequestIds.add(operation.requestId)
+    pendingOperationIds.add(operation.requestId)
     if (operation.type === OPERATION_TYPE.REFRESH) refreshOperationId = operation.requestId
     if (operation.type === OPERATION_TYPE.RETRY) retryOperationId = operation.requestId
     state = {
@@ -289,6 +316,7 @@ export function createHomeController(options = {}) {
     stopBroadcast()
     refreshOperationId = null
     retryOperationId = null
+    pendingOperationIds.clear()
     state = { ...state, isVisible: false, isRefreshPending: false, isRetryPending: false }
     notify()
   }
@@ -314,6 +342,7 @@ export function createHomeController(options = {}) {
     stopBroadcast()
     refreshOperationId = null
     retryOperationId = null
+    pendingOperationIds.clear()
     state = {
       ...state,
       isVisible: false,

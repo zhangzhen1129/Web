@@ -5,6 +5,12 @@ import { createNetworkDiagnostics } from './diagnostics.js'
 import { createNetworkError, isNetworkError, NETWORK_ERROR_CATEGORY } from './errors.js'
 
 const SENSITIVE_PARAM_NAME = /(token|authorization|auth|password|captcha|phone|mobile|identity|card|device)/i
+const CONTROLLED_CREDENTIAL_HEADERS = Object.freeze([
+  'authorization',
+  'proxy-authorization',
+  'cookie',
+  'x-api-key',
+])
 
 function createAxiosTransport(adapter) {
   return axios.create({ adapter })
@@ -18,14 +24,25 @@ function validateRequestConfig(config) {
   if (typeof config.method !== 'string' || !config.method) {
     throw createNetworkError({ category: NETWORK_ERROR_CATEGORY.CONFIGURATION, message: 'Request method is required.' })
   }
-  if (typeof config.url !== 'string' || !config.url.startsWith('/') || config.url.includes('?')) {
-    throw createNetworkError({ category: NETWORK_ERROR_CATEGORY.CONFIGURATION, message: 'Request path must be a relative path without an inline query string.' })
+  if (
+    typeof config.url !== 'string'
+    || !config.url.startsWith('/')
+    || config.url.startsWith('//')
+    || config.url.includes('\\')
+    || config.url.includes('?')
+    || config.url.includes('#')
+  ) {
+    throw createNetworkError({ category: NETWORK_ERROR_CATEGORY.CONFIGURATION, message: 'Request path must be a safe relative path without an authority, query string, or fragment.' })
   }
   if (!config.protocolId || typeof config.protocolId !== 'string') {
     throw createNetworkError({ category: NETWORK_ERROR_CATEGORY.CONFIGURATION, message: 'A protocol identifier is required for every service request.' })
   }
   if (config.params && Object.keys(config.params).some((name) => SENSITIVE_PARAM_NAME.test(name))) {
     throw createNetworkError({ category: NETWORK_ERROR_CATEGORY.CONFIGURATION, message: 'Sensitive values must not be sent in request query parameters.' })
+  }
+  const callerHeaders = axios.AxiosHeaders.from(config.headers)
+  if (CONTROLLED_CREDENTIAL_HEADERS.some((name) => callerHeaders.has(name))) {
+    throw createNetworkError({ category: NETWORK_ERROR_CATEGORY.CONFIGURATION, message: 'Credential headers must come from the controlled credential provider.' })
   }
   if (config.requestedTimeout !== undefined && (!Number.isInteger(config.requestedTimeout) || config.requestedTimeout <= 0)) {
     throw createNetworkError({ category: NETWORK_ERROR_CATEGORY.CONFIGURATION, message: 'Request timeout must be a positive integer.' })
@@ -82,12 +99,12 @@ export function createNetworkClient({
   transport.interceptors.request.use(async (config) => {
     const request = { ...config, protocolId: config.protocolId ?? config.meta?.protocolId }
     validateRequestConfig(request)
-    const settings = validateNetworkSettings(await resolveSettings())
+    const settings = validateNetworkSettings(await resolveSettings(), request.requestedTimeout)
     const credentialHeaders = await credentialHeaderProvider({ protocolId: request.protocolId, path: request.url, method: request.method })
     const headers = axios.AxiosHeaders.from(request.headers)
     headers.set(credentialHeaders)
     request.baseURL = settings.baseUrl
-    request.timeout = request.requestedTimeout ?? settings.timeoutMs
+    request.timeout = settings.timeoutMs
     request.headers = headers
     diagnostics.record({ type: 'request', protocolId: request.protocolId, method: request.method.toUpperCase(), path: request.url })
     return request

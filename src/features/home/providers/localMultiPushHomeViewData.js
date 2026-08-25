@@ -1,4 +1,4 @@
-export const MULTI_PUSH_APP_MODE = 'MULTI_PUSH'
+export const MULTI_PUSH_APP_MODE = 'multi_push'
 
 const broadcast = Object.freeze({
   items: Object.freeze([
@@ -31,7 +31,7 @@ const scenarios = Object.freeze({
     usedCredit: '0',
     locked: false,
     primaryButtonText: 'Aplicar ahora',
-    primaryAction: 'APPLY',
+    primaryAction: 'apply',
     statusDescription: '',
     products: Object.freeze([product]),
   }),
@@ -45,7 +45,7 @@ const scenarios = Object.freeze({
     usedCredit: '0',
     locked: false,
     primaryButtonText: 'Ir a reembolsar',
-    primaryAction: 'REPAY',
+    primaryAction: 'repay',
     statusDescription: 'Demasiados préstamos ahora. Por favor, pagar primero y desbloquear una mayor cantidad del préstamo.',
     products: Object.freeze([]),
   }),
@@ -59,7 +59,7 @@ const scenarios = Object.freeze({
     usedCredit: '0',
     locked: false,
     primaryButtonText: 'Evaluando',
-    primaryAction: 'PROCESSING',
+    primaryAction: 'processing',
     statusDescription: '',
     products: Object.freeze([]),
   }),
@@ -73,14 +73,22 @@ const scenarios = Object.freeze({
     usedCredit: '0',
     locked: false,
     primaryButtonText: 'Aplicar ahora',
-    primaryAction: 'APPLY',
+    primaryAction: 'apply',
     statusDescription: '',
     products: Object.freeze([product]),
   }),
 })
 
+function createTabs() {
+  return [
+    { key: 'home', text: 'Préstamos', iconResourceKey: 'home', active: true, enabled: true },
+    { key: 'account', text: 'Mi cuenta', iconResourceKey: 'account', active: false, enabled: true },
+  ]
+}
+
 export function createLocalMultiPushHomeViewData(scenario) {
-  return scenarios[scenario] ?? scenarios['multi-available-only']
+  const data = scenarios[scenario] ?? scenarios['multi-available-only']
+  return { ...data, tabs: createTabs(), products: data.products.map((item) => ({ ...item })) }
 }
 
 export function getMultiPushHomeState(data) {
@@ -94,6 +102,17 @@ export function getMultiPushHomeState(data) {
   if (data.availableProductCount === 0 && data.activeLoanCount === 0 && data.allProcessing === true) return 'processing'
   if (data.availableProductCount > 0 && data.activeLoanCount > 0) return 'available-active'
   return 'invalid'
+}
+
+export function createMultiPushContentPayload(scenario, requestId, sourceOperationId) {
+  const viewData = createLocalMultiPushHomeViewData(scenario)
+  return {
+    requestId,
+    ...(sourceOperationId ? { sourceOperationId } : {}),
+    pageStatus: 'content',
+    homeMode: MULTI_PUSH_APP_MODE,
+    multiPushViewData: viewData,
+  }
 }
 
 export const localMultiPushScenarios = Object.freeze(Object.keys(scenarios))

@@ -10,7 +10,7 @@ export const NETWORK_ERROR_CATEGORY = Object.freeze({
   INVALID_RESPONSE: 'invalid_response',
 })
 
-const SENSITIVE_VALUE_PATTERN = /((?:bearer|token|authorization|cookie)\s*[:=]?\s*)[^\s,;]+/gi
+const SENSITIVE_VALUE_PATTERN = /((?:bearer|token|authorization|proxy-authorization|cookie|x-api-key|password|captcha|phone|mobile|identity|card|device)\s*[:=]?\s*)[^\s,;]+/gi
 const MAX_SUMMARY_LENGTH = 180
 
 function summarizeError(value) {

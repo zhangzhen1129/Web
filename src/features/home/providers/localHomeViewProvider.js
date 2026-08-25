@@ -7,6 +7,7 @@ import {
   localViewModes,
   modeHasProductSelection,
 } from './localHomeViewData.js'
+import { createMultiPushContentPayload, createLocalMultiPushHomeViewData, getMultiPushHomeState } from './localMultiPushHomeViewData.js'
 
 const SPECIAL_MODES = new Set(['loading', 'error'])
 const INITIAL_LOADING_DELAY_MS = 800
@@ -18,7 +19,7 @@ export function createLocalHomeViewProvider(controller, options = {}) {
 
   const schedule = options.schedule ?? ((callback, delay) => window.setTimeout(callback, delay))
   const clearSchedule = options.clearSchedule ?? ((timerId) => window.clearTimeout(timerId))
-  const initialMode = localViewModes.includes(options.initialMode) || SPECIAL_MODES.has(options.initialMode)
+  const initialMode = localViewModes.includes(options.initialMode) || SPECIAL_MODES.has(options.initialMode) || options.initialMode === 'multi_push'
     ? options.initialMode
     : 'apply'
   const showInitialLoading = options.initialLoading !== false && !SPECIAL_MODES.has(initialMode)
@@ -37,6 +38,16 @@ export function createLocalHomeViewProvider(controller, options = {}) {
   }
 
   function pushView(sourceOperationId, pageStatus = 'content') {
+    if (currentMode === 'multi_push') {
+      const multiData = options.multiPushData ?? createLocalMultiPushHomeViewData()
+      controller.updateHomeView({
+        ...createMultiPushContentPayload(options.multiPushScenario, createRequestId('multi'), sourceOperationId),
+        pageStatus,
+        multiPushViewData: multiData,
+        viewMode: getMultiPushHomeState(multiData).replace(/-/g, '_'),
+      })
+      return
+    }
     if (currentMode === 'loading') {
       controller.updateHomeView(createLocalLoadingPayload(createRequestId('loading')))
       return
@@ -60,6 +71,10 @@ export function createLocalHomeViewProvider(controller, options = {}) {
   }
 
   function handleOperation(operation) {
+    if (currentMode === 'multi_push') {
+      if (operation.type === 'refresh') beginLoading(operation.requestId)
+      return
+    }
     if (operation.type === 'select_amount' && modeHasProductSelection(currentMode)) {
       selections.get(currentMode).selectedAmountKey = operation.data.amountKey
       pushView(operation.requestId)
@@ -104,11 +119,20 @@ export function createLocalHomeViewProvider(controller, options = {}) {
     initialLoadingTimerId = null
   }
 
+  function setHomeMode(mode) {
+    if (isDestroyed) return false
+    const nextMode = mode === 'multi_push' ? 'multi_push' : (localViewModes.includes(mode) ? mode : 'apply')
+    currentMode = nextMode
+    pushView()
+    return true
+  }
+
   return Object.freeze({
     start,
     reload,
     getMode: () => currentMode,
     setMode,
+    setHomeMode,
     handleOperation,
     destroy,
   })

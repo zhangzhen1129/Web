@@ -165,6 +165,27 @@ test('contains storage, serialization, and quota failures within the cache bound
   assert.equal(remove('feature:entry'), false)
 })
 
+test('contains key enumeration and bulk removal failures', () => {
+  const enumerationFailure = new MemoryStorage()
+  Object.defineProperty(enumerationFailure, 'length', {
+    get() {
+      throw new Error('enumeration denied')
+    },
+  })
+  useStorage(enumerationFailure)
+  assert.equal(clearFeature('feature'), false)
+  assert.equal(clearAll(), false)
+
+  const removalFailure = new MemoryStorage()
+  removalFailure.setItem(cacheKey('feature:entry'), 'value')
+  removalFailure.removeItem = () => {
+    throw new Error('bulk removal denied')
+  }
+  useStorage(removalFailure)
+  assert.equal(clearFeature('feature'), false)
+  assert.equal(clearAll(), false)
+})
+
 test('rejects invalid logical keys and cache options without touching storage', () => {
   const storage = new MemoryStorage()
   useStorage(storage)

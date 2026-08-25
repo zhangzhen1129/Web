@@ -12,6 +12,10 @@ body,
   min-height: 100%;
 }
 
+:root {
+  --app-safe-area-top: 1.17949rem;
+}
+
 html,
 body {
   overflow-x: hidden;
@@ -50,6 +54,15 @@ body {
   height: 0;
 }
 
+.safe-area-probe {
+  position: fixed;
+  width: 0;
+  height: 0;
+  padding-top: env(safe-area-inset-top, 0px);
+  visibility: hidden;
+  pointer-events: none;
+}
+
 button {
   font: inherit;
 }
@@ -64,6 +77,7 @@ button {
 .main-tab-shell__viewport {
   width: 100%;
   min-height: 100%;
+  padding-top: var(--app-safe-area-top);
   overflow: visible;
 }
 
@@ -82,4 +96,29 @@ button {
   margin: 0;
   font-size: .51282rem;
   line-height: .76923rem;
+}
+.runtime-recovery {
+  display: grid;
+  min-height: 100dvh;
+  place-content: center;
+  justify-items: center;
+  gap: 0.32rem;
+  padding: 0.48rem;
+  color: #202124;
+  text-align: center;
+}
+
+.runtime-recovery__message {
+  margin: 0;
+  font-size: 0.32rem;
+}
+
+.runtime-recovery__button {
+  min-width: 2.4rem;
+  min-height: 0.88rem;
+  border: 0;
+  border-radius: 0.16rem;
+  background: #111827;
+  color: #fff;
+  font: inherit;
 }

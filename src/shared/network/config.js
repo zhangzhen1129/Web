@@ -1,20 +1,28 @@
 import { createNetworkError, NETWORK_ERROR_CATEGORY } from './errors.js'
+import { useGlobalStore } from '../globalStore/globalStore.js'
 
-const BASE_URL_KEY = 'VITE_API_BASE_URL'
 const TIMEOUT_KEY = 'VITE_API_TIMEOUT_MS'
 
-export function readNetworkSettings(environment = import.meta.env) {
+function readApiHostFromGlobalStore() {
+  try {
+    return useGlobalStore().apiHost || ''
+  } catch {
+    return ''
+  }
+}
+
+export function readNetworkSettings(environment = import.meta.env, readApiHost = readApiHostFromGlobalStore) {
   return {
-    baseUrl: environment?.[BASE_URL_KEY]?.trim() || '',
+    baseUrl: readApiHost(),
     timeoutMs: Number(environment?.[TIMEOUT_KEY]),
   }
 }
 
-export function validateNetworkSettings(settings) {
+export function validateNetworkSettings(settings, requestedTimeout) {
   if (!settings?.baseUrl) {
     throw createNetworkError({
       category: NETWORK_ERROR_CATEGORY.CONFIGURATION,
-      message: `${BASE_URL_KEY} is required before a service request can be sent.`,
+      message: 'globalStore.apiHost is required before a service request can be sent.',
     })
   }
 
@@ -24,7 +32,7 @@ export function validateNetworkSettings(settings) {
   } catch {
     throw createNetworkError({
       category: NETWORK_ERROR_CATEGORY.CONFIGURATION,
-      message: `${BASE_URL_KEY} must be an absolute URL.`,
+      message: 'globalStore.apiHost must be an absolute URL.',
     })
   }
 
@@ -37,7 +45,8 @@ export function validateNetworkSettings(settings) {
     })
   }
 
-  if (!Number.isInteger(settings.timeoutMs) || settings.timeoutMs <= 0) {
+  const timeoutMs = requestedTimeout ?? settings.timeoutMs
+  if (!Number.isInteger(timeoutMs) || timeoutMs <= 0) {
     throw createNetworkError({
       category: NETWORK_ERROR_CATEGORY.CONFIGURATION,
       message: `${TIMEOUT_KEY} must be a positive integer supplied by controlled configuration.`,
@@ -46,6 +55,6 @@ export function validateNetworkSettings(settings) {
 
   return {
     baseUrl: parsedUrl.toString().replace(/\/$/, ''),
-    timeoutMs: settings.timeoutMs,
+    timeoutMs,
   }
 }

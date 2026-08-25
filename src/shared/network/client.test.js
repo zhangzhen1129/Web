@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import axios from 'axios'
+import { createPinia, setActivePinia } from 'pinia'
 import { createNetworkClient } from './client.js'
 import { createCredentialHeaderProvider } from './credentials.js'
 import { NETWORK_ERROR_CATEGORY } from './errors.js'
+import { useGlobalStore } from '../globalStore/globalStore.js'
 
 const settings = () => ({ baseUrl: 'https://api.example.test', timeoutMs: 2500 })
 
@@ -56,14 +58,40 @@ test('uses one interceptor pair, propagates service request fields, and never de
   ])
 })
 
-test('rejects missing controlled configuration, unsafe paths, sensitive query parameters, and zero timeout', async () => {
+test('rejects missing controlled configuration, unsafe paths, sensitive query parameters, caller credentials, and zero timeout', async () => {
   const noSettingsClient = createNetworkClient({ adapter: responseAdapter(), resolveSettings: () => ({ baseUrl: '', timeoutMs: 0 }) })
   await expectCategory(() => noSettingsClient.request({ method: 'get', path: '/health', protocolId: 'health.read' }), NETWORK_ERROR_CATEGORY.CONFIGURATION)
 
   const client = createTestClient()
   await expectCategory(() => client.request({ method: 'get', path: 'https://example.test/health', protocolId: 'health.read' }), NETWORK_ERROR_CATEGORY.CONFIGURATION)
+  await expectCategory(() => client.request({ method: 'get', path: '//evil.example/health', protocolId: 'health.read' }), NETWORK_ERROR_CATEGORY.CONFIGURATION)
+  await expectCategory(() => client.request({ method: 'get', path: '/health\\redirect', protocolId: 'health.read' }), NETWORK_ERROR_CATEGORY.CONFIGURATION)
+  await expectCategory(() => client.request({ method: 'get', path: '/health?token=secret', protocolId: 'health.read' }), NETWORK_ERROR_CATEGORY.CONFIGURATION)
+  await expectCategory(() => client.request({ method: 'get', path: '/health#fragment', protocolId: 'health.read' }), NETWORK_ERROR_CATEGORY.CONFIGURATION)
   await expectCategory(() => client.request({ method: 'get', path: '/health', params: { token: 'secret' }, protocolId: 'health.read' }), NETWORK_ERROR_CATEGORY.CONFIGURATION)
+  for (const headerName of ['Authorization', 'proxy-authorization', 'Cookie', 'X-Api-Key']) {
+    await expectCategory(() => client.request({ method: 'get', path: '/health', headers: { [headerName]: 'caller-secret' }, protocolId: 'health.read' }), NETWORK_ERROR_CATEGORY.CONFIGURATION)
+  }
   await expectCategory(() => client.request({ method: 'get', path: '/health', timeoutMs: 0, protocolId: 'health.read' }), NETWORK_ERROR_CATEGORY.CONFIGURATION)
+})
+
+test('reads apiHost dynamically from globalStore without an environment base URL', async () => {
+  setActivePinia(createPinia())
+  const store = useGlobalStore()
+  store.$patch({ apiHost: 'https://first.example.test' })
+  const baseUrls = []
+  const client = createNetworkClient({
+    adapter: async (config) => {
+      baseUrls.push(config.baseURL)
+      return { config, data: { ok: true }, headers: { 'content-type': 'application/json' }, request: {}, status: 200, statusText: 'OK' }
+    },
+  })
+
+  await client.request({ method: 'get', path: '/health', protocolId: 'health.read', timeoutMs: 1000 })
+  store.$patch({ apiHost: 'https://second.example.test' })
+  await client.request({ method: 'get', path: '/health', protocolId: 'health.read', timeoutMs: 1000 })
+
+  assert.deepEqual(baseUrls, ['https://first.example.test', 'https://second.example.test'])
 })
 
 test('classifies HTTP and authentication failures without automatic retry', async () => {
