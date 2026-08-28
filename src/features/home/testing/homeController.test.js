@@ -8,6 +8,7 @@ import {
   createHomeController,
   createNoopPageLoadingAdapter,
 } from '../index.js'
+import { createMultiPushContentPayload, createLocalMultiPushHomeViewData } from '../providers/localMultiPushHomeViewData.js'
 
 function createViewData(overrides = {}) {
   return {
@@ -59,6 +60,13 @@ function createCreditViewData() {
     usedLabelText: 'used label', usedText: 'used value', locked: false,
   }
   return viewData
+}
+
+function multiPushPayload(requestId, overrides = {}) {
+  return {
+    ...createMultiPushContentPayload('multi-available-only', requestId),
+    ...overrides,
+  }
 }
 
 function createRecordingLoadingPort() {
@@ -320,6 +328,59 @@ test('refresh keeps its pending operation through the associated skeleton and on
   assert.equal(controller.getState().isRefreshPending, false)
 })
 
+test('multi-push credit refresh is distinct, associated, and locked by pending state', () => {
+  const operations = []
+  const diagnostics = []
+  const controller = createHomeController({
+    onOperation: (operation) => operations.push(operation),
+    onDiagnostic: (diagnostic) => diagnostics.push(diagnostic),
+    createRequestId: createSequentialIdFactory(),
+  })
+  controller.updateHomeView(multiPushPayload('multi-model-1'))
+
+  assert.equal(controller.refreshCredit(), 'operation-1')
+  assert.equal(controller.refreshCredit(), 'operation-2')
+  assert.deepEqual(operations.map(({ type }) => type), [OPERATION_TYPE.REFRESH_CREDIT])
+  assert.equal(operations[0].data, undefined)
+  assert.equal(controller.getState().isCreditRefreshPending, true)
+
+  controller.updateHomeView({ requestId: 'multi-loading-1', sourceOperationId: 'operation-1', pageStatus: PAGE_STATUS.LOADING })
+  assert.equal(controller.getState().isCreditRefreshPending, true)
+  controller.updateHomeView(multiPushPayload('multi-model-2', { sourceOperationId: 'operation-1' }))
+  assert.equal(controller.getState().isCreditRefreshPending, false)
+
+  controller.updateHomeView(createMultiPushContentPayload('multi-active-only', 'multi-model-active'))
+  controller.refreshCredit()
+  assert.equal(operations.length, 1)
+
+  const lockedData = createLocalMultiPushHomeViewData('multi-available-only')
+  lockedData.locked = true
+  controller.updateHomeView(multiPushPayload('multi-model-3', { multiPushViewData: lockedData }))
+  controller.refreshCredit()
+  assert.equal(operations.length, 1)
+  assert.equal(diagnostics.at(-1).issues[0].code, 'operation_not_available')
+  controller.destroy()
+})
+
+test('cash-loan credit summary can opt into the same refresh operation without selectors', () => {
+  const operations = []
+  const controller = createHomeController({
+    onOperation: (operation) => operations.push(operation),
+    createRequestId: createSequentialIdFactory(),
+  })
+  const viewData = createCreditViewData()
+  viewData.creditSummary.refreshEnabled = true
+  viewData.creditSummary.refreshLabelText = 'Actualizar crédito'
+  controller.updateHomeView(contentPayload('cash-credit-1', { viewData }))
+
+  assert.equal(controller.refreshCredit(), 'operation-1')
+  assert.equal(operations[0].type, OPERATION_TYPE.REFRESH_CREDIT)
+  assert.equal(controller.getState().isCreditRefreshPending, true)
+  controller.updateHomeView(contentPayload('cash-credit-2', { sourceOperationId: 'operation-1', viewData }))
+  assert.equal(controller.getState().isCreditRefreshPending, false)
+  controller.destroy()
+})
+
 test('retry remains locked until a matching update and lifecycle cleanup cancels pending state', () => {
   const operations = []
   const controller = createHomeController({
@@ -377,6 +438,23 @@ test('broadcast uses one manageable two-second timer and cleans it on hide and d
   assert.equal(clock.activeCount(), 1)
   controller.updateHomeView(contentPayload('model-2'))
   assert.equal(clock.activeCount(), 0)
+  controller.destroy()
+  assert.equal(clock.activeCount(), 0)
+})
+
+test('multi-push broadcast rotates from multi-push view data', () => {
+  const clock = createManualClock()
+  const multiPushData = createLocalMultiPushHomeViewData('multi-available-only')
+  multiPushData.broadcast = { items: [
+    { key: 'multi-a', text: 'message a' },
+    { key: 'multi-b', text: 'message b' },
+  ] }
+  const controller = createHomeController({ clock })
+  controller.updateHomeView(multiPushPayload('multi-broadcast-1', { multiPushViewData: multiPushData }))
+
+  assert.equal(clock.activeCount(), 1)
+  clock.tick()
+  assert.equal(controller.getState().broadcastIndex, 1)
   controller.destroy()
   assert.equal(clock.activeCount(), 0)
 })

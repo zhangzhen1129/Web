@@ -8,6 +8,8 @@ import {
   GLOBAL_APP_INFO_CACHE_VERSION,
   GLOBAL_TOKEN_CACHE_KEY,
   GLOBAL_TOKEN_CACHE_VERSION,
+  GLOBAL_THIRD_PARTY_SDK_CACHE_KEYS,
+  GLOBAL_THIRD_PARTY_SDK_CACHE_VERSION,
   useGlobalStore,
 } from './globalStore.js'
 
@@ -39,18 +41,29 @@ test('updates and hydrates authorized global fields through the cache adapter', 
     androidId: 'redacted-android-id',
   }
   assert.equal(store.setGlobal(appInfo), true)
+  const sdkIdentifiers = {
+    afId: 'redacted-apps-flyer-id',
+    fbId: 'redacted-firebase-id',
+    gaId: 'redacted-advertising-id',
+  }
+  assert.equal(store.setGlobal(sdkIdentifiers), true)
   assert.equal(store.token, 'redacted-token')
   assert.equal(store.apiHost, 'https://api.example.test')
   assert.deepEqual(Object.fromEntries(Object.keys(appInfo).map((field) => [field, store[field]])), appInfo)
+  assert.deepEqual(Object.fromEntries(Object.keys(sdkIdentifiers).map((field) => [field, store[field]])), sdkIdentifiers)
   assert.deepEqual(JSON.parse(window.localStorage.getItem('DineroPro:global:token')), { version: GLOBAL_TOKEN_CACHE_VERSION, value: 'redacted-token' })
   assert.deepEqual(JSON.parse(window.localStorage.getItem('DineroPro:global:api-host')), { version: GLOBAL_API_HOST_CACHE_VERSION, value: 'https://api.example.test' })
   for (const [field, key] of Object.entries(GLOBAL_APP_INFO_CACHE_KEYS)) {
     assert.deepEqual(JSON.parse(window.localStorage.getItem(`DineroPro:${key}`)), { version: GLOBAL_APP_INFO_CACHE_VERSION, value: appInfo[field] })
   }
+  for (const [field, key] of Object.entries(GLOBAL_THIRD_PARTY_SDK_CACHE_KEYS)) {
+    assert.deepEqual(JSON.parse(window.localStorage.getItem(`DineroPro:${key}`)), { version: GLOBAL_THIRD_PARTY_SDK_CACHE_VERSION, value: sdkIdentifiers[field] })
+  }
   store.$reset()
   assert.equal(store.hydrateGlobal(), 'redacted-token')
   assert.equal(store.apiHost, 'https://api.example.test')
   assert.deepEqual(Object.fromEntries(Object.keys(appInfo).map((field) => [field, store[field]])), appInfo)
+  assert.deepEqual(Object.fromEntries(Object.keys(sdkIdentifiers).map((field) => [field, store[field]])), sdkIdentifiers)
   assert.equal(GLOBAL_TOKEN_CACHE_KEY, 'global:token')
   assert.equal(GLOBAL_API_HOST_CACHE_KEY, 'global:api-host')
 })
@@ -59,6 +72,8 @@ test('rejects unknown, unresolved, and invalid authorized fields', () => {
   const store = useGlobalStore()
   assert.equal(store.setGlobal({ unknown: true }), false)
   assert.equal(store.setGlobal({ userId: 'unconfirmed-user' }), false)
+  assert.equal(store.setGlobal({ afId: '' }), false)
+  assert.equal(store.setGlobal({ fbId: 123 }), false)
   assert.equal(store.setGlobal({ appVersionName: '' }), false)
   assert.equal(store.setGlobal({ token: '' }), false)
   assert.equal(store.setGlobal({ apiHost: 'http://api.example.test' }), false)
@@ -108,6 +123,9 @@ test('clearGlobal removes every authorized cache entry and resets every field', 
     appVersion: '42',
     appVersionName: '1.2.0',
     androidId: 'redacted-android-id',
+    afId: 'redacted-apps-flyer-id',
+    fbId: 'redacted-firebase-id',
+    gaId: 'redacted-advertising-id',
   }), true)
   assert.equal(store.clearGlobal(), true)
   assert.equal(store.token, null)
@@ -115,4 +133,5 @@ test('clearGlobal removes every authorized cache entry and resets every field', 
   assert.equal(window.localStorage.getItem('DineroPro:global:token'), null)
   assert.equal(window.localStorage.getItem('DineroPro:global:api-host'), null)
   for (const key of Object.values(GLOBAL_APP_INFO_CACHE_KEYS)) assert.equal(window.localStorage.getItem(`DineroPro:${key}`), null)
+  for (const key of Object.values(GLOBAL_THIRD_PARTY_SDK_CACHE_KEYS)) assert.equal(window.localStorage.getItem(`DineroPro:${key}`), null)
 })

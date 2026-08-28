@@ -71,7 +71,7 @@ const modes = {
     statusNotice: { text: 'Devuelve el dinero a tiempo y desbloquea un préstamo de mayor cuantía', tone: 'warning' },
     primaryAction: { text: 'Ir a reembolsar', enabled: true, loading: false },
   },
-  rejected: { primaryAction: { text: 'Rechazado', enabled: false, loading: false } },
+  rejected: { primaryAction: { text: 'Rechazado', enabled: true, loading: false } },
 }
 
 export function modeHasProductSelection(viewMode) {

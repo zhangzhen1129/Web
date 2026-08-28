@@ -3,6 +3,7 @@ import test from 'node:test'
 
 import { createHomeController } from '../index.js'
 import { createLocalHomeViewProvider } from '../providers/localHomeViewProvider.js'
+import { createLocalMultiPushHomeViewData } from '../providers/localMultiPushHomeViewData.js'
 import {
   AMOUNT_MAXIMUM,
   AMOUNT_MINIMUM,
@@ -117,6 +118,60 @@ test('local provider switches pull refresh from content to an associated skeleto
   controller.destroy()
 })
 
+test('multi-push loading keeps its mode while returning to the cached home tab', () => {
+  const scheduledCallbacks = []
+  const controller = createHomeController()
+  const provider = createLocalHomeViewProvider(controller, {
+    initialMode: 'multi_push',
+    schedule(callback) {
+      scheduledCallbacks.push(callback)
+      return scheduledCallbacks.length
+    },
+    clearSchedule() {},
+  })
+
+  provider.start()
+  scheduledCallbacks[0]()
+  assert.equal(controller.getState().homeMode, 'multi_push')
+
+  provider.reload()
+  assert.equal(controller.getState().pageStatus, 'loading')
+  assert.equal(controller.getState().homeMode, 'multi_push')
+
+  provider.destroy()
+  controller.destroy()
+})
+
+test('local provider reloads multi-push credit data for the dedicated refresh operation', () => {
+  const scheduledCallbacks = []
+  let provider
+  const controller = createHomeController({
+    onOperation(operation) { provider.handleOperation(operation) },
+  })
+  provider = createLocalHomeViewProvider(controller, {
+    initialMode: 'multi_push',
+    initialLoading: false,
+    schedule(callback) {
+      scheduledCallbacks.push(callback)
+      return scheduledCallbacks.length
+    },
+    clearSchedule() {},
+  })
+
+  provider.start()
+  assert.equal(controller.getState().pageStatus, 'content')
+  const refreshOperationId = controller.refreshCredit()
+  assert.equal(controller.getState().pageStatus, 'loading')
+  assert.equal(controller.getState().sourceOperationId, refreshOperationId)
+  assert.equal(controller.getState().homeMode, 'multi_push')
+  scheduledCallbacks[0]()
+  assert.equal(controller.getState().pageStatus, 'content')
+  assert.equal(controller.getState().isCreditRefreshPending, false)
+
+  provider.destroy()
+  controller.destroy()
+})
+
 test('local provider reflects amount steps and term selection through new view models', () => {
   const operations = []
   let provider
@@ -169,6 +224,76 @@ test('local provider keeps product selections isolated by view mode', () => {
   assert.equal(provider.setMode('apply'), true)
   assert.equal(controller.getState().viewData.productSelection.selectedAmountKey, 'amount-1200')
   assert.equal(controller.getState().viewData.productSelection.selectedTermKey, 'term-120')
+
+  controller.destroy()
+})
+
+test('rejected status stays quiet until a successful primary action permission flow', async () => {
+  let provider
+  let resolvePermission
+  const controller = createHomeController({ onOperation: (operation) => provider.handleOperation(operation) })
+  provider = createLocalHomeViewProvider(controller, {
+    initialMode: 'rejected',
+    initialLoading: false,
+    schedule: () => 0,
+    permissionFlow: () => new Promise((resolve) => { resolvePermission = resolve }),
+  })
+
+  provider.start()
+  assert.equal(controller.getState().overlayNotice, null)
+  controller.primaryAction()
+  assert.equal(controller.getState().overlayNotice, null)
+  resolvePermission(true)
+  await Promise.resolve()
+  await Promise.resolve()
+  assert.deepEqual(controller.getState().overlayNotice, {
+    noticeId: 'local-home-notice-1',
+    messageId: '10',
+    text: 'No hay productos disponibles. Inténtalo mañana.',
+  })
+
+  provider.destroy()
+  controller.destroy()
+})
+
+test('multi-push provider enforces minimum selection and submits ordered unique ids', () => {
+  const operations = []
+  let provider
+  const controller = createHomeController({ onOperation: (operation) => {
+    operations.push(operation)
+    provider.handleOperation(operation)
+  } })
+  const base = createLocalMultiPushHomeViewData('multi-available-only')
+  const multiPushData = {
+    ...base,
+    availableProductCount: 2,
+    products: base.products.slice(0, 2).map((item, index) => ({
+      ...item,
+      id: `product-${String(index + 1).padStart(3, '0')}`,
+      name: index === 0 ? item.name : 'Segunda solución',
+      selected: true,
+    })),
+    selectedProductCount: 2,
+    selectedMinimumAmount: 'S/ 200',
+    availableAmount: 'S/ 200',
+  }
+  provider = createLocalHomeViewProvider(controller, {
+    initialMode: 'multi_push',
+    initialLoading: false,
+    multiPushData,
+  })
+  provider.start()
+
+  controller.toggleProductSelection('product-001', false)
+  assert.equal(controller.getState().multiPushViewData.selectedProductCount, 1)
+  controller.toggleProductSelection('product-002', false)
+  assert.equal(controller.getState().multiPushViewData.selectedProductCount, 1)
+  assert.equal(operations.filter(({ type }) => type === 'toggle_product_selection').length, 1)
+
+  controller.toggleProductSelection('product-001', true)
+  controller.submitSelectedProducts(['product-001', 'product-002', 'product-001'])
+  assert.equal(operations.at(-1).type, 'submit_selected_products')
+  assert.deepEqual(operations.at(-1).data.productIds, ['product-001', 'product-002'])
 
   controller.destroy()
 })

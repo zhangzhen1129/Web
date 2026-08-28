@@ -29,9 +29,11 @@ function createInitialState() {
     viewData: null,
     multiPushViewData: null,
     errorData: null,
+    overlayNotice: null,
     diagnosticCode: null,
     broadcastIndex: 0,
     isRefreshPending: false,
+    isCreditRefreshPending: false,
     isRetryPending: false,
     isVisible: true,
     isDestroyed: false,
@@ -68,6 +70,7 @@ export function createHomeController(options = {}) {
   let lastViewMode = null
   let activeLoadingRequestId = null
   let refreshOperationId = null
+  let creditRefreshOperationId = null
   let retryOperationId = null
   let broadcastTimerId = null
   const listeners = new Set()
@@ -96,7 +99,9 @@ export function createHomeController(options = {}) {
 
   function getBroadcastItems() {
     if (state.pageStatus !== PAGE_STATUS.CONTENT && state.pageStatus !== PAGE_STATUS.REFRESHING) return []
-    return state.viewData?.broadcast?.items ?? []
+    return state.homeMode === HOME_MODE.MULTI_PUSH
+      ? state.multiPushViewData?.broadcast?.items ?? []
+      : state.viewData?.broadcast?.items ?? []
   }
 
   function startBroadcast() {
@@ -140,6 +145,7 @@ export function createHomeController(options = {}) {
       homeMode: null,
       multiPushViewData: null,
       errorData: null,
+      overlayNotice: null,
       diagnosticCode: 'INVALID_HOME_VIEW',
       broadcastIndex: 0,
     }
@@ -151,6 +157,7 @@ export function createHomeController(options = {}) {
     const isTerminal = payload.pageStatus === PAGE_STATUS.CONTENT || payload.pageStatus === PAGE_STATUS.ERROR
     if (payload.sourceOperationId && isTerminal) pendingOperationIds.delete(payload.sourceOperationId)
     if (payload.sourceOperationId === refreshOperationId && isTerminal) refreshOperationId = null
+    if (payload.sourceOperationId === creditRefreshOperationId && isTerminal) creditRefreshOperationId = null
     if (payload.sourceOperationId === retryOperationId) retryOperationId = null
   }
 
@@ -188,13 +195,15 @@ export function createHomeController(options = {}) {
       sourceOperationId: payload.sourceOperationId ?? null,
       pageStatus: payload.pageStatus,
       viewMode: payload.viewMode ?? lastViewMode,
-      homeMode: payload.homeMode ?? (payload.multiPushViewData ? HOME_MODE.MULTI_PUSH : HOME_MODE.CASH_LOAN),
+      homeMode: payload.homeMode ?? state.homeMode ?? (payload.multiPushViewData ? HOME_MODE.MULTI_PUSH : HOME_MODE.CASH_LOAN),
       viewData: payload.viewData ? cloneValue(payload.viewData) : null,
       multiPushViewData: payload.multiPushViewData ? cloneValue(payload.multiPushViewData) : null,
       errorData: payload.errorData ? cloneValue(payload.errorData) : null,
+      overlayNotice: payload.overlayNotice ? cloneValue(payload.overlayNotice) : null,
       diagnosticCode: null,
       broadcastIndex: 0,
       isRefreshPending: refreshOperationId !== null,
+      isCreditRefreshPending: creditRefreshOperationId !== null,
       isRetryPending: retryOperationId !== null,
     }
     startBroadcast()
@@ -222,7 +231,33 @@ export function createHomeController(options = {}) {
       return operation.data?.amountKey === selection.selectedAmountKey
         && operation.data?.termKey === selection.selectedTermKey
     }
+    if (operation.type === OPERATION_TYPE.TOGGLE_PRODUCT_SELECTION) {
+      if (state.homeMode !== 'multi_push') return false
+      const product = state.multiPushViewData?.products?.find((item) => item.id === operation.data.productId)
+      if (!product?.selectable) return false
+      if (operation.data.selected === false) {
+        const selectedCount = state.multiPushViewData.products.filter((item) => item.selectable && item.selected).length
+        return selectedCount > (state.multiPushViewData.minimumSelectionCount ?? 1)
+      }
+      return product.selected !== true
+    }
+    if (operation.type === OPERATION_TYPE.SUBMIT_SELECTED_PRODUCTS) {
+      if (state.homeMode !== 'multi_push') return false
+      const products = state.multiPushViewData?.products ?? []
+      const selectedIds = products.filter((item) => item.selectable && item.selected).map((item) => item.id)
+      return selectedIds.length >= (state.multiPushViewData?.minimumSelectionCount ?? 1)
+        && JSON.stringify(selectedIds) === JSON.stringify(operation.data.productIds)
+    }
     if (operation.type === OPERATION_TYPE.REFRESH) return state.pageStatus === PAGE_STATUS.CONTENT
+    if (operation.type === OPERATION_TYPE.REFRESH_CREDIT) {
+      const multiPushAvailable = state.homeMode === HOME_MODE.MULTI_PUSH
+        && ['available_only', 'available_and_active'].includes(lastViewMode)
+        && state.multiPushViewData?.locked !== true
+      const cashLoanSummary = state.homeMode === HOME_MODE.CASH_LOAN
+        && state.viewData?.creditSummary?.refreshEnabled === true
+        && state.viewData.creditSummary.locked !== true
+      return state.pageStatus === PAGE_STATUS.CONTENT && (multiPushAvailable || cashLoanSummary)
+    }
     if (operation.type === OPERATION_TYPE.RETRY) return Boolean(state.errorData?.retryVisible)
     return false
   }
@@ -246,15 +281,18 @@ export function createHomeController(options = {}) {
     }
 
     if (operation.type === OPERATION_TYPE.REFRESH && refreshOperationId !== null) return
+    if (operation.type === OPERATION_TYPE.REFRESH_CREDIT && creditRefreshOperationId !== null) return
     if (operation.type === OPERATION_TYPE.RETRY && retryOperationId !== null) return
 
     operationRequestIds.add(operation.requestId)
     pendingOperationIds.add(operation.requestId)
     if (operation.type === OPERATION_TYPE.REFRESH) refreshOperationId = operation.requestId
+    if (operation.type === OPERATION_TYPE.REFRESH_CREDIT) creditRefreshOperationId = operation.requestId
     if (operation.type === OPERATION_TYPE.RETRY) retryOperationId = operation.requestId
     state = {
       ...state,
       isRefreshPending: refreshOperationId !== null,
+      isCreditRefreshPending: creditRefreshOperationId !== null,
       isRetryPending: retryOperationId !== null,
     }
     notify()
@@ -274,6 +312,10 @@ export function createHomeController(options = {}) {
     return makeOperation(OPERATION_TYPE.REFRESH)
   }
 
+  function refreshCredit() {
+    return makeOperation(OPERATION_TYPE.REFRESH_CREDIT)
+  }
+
   function primaryAction() {
     const selection = state.viewData?.productSelection
     const data = selection
@@ -288,6 +330,15 @@ export function createHomeController(options = {}) {
 
   function selectTerm(termKey) {
     return makeOperation(OPERATION_TYPE.SELECT_TERM, { termKey })
+  }
+
+  function toggleProductSelection(productId, selected) {
+    return makeOperation(OPERATION_TYPE.TOGGLE_PRODUCT_SELECTION, { productId, selected })
+  }
+
+  function submitSelectedProducts(productIds) {
+    const uniqueIds = Array.isArray(productIds) ? [...new Set(productIds)] : productIds
+    return makeOperation(OPERATION_TYPE.SUBMIT_SELECTED_PRODUCTS, { productIds: uniqueIds })
   }
 
   function selectAdjacentAmount(direction) {
@@ -315,9 +366,10 @@ export function createHomeController(options = {}) {
     hideLoading()
     stopBroadcast()
     refreshOperationId = null
+    creditRefreshOperationId = null
     retryOperationId = null
     pendingOperationIds.clear()
-    state = { ...state, isVisible: false, isRefreshPending: false, isRetryPending: false }
+    state = { ...state, isVisible: false, overlayNotice: null, isRefreshPending: false, isCreditRefreshPending: false, isRetryPending: false }
     notify()
   }
 
@@ -341,13 +393,16 @@ export function createHomeController(options = {}) {
     hideLoading()
     stopBroadcast()
     refreshOperationId = null
+    creditRefreshOperationId = null
     retryOperationId = null
     pendingOperationIds.clear()
     state = {
       ...state,
       isVisible: false,
       isDestroyed: true,
+      overlayNotice: null,
       isRefreshPending: false,
+      isCreditRefreshPending: false,
       isRetryPending: false,
     }
     listeners.clear()
@@ -359,9 +414,12 @@ export function createHomeController(options = {}) {
     updateHomeView,
     emitHomeOperation,
     refresh,
+    refreshCredit,
     primaryAction,
     selectAmount,
     selectTerm,
+    toggleProductSelection,
+    submitSelectedProducts,
     selectAdjacentAmount,
     retry,
     hide,

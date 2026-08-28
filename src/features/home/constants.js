@@ -22,12 +22,18 @@ export const HOME_MODE = Object.freeze({
   MULTI_PUSH: 'multi_push',
 })
 
-export const OPERATION_TYPE = Object.freeze({
+const operationTypes = {
   REFRESH: 'refresh',
   PRIMARY_ACTION: 'primary_action',
   SELECT_AMOUNT: 'select_amount',
   SELECT_TERM: 'select_term',
   RETRY: 'retry',
+}
+Object.defineProperties(operationTypes, {
+  REFRESH_CREDIT: { value: 'refresh_credit', enumerable: false },
+  TOGGLE_PRODUCT_SELECTION: { value: 'toggle_product_selection', enumerable: false },
+  SUBMIT_SELECTED_PRODUCTS: { value: 'submit_selected_products', enumerable: false },
 })
+export const OPERATION_TYPE = Object.freeze(operationTypes)
 
 export const BROADCAST_INTERVAL_MS = 2000

@@ -7,7 +7,6 @@ import { router } from './router/index.js'
 import { initializeVConsole } from './shared/diagnostics/vConsole.js'
 import { createRuntimeRecovery } from './shared/diagnostics/runtimeRecovery.js'
 import { useGlobalStore } from './shared/globalStore/globalStore.js'
-import { requestNativeAppInfo } from './shared/globalStore/nativeAppInfoBootstrap.js'
 
 const runtimeRecovery = createRuntimeRecovery()
 runtimeRecovery.install()
@@ -21,8 +20,6 @@ try {
   app.use(pinia)
   app.use(router)
   const globalStore = useGlobalStore(pinia)
-  globalStore.hydrateGlobal()
-  requestNativeAppInfo(globalStore)
   app.mount('#app')
 } catch {
   runtimeRecovery.handleStartupFailure()

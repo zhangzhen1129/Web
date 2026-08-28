@@ -305,6 +305,23 @@
   height: .41026rem;
 }
 
+.credit-summary__refresh {
+  position: absolute;
+  top: .58974rem;
+  right: .48718rem;
+  display: grid;
+  width: .87179rem;
+  height: .87179rem;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+}
+
+.credit-summary__refresh img { width: .42308rem; height: .39744rem; }
+.credit-summary__refresh:disabled { opacity: .5; }
+
 .credit-summary__details {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -389,8 +406,38 @@
 .home-error button { min-height: 1.23077rem; padding: .30769rem .61538rem; border: 0; border-radius: .41026rem; background: var(--home-blue); color: #fff; }
 .home-error-symbol { display: grid; width: 1.4359rem; height: 1.4359rem; place-items: center; border: .05128rem solid #dc2626; border-radius: 50%; color: #dc2626; font-size: .76923rem; font-weight: 700; }
 
+.home-overlay-notice {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  padding: .61538rem;
+  background: rgba(0, 0, 0, .08);
+}
+
+.home-overlay-notice__dialog {
+  width: min(8.20513rem, 100%);
+  padding: .61538rem .71795rem;
+  border: .02564rem solid #d1d5db;
+  border-radius: .41026rem;
+  background: #fff;
+  color: #111827;
+  font-size: .41026rem;
+  line-height: .61538rem;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.home-overlay-notice-enter-active,
+.home-overlay-notice-leave-active { transition: opacity .2s ease; }
+.home-overlay-notice-enter-from,
+.home-overlay-notice-leave-to { opacity: 0; }
+
 @media (prefers-reduced-motion: reduce) {
   .home-page__content { transition: none; }
   .button-spinner { animation: none; }
   .home-page__skeleton .van-skeleton__row { animation: none; }
+  .home-overlay-notice-enter-active,
+  .home-overlay-notice-leave-active { transition: none; }
 }

@@ -9,6 +9,7 @@ export const APP_MODE = Object.freeze({
 
 const state = reactive({
   mode: APP_MODE.CASH_LOAN,
+  multiPushTabs: [],
   diagnosticCode: null,
 })
 
@@ -32,19 +33,26 @@ export function setAppMode(value) {
   const normalized = normalizeAppMode(value)
   if (!normalized) {
     state.mode = APP_MODE.CASH_LOAN
+    state.multiPushTabs = []
     state.diagnosticCode = 'INVALID_APP_MODE'
     dispatchAppModeEvent('dinero-pro:app-mode-diagnostic', { code: state.diagnosticCode })
     return false
   }
 
   state.mode = normalized
+  if (normalized !== APP_MODE.MULTI_PUSH) state.multiPushTabs = []
   state.diagnosticCode = null
   dispatchAppModeEvent('dinero-pro:app-mode-change', { mode: normalized })
   return true
 }
 
-export function shouldShowRepaymentTab(mode = state.mode) {
-  return mode === APP_MODE.REPAYMENT_VISIBLE || mode === APP_MODE.MULTI_PUSH
+export function setMultiPushTabs(tabs) {
+  state.multiPushTabs = Array.isArray(tabs) ? tabs.map((tab) => ({ ...tab })) : []
+}
+
+export function shouldShowRepaymentTab(mode = state.mode, tabs = state.multiPushTabs) {
+  if (mode !== APP_MODE.MULTI_PUSH) return false
+  return tabs.some((tab) => tab?.key === 'repayment' && tab.enabled !== false)
 }
 
 export function readInitialAppMode(candidate) {

@@ -2,7 +2,12 @@ import { HOME_MODE, OPERATION_TYPE, PAGE_STATUS, VIEW_MODE } from './constants.j
 
 const PAGE_STATUSES = new Set(Object.values(PAGE_STATUS))
 const VIEW_MODES = new Set(Object.values(VIEW_MODE))
-const OPERATION_TYPES = new Set(Object.values(OPERATION_TYPE))
+const OPERATION_TYPES = new Set([
+  ...Object.values(OPERATION_TYPE),
+  OPERATION_TYPE.REFRESH_CREDIT,
+  OPERATION_TYPE.TOGGLE_PRODUCT_SELECTION,
+  OPERATION_TYPE.SUBMIT_SELECTED_PRODUCTS,
+])
 const NOTICE_TONES = new Set(['info', 'success', 'warning', 'error'])
 const REQUIRED_TAB_KEYS = new Set(['home', 'account'])
 const TAB_KEYS = new Set(['home', 'repayment', 'account'])
@@ -113,6 +118,8 @@ function validateCreditSummary(value, path, issues) {
     'usedLabelText',
     'usedText',
     'locked',
+    'refreshEnabled',
+    'refreshLabelText',
   ])
   if (!validateExactKeys(value, keys, path, issues)) return
   validateRequiredString(value.availableLabelText, `${path}.availableLabelText`, issues)
@@ -122,6 +129,9 @@ function validateCreditSummary(value, path, issues) {
   validateRequiredString(value.usedLabelText, `${path}.usedLabelText`, issues)
   validateRequiredString(value.usedText, `${path}.usedText`, issues)
   validateBoolean(value.locked, `${path}.locked`, issues)
+  if (hasOwn(value, 'refreshEnabled')) validateBoolean(value.refreshEnabled, `${path}.refreshEnabled`, issues)
+  if (hasOwn(value, 'refreshLabelText')) validateRequiredString(value.refreshLabelText, `${path}.refreshLabelText`, issues)
+  if (value.refreshEnabled === true && !hasOwn(value, 'refreshLabelText')) addIssue(issues, `${path}.refreshLabelText`, 'required_field')
 }
 
 function validateSelectOption(value, path, issues) {
@@ -174,6 +184,13 @@ function validateStatusNotice(value, path, issues) {
   if (!validateExactKeys(value, new Set(['text', 'tone']), path, issues)) return
   validateRequiredString(value.text, `${path}.text`, issues)
   if (!NOTICE_TONES.has(value.tone)) addIssue(issues, `${path}.tone`, 'invalid_enum')
+}
+
+function validateOverlayNotice(value, path, issues) {
+  if (!validateExactKeys(value, new Set(['noticeId', 'messageId', 'text']), path, issues)) return
+  validateRequiredString(value.noticeId, `${path}.noticeId`, issues)
+  validateRequiredString(value.messageId, `${path}.messageId`, issues)
+  validateRequiredString(value.text, `${path}.text`, issues)
 }
 
 function validateTab(value, path, issues) {
@@ -240,24 +257,41 @@ function validateErrorData(value, path, issues) {
 }
 
 function validateMultiPushProduct(value, path, issues) {
-  const keys = new Set(['id', 'name', 'imageUrl', 'iconUrl', 'interestText', 'companyName', 'amountRangeText', 'minAmount', 'maxAmount', 'isReloan'])
+  const keys = new Set(['id', 'name', 'imageUrl', 'iconUrl', 'interestText', 'companyName', 'amountRangeText', 'loanAmountText', 'dueDateText', 'minAmount', 'maxAmount', 'isReloan', 'selectable', 'selected'])
   if (!validateExactKeys(value, keys, path, issues)) return
   for (const key of ['id', 'name', 'interestText', 'companyName', 'amountRangeText']) validateRequiredString(value[key], `${path}.${key}`, issues)
-  for (const key of ['imageUrl', 'iconUrl']) validateOptionalString(value[key], `${path}.${key}`, issues)
+  for (const key of ['imageUrl', 'iconUrl']) if (typeof value[key] !== 'string') addIssue(issues, `${path}.${key}`, 'required_string')
+  for (const key of ['loanAmountText', 'dueDateText']) if (hasOwn(value, key)) validateRequiredString(value[key], `${path}.${key}`, issues)
   if (typeof value.minAmount !== 'number' || !Number.isFinite(value.minAmount)) addIssue(issues, `${path}.minAmount`, 'required_number')
   if (typeof value.maxAmount !== 'number' || !Number.isFinite(value.maxAmount)) addIssue(issues, `${path}.maxAmount`, 'required_number')
   validateBoolean(value.isReloan, `${path}.isReloan`, issues)
+  if (hasOwn(value, 'selectable')) validateBoolean(value.selectable, `${path}.selectable`, issues)
+  if (hasOwn(value, 'selected')) validateBoolean(value.selected, `${path}.selected`, issues)
+  if (value.selected === true && value.selectable !== true) addIssue(issues, `${path}.selected`, 'selected_product_not_selectable')
 }
 
 function validateMultiPushViewData(value, path, issues) {
-  const keys = new Set(['availableProductCount', 'activeLoanCount', 'allProcessing', 'availableAmount', 'totalCredit', 'usedCredit', 'locked', 'primaryButtonText', 'primaryAction', 'statusDescription', 'products', 'tabs'])
+  const keys = new Set(['titleText', 'steps', 'broadcast', 'availableProductCount', 'activeLoanCount', 'allProcessing', 'availableAmount', 'availableLabelText', 'totalCredit', 'totalCreditLabelText', 'usedCredit', 'usedCreditLabelText', 'selectedProductCount', 'selectedMinimumAmount', 'serverRemainingAmount', 'locked', 'primaryButtonText', 'creditRefreshLabelText', 'primaryAction', 'statusDescription', 'products', 'minimumSelectionCount', 'selectionSubmitText', 'selectionBadgeText', 'productSummaryText', 'productCountText', 'tabs'])
   if (!validateExactKeys(value, keys, path, issues)) return
-  for (const key of ['availableAmount', 'totalCredit', 'usedCredit', 'primaryButtonText', 'statusDescription']) validateRequiredString(value[key], `${path}.${key}`, issues)
+  for (const key of ['availableAmount', 'availableLabelText', 'totalCredit', 'totalCreditLabelText', 'usedCredit', 'usedCreditLabelText', 'primaryButtonText', 'creditRefreshLabelText']) validateRequiredString(value[key], `${path}.${key}`, issues)
+  if (typeof value.statusDescription !== 'string') addIssue(issues, `${path}.statusDescription`, 'required_string')
+  if (hasOwn(value, 'titleText')) validateRequiredString(value.titleText, `${path}.titleText`, issues)
+  for (const key of ['selectionSubmitText', 'selectionBadgeText']) if (hasOwn(value, key)) validateRequiredString(value[key], `${path}.${key}`, issues)
+  if (hasOwn(value, 'productSummaryText')) validateRequiredString(value.productSummaryText, `${path}.productSummaryText`, issues)
+  if (hasOwn(value, 'productCountText')) validateRequiredString(value.productCountText, `${path}.productCountText`, issues)
+  if (hasOwn(value, 'steps')) { validateArray(value.steps, `${path}.steps`, issues, validateStep); validateUniqueKeys(value.steps, `${path}.steps`, issues) }
+  if (hasOwn(value, 'broadcast')) validateBroadcast(value.broadcast, `${path}.broadcast`, issues)
   for (const key of ['availableProductCount', 'activeLoanCount']) {
     if (!Number.isInteger(value[key]) || value[key] < 0) addIssue(issues, `${path}.${key}`, 'invalid_non_negative_integer')
   }
   validateBoolean(value.allProcessing, `${path}.allProcessing`, issues)
   validateBoolean(value.locked, `${path}.locked`, issues)
+  for (const key of ['selectedMinimumAmount', 'serverRemainingAmount']) {
+    if (hasOwn(value, key)) validateRequiredString(value[key], `${path}.${key}`, issues)
+  }
+  for (const key of ['selectedProductCount', 'minimumSelectionCount']) {
+    if (hasOwn(value, key) && (!Number.isInteger(value[key]) || value[key] < 0)) addIssue(issues, `${path}.${key}`, 'invalid_non_negative_integer')
+  }
   if (!MULTI_PUSH_ACTIONS.has(value.primaryAction)) addIssue(issues, `${path}.primaryAction`, 'invalid_enum')
   validateArray(value.products, `${path}.products`, issues, validateMultiPushProduct)
   validateTabs(value.tabs, `${path}.tabs`, issues)
@@ -266,6 +300,10 @@ function validateMultiPushViewData(value, path, issues) {
   const validState = (hasAvailable && (hasActive || value.products.length > 0)) || (!hasAvailable && hasActive && value.products.length === 0) || (!hasAvailable && !hasActive && value.allProcessing)
   if (!validState) addIssue(issues, path, 'invalid_multi_push_state')
   if (value.primaryAction === 'processing' && (hasAvailable || hasActive)) addIssue(issues, `${path}.primaryAction`, 'processing_state_mismatch')
+  if (hasOwn(value, 'selectedProductCount')) {
+    const selectedCount = value.products.filter((product) => product.selectable === true && product.selected === true).length
+    if (selectedCount !== value.selectedProductCount) addIssue(issues, `${path}.selectedProductCount`, 'selected_count_mismatch')
+  }
 }
 
 function rejectPresentFields(value, fields, issues) {
@@ -276,7 +314,7 @@ function rejectPresentFields(value, fields, issues) {
 
 export function validateHomeViewPayload(payload) {
   const issues = []
-  const keys = new Set(['requestId', 'sourceOperationId', 'pageStatus', 'homeMode', 'viewMode', 'viewData', 'multiPushViewData', 'errorData'])
+  const keys = new Set(['requestId', 'sourceOperationId', 'pageStatus', 'homeMode', 'viewMode', 'viewData', 'multiPushViewData', 'errorData', 'overlayNotice'])
   if (!validateExactKeys(payload, keys, 'payload', issues)) return issues
 
   validateRequiredString(payload.requestId, 'payload.requestId', issues)
@@ -291,18 +329,19 @@ export function validateHomeViewPayload(payload) {
       if (!VIEW_MODES.has(payload.viewMode)) addIssue(issues, 'payload.viewMode', 'invalid_enum')
       if (!hasOwn(payload, 'viewData')) addIssue(issues, 'payload.viewData', 'required_field')
       else validateHomeViewData(payload.viewData, 'payload.viewData', issues)
+      if (hasOwn(payload, 'overlayNotice')) validateOverlayNotice(payload.overlayNotice, 'payload.overlayNotice', issues)
       rejectPresentFields(payload, ['multiPushViewData', 'errorData'], issues)
     } else if (homeMode === HOME_MODE.MULTI_PUSH) {
       if (!hasOwn(payload, 'multiPushViewData')) addIssue(issues, 'payload.multiPushViewData', 'required_field')
       else validateMultiPushViewData(payload.multiPushViewData, 'payload.multiPushViewData', issues)
-      rejectPresentFields(payload, ['viewMode', 'viewData', 'errorData'], issues)
+      rejectPresentFields(payload, ['viewMode', 'viewData', 'errorData', 'overlayNotice'], issues)
     }
   } else if (payload.pageStatus === PAGE_STATUS.ERROR) {
     if (!hasOwn(payload, 'errorData')) addIssue(issues, 'payload.errorData', 'required_field')
     else validateErrorData(payload.errorData, 'payload.errorData', issues)
-    rejectPresentFields(payload, ['homeMode', 'viewMode', 'viewData', 'multiPushViewData'], issues)
+    rejectPresentFields(payload, ['homeMode', 'viewMode', 'viewData', 'multiPushViewData', 'overlayNotice'], issues)
   } else if (payload.pageStatus === PAGE_STATUS.LOADING) {
-    rejectPresentFields(payload, ['homeMode', 'viewMode', 'viewData', 'multiPushViewData', 'errorData'], issues)
+    rejectPresentFields(payload, ['homeMode', 'viewMode', 'viewData', 'multiPushViewData', 'errorData', 'overlayNotice'], issues)
   }
 
   return issues
@@ -326,6 +365,27 @@ function validateOperationData(operation, issues) {
     }
     if (!validateExactKeys(operation.data, new Set([key]), 'operation.data', issues)) return
     validateRequiredString(operation.data[key], `operation.data.${key}`, issues)
+    return
+  }
+
+  if (operation.type === OPERATION_TYPE.TOGGLE_PRODUCT_SELECTION) {
+    if (!hasData) {
+      addIssue(issues, 'operation.data', 'required_field')
+      return
+    }
+    if (!validateExactKeys(operation.data, new Set(['productId', 'selected']), 'operation.data', issues)) return
+    validateRequiredString(operation.data.productId, 'operation.data.productId', issues)
+    validateBoolean(operation.data.selected, 'operation.data.selected', issues)
+    return
+  }
+
+  if (operation.type === OPERATION_TYPE.SUBMIT_SELECTED_PRODUCTS) {
+    if (!hasData) {
+      addIssue(issues, 'operation.data', 'required_field')
+      return
+    }
+    if (!validateExactKeys(operation.data, new Set(['productIds']), 'operation.data', issues)) return
+    validateArray(operation.data.productIds, 'operation.data.productIds', issues, (item, path, nestedIssues) => validateRequiredString(item, path, nestedIssues), 1)
     return
   }
 

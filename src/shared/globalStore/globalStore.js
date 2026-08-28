@@ -15,14 +15,22 @@ export const GLOBAL_APP_INFO_CACHE_KEYS = Object.freeze({
 })
 export const GLOBAL_APP_INFO_CACHE_VERSION = 1
 export const GLOBAL_APP_INFO_FIELDS = Object.freeze(Object.keys(GLOBAL_APP_INFO_CACHE_KEYS))
+export const GLOBAL_THIRD_PARTY_SDK_CACHE_KEYS = Object.freeze({
+  afId: 'global:af-id',
+  fbId: 'global:fb-id',
+  gaId: 'global:ga-id',
+})
+export const GLOBAL_THIRD_PARTY_SDK_CACHE_VERSION = 1
+export const GLOBAL_THIRD_PARTY_SDK_FIELDS = Object.freeze(Object.keys(GLOBAL_THIRD_PARTY_SDK_CACHE_KEYS))
 
 export const GLOBAL_FIELDS = Object.freeze([
   'apiHost', 'appName', 'packageName', 'packageId', 'appVersion', 'appVersionName', 'androidId',
-  'token', 'userId', 'mobile', 'afId', 'gaId', 'gpsAddress', 'gps',
+  'token', 'userId', 'mobile', 'afId', 'gaId', 'fbId', 'gpsAddress', 'gps',
 ])
 
 const initialState = () => Object.fromEntries(GLOBAL_FIELDS.map((field) => [field, null]))
-const UNRESOLVED_FIELDS = new Set(GLOBAL_FIELDS.filter((field) => field !== 'token' && field !== 'apiHost' && !GLOBAL_APP_INFO_FIELDS.includes(field)))
+const AUTHORIZED_FIELDS = new Set(['token', 'apiHost', ...GLOBAL_APP_INFO_FIELDS, ...GLOBAL_THIRD_PARTY_SDK_FIELDS])
+const UNRESOLVED_FIELDS = new Set(GLOBAL_FIELDS.filter((field) => !AUTHORIZED_FIELDS.has(field)))
 
 export function normalizeApiHost(value) {
   if (typeof value !== 'string' || value.trim().length === 0) return null
@@ -71,6 +79,15 @@ function readCachedAppInfo() {
   }))
 }
 
+function readCachedThirdPartySdkIdentifiers() {
+  return Object.fromEntries(GLOBAL_THIRD_PARTY_SDK_FIELDS.map((field) => {
+    const cachedValue = getPersistentValue(GLOBAL_THIRD_PARTY_SDK_CACHE_KEYS[field], null, { version: GLOBAL_THIRD_PARTY_SDK_CACHE_VERSION })
+    if (typeof cachedValue === 'string' && cachedValue.length > 0) return [field, cachedValue]
+    if (cachedValue !== null) removePersistentValue(GLOBAL_THIRD_PARTY_SDK_CACHE_KEYS[field])
+    return [field, null]
+  }))
+}
+
 export const useGlobalStore = defineStore('globalStore', {
   state: initialState,
   actions: {
@@ -81,6 +98,7 @@ export const useGlobalStore = defineStore('globalStore', {
       if (fields.some((field) => UNRESOLVED_FIELDS.has(field) && partial[field] !== null)) return false
       if (Object.hasOwn(partial, 'token') && (typeof partial.token !== 'string' || partial.token.length === 0)) return false
       if (GLOBAL_APP_INFO_FIELDS.some((field) => Object.hasOwn(partial, field) && (typeof partial[field] !== 'string' || partial[field].length === 0))) return false
+      if (GLOBAL_THIRD_PARTY_SDK_FIELDS.some((field) => Object.hasOwn(partial, field) && (typeof partial[field] !== 'string' || partial[field].length === 0))) return false
 
       const apiHost = Object.hasOwn(partial, 'apiHost') ? normalizeApiHost(partial.apiHost) : null
       if (Object.hasOwn(partial, 'apiHost') && !apiHost) return false
@@ -101,12 +119,18 @@ export const useGlobalStore = defineStore('globalStore', {
           persisted = setPersistentValue(GLOBAL_APP_INFO_CACHE_KEYS[field], partial[field], { version: GLOBAL_APP_INFO_CACHE_VERSION }) && persisted
         }
       })
+      GLOBAL_THIRD_PARTY_SDK_FIELDS.forEach((field) => {
+        if (Object.hasOwn(partial, field)) {
+          persisted = setPersistentValue(GLOBAL_THIRD_PARTY_SDK_CACHE_KEYS[field], partial[field], { version: GLOBAL_THIRD_PARTY_SDK_CACHE_VERSION }) && persisted
+        }
+      })
       return persisted
     },
     hydrateGlobal() {
       this.token = readCachedToken()
       this.apiHost = readCachedApiHost()
       Object.assign(this, readCachedAppInfo())
+      Object.assign(this, readCachedThirdPartySdkIdentifiers())
 
       const locationApiHost = normalizeApiHost(readApiHostFromLocation())
       if (locationApiHost) {
@@ -121,8 +145,11 @@ export const useGlobalStore = defineStore('globalStore', {
       const appInfoRemoved = GLOBAL_APP_INFO_FIELDS
         .map((field) => removePersistentValue(GLOBAL_APP_INFO_CACHE_KEYS[field]))
         .every(Boolean)
+      const thirdPartySdkRemoved = GLOBAL_THIRD_PARTY_SDK_FIELDS
+        .map((field) => removePersistentValue(GLOBAL_THIRD_PARTY_SDK_CACHE_KEYS[field]))
+        .every(Boolean)
       this.$patch(initialState())
-      return tokenRemoved && apiHostRemoved && appInfoRemoved
+      return tokenRemoved && apiHostRemoved && appInfoRemoved && thirdPartySdkRemoved
     },
   },
 })

@@ -15,3 +15,15 @@ export {
   getNativeAppInfoRegistrySize,
   nativeAppInfoBridge,
 } from './nativeAppInfo.js'
+
+export {
+  getThirdPartySdkIdentifiers,
+  getThirdPartySdkIdentifiersRegistrySize,
+  nativeThirdPartySdkIdentifiersBridge,
+} from './nativeThirdPartySdkIdentifiers.js'
+
+export {
+  getNativeOneClickPermissionRegistrySize,
+  nativeOneClickPermissionsBridge,
+  requestNativeOneClickPermissions,
+} from './nativeOneClickPermissions.js'
