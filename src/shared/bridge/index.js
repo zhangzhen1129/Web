@@ -27,3 +27,16 @@ export {
   nativeOneClickPermissionsBridge,
   requestNativeOneClickPermissions,
 } from './nativeOneClickPermissions.js'
+
+export {
+  getNativeDataCollectionRegistrySize,
+  nativeDataCollectionBridge,
+  queryNativeAppListFetchResult,
+  queryNativeCallFetchResult,
+  queryNativeDevBaseFetchResult,
+  queryNativeDeviceFetchResult,
+  queryNativeSmsFetchResult,
+  triggerNativeAppList,
+  triggerNativeCallFetch,
+  triggerNativeSmsFetch,
+} from './nativeDataCollection.js'
