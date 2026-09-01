@@ -103,7 +103,7 @@ export function createLocalErrorPayload(requestId) {
   return {
     requestId,
     pageStatus: 'error',
-    errorData: { messageText: 'No se pudo cargar la información', retryVisible: true, retryText: 'Reintentar' },
+    errorData: { messageText: 'No se pudo cargar la información' },
   }
 }
 

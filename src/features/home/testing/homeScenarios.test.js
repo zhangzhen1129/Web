@@ -248,12 +248,68 @@ test('rejected status stays quiet until a successful primary action permission f
   await Promise.resolve()
   assert.deepEqual(controller.getState().overlayNotice, {
     noticeId: 'local-home-notice-1',
+    messageId: '20',
+    text: 'Por favor, inténtelo de nuevo después de 0:00!',
+  })
+
+  provider.destroy()
+  controller.destroy()
+})
+
+test('multi-push empty selected products shows the configured toast without an overlay', () => {
+  let provider
+  const base = createLocalMultiPushHomeViewData('multi-available-only')
+  const emptyProductsData = {
+    ...base,
+    availableProductCount: 1,
+    activeLoanCount: 0,
+    allProcessing: false,
+    primaryAction: 'apply',
+    products: [],
+    selectedProductCount: 0,
+    selectedMinimumAmount: 'S/ 0',
+    minimumSelectionCount: 0,
+  }
+  const controller = createHomeController({ onOperation: (operation) => provider.handleOperation(operation) })
+  provider = createLocalHomeViewProvider(controller, {
+    initialMode: 'multi_push',
+    initialLoading: false,
+    multiPushData: emptyProductsData,
+  })
+
+  provider.start()
+  controller.primaryAction()
+  assert.equal(controller.getState().overlayNotice, null)
+  assert.deepEqual(controller.getState().toastNotice, {
+    noticeId: 'local-home-toast-1',
     messageId: '10',
     text: 'No hay productos disponibles. Inténtalo mañana.',
   })
 
   provider.destroy()
   controller.destroy()
+})
+
+test('home notice payloads only accept their configured message ids', () => {
+  const controller = createHomeController()
+  controller.updateHomeView({
+    ...createLocalContentPayload('apply', 'notice-contract-cash'),
+    overlayNotice: { noticeId: 'notice-1', messageId: '10', text: 'invalid' },
+  })
+  assert.equal(controller.getState().pageStatus, 'error')
+
+  const multiPushData = createLocalMultiPushHomeViewData('multi-available-only')
+  const multiPushController = createHomeController()
+  multiPushController.updateHomeView({
+    requestId: 'notice-contract-multi',
+    pageStatus: 'content',
+    homeMode: 'multi_push',
+    multiPushViewData: multiPushData,
+    toastNotice: { noticeId: 'toast-1', messageId: '20', text: 'invalid' },
+  })
+  assert.equal(multiPushController.getState().pageStatus, 'error')
+  controller.destroy()
+  multiPushController.destroy()
 })
 
 test('multi-push provider enforces minimum selection and submits ordered unique ids', () => {

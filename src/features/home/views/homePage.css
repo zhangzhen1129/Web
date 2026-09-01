@@ -360,6 +360,14 @@
 }
 
 .primary-action:disabled { opacity: 1; }
+.primary-action__supporting-text {
+  margin: .20513rem 0 0;
+  color: #6a7282;
+  font-size: .30769rem;
+  line-height: .41026rem;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
 .primary-action__badge,
 .status-notice {
   position: absolute;

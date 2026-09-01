@@ -1,4 +1,20 @@
+import { getProjectMessage } from '../../../shared/config/projectLanguage.js'
+
 export const MULTI_PUSH_APP_MODE = 'multi_push'
+
+const MULTI_PUSH_BUTTON_MESSAGE_IDS = Object.freeze({
+  apply: '33',
+  repay: '30',
+  evaluating: '31',
+  disbursing: '32',
+})
+
+export function getMultiPushPrimaryButtonText(action, processingVariant = 'evaluating') {
+  const messageId = action === 'processing'
+    ? MULTI_PUSH_BUTTON_MESSAGE_IDS[processingVariant]
+    : MULTI_PUSH_BUTTON_MESSAGE_IDS[action]
+  return getProjectMessage(messageId)
+}
 
 const broadcast = Object.freeze({
   items: Object.freeze([
@@ -15,15 +31,10 @@ const steps = Object.freeze([
 const product = Object.freeze({
   id: 'product-001',
   name: 'Préstamo Rápido',
-  imageUrl: '',
-  iconUrl: '',
-  interestText: 'Préstamo personalizado',
-  companyName: 'DineroPro',
-  amountRangeText: 'S/ 1,500',
+  iconUrl: '/src/assets/home/multi-product-icon.png',
   loanAmountText: 'S/ 1,500',
   dueDateText: '2025-11-20',
   minAmount: 1000,
-  maxAmount: 5000,
   isReloan: true,
   selectable: true,
   selected: true,
@@ -49,7 +60,8 @@ const scenarios = Object.freeze({
     usedCredit: '0',
     usedCreditLabelText: 'Crédito usado',
     locked: false,
-    primaryButtonText: 'Aplicar ahora',
+    refreshEnabled: true,
+    primaryButtonText: getMultiPushPrimaryButtonText('apply'),
     primaryAction: 'apply',
     statusDescription: '',
     products,
@@ -58,7 +70,6 @@ const scenarios = Object.freeze({
     serverRemainingAmount: 'S/ 5,000',
   minimumSelectionCount: 1,
     selectionSubmitText: 'Solicite ahora',
-    selectionBadgeText: '88',
     productSummaryText: 'Soluciones personalizadas',
   }),
   'multi-active-only': Object.freeze({
@@ -73,7 +84,8 @@ const scenarios = Object.freeze({
     usedCredit: '0',
     usedCreditLabelText: 'Crédito usado',
     locked: false,
-    primaryButtonText: 'Ir a reembolsar',
+    refreshEnabled: false,
+    primaryButtonText: getMultiPushPrimaryButtonText('repay'),
     primaryAction: 'repay',
     statusDescription: 'Demasiados préstamos ahora. Por favor, pagar primero y desbloquear una mayor cantidad del préstamo.',
     products: Object.freeze([]),
@@ -94,7 +106,8 @@ const scenarios = Object.freeze({
     usedCredit: '0',
     usedCreditLabelText: 'Crédito usado',
     locked: false,
-    primaryButtonText: 'Evaluando',
+    refreshEnabled: false,
+    primaryButtonText: getMultiPushPrimaryButtonText('processing'),
     primaryAction: 'processing',
     statusDescription: '',
     products: Object.freeze([]),
@@ -115,7 +128,8 @@ const scenarios = Object.freeze({
     usedCredit: '0',
     usedCreditLabelText: 'Crédito usado',
     locked: false,
-    primaryButtonText: 'Aplicar ahora',
+    refreshEnabled: true,
+    primaryButtonText: getMultiPushPrimaryButtonText('apply'),
     primaryAction: 'apply',
     statusDescription: '',
     products,
@@ -124,7 +138,6 @@ const scenarios = Object.freeze({
     serverRemainingAmount: 'S/ 5,000',
     minimumSelectionCount: 1,
     selectionSubmitText: 'Solicite ahora',
-    selectionBadgeText: '88',
     productSummaryText: 'Soluciones personalizadas',
   }),
 })
@@ -150,6 +163,9 @@ export function createLocalMultiPushHomeViewData(scenario) {
     ...displayData,
     titleText: 'Solicitud rápida en 3 pasos',
     creditRefreshLabelText: 'Actualizar crédito',
+    loanAmountLabelText: 'Monto del préstamo',
+    dueDateLabelText: 'Vence el',
+    reloanLabelText: 'Volver a prestar',
     steps,
     broadcast,
     availableAmount: data.availableAmount,
@@ -167,10 +183,9 @@ export function getMultiPushHomeState(data) {
     || data.availableProductCount < 0
     || !Number.isInteger(data?.activeLoanCount)
     || data.activeLoanCount < 0) return 'invalid'
-  if (data.availableProductCount > 0 && data.activeLoanCount === 0) return 'available-only'
-  if (data.availableProductCount === 0 && data.activeLoanCount > 0) return 'active-only'
-  if (data.availableProductCount === 0 && data.activeLoanCount === 0 && data.allProcessing === true) return 'processing'
-  if (data.availableProductCount > 0 && data.activeLoanCount > 0) return 'available-active'
+  if (data.primaryAction === 'apply' && data.availableProductCount > 0) return 'available-and-active'
+  if (data.primaryAction === 'repay' && data.activeLoanCount > 0) return 'active-only'
+  if (data.primaryAction === 'processing' && data.allProcessing === true) return 'processing-only'
   return 'invalid'
 }
 

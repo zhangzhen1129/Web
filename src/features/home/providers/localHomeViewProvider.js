@@ -36,6 +36,7 @@ export function createLocalHomeViewProvider(controller, options = {}) {
   let initialLoadingTimerId = null
   let isDestroyed = false
   let noticeSequence = 0
+  let toastSequence = 0
   let permissionPending = false
 
   function createRequestId(prefix) {
@@ -43,13 +44,14 @@ export function createLocalHomeViewProvider(controller, options = {}) {
     return `local-home-${prefix}-${requestSequence}`
   }
 
-  function pushView(sourceOperationId, pageStatus = 'content', overlayNotice) {
+  function pushView(sourceOperationId, pageStatus = 'content', overlayNotice, toastNotice) {
     if (currentMode === 'multi_push') {
       const multiData = currentMultiPushData ?? options.multiPushData ?? createLocalMultiPushHomeViewData(options.multiPushScenario)
       controller.updateHomeView({
         ...createMultiPushContentPayload(options.multiPushScenario, createRequestId('multi'), sourceOperationId),
         pageStatus,
         multiPushViewData: multiData,
+        ...(toastNotice ? { toastNotice } : {}),
       })
       return
     }
@@ -79,6 +81,39 @@ export function createLocalHomeViewProvider(controller, options = {}) {
 
   function handleOperation(operation) {
     if (currentMode === 'multi_push') {
+      if (operation.type === 'primary_action') {
+        const selectedProducts = (currentMultiPushData?.products ?? []).filter((item) => item.selectable && item.selected)
+        if (currentMultiPushData?.primaryAction !== 'apply' || selectedProducts.length > 0) return
+        if (permissionPending) return
+        permissionPending = true
+        const finishPermissionFlow = (accepted) => {
+          permissionPending = false
+          if (isDestroyed) return
+          const text = getProjectMessage('10')
+          if (accepted === true && text) {
+            toastSequence += 1
+            pushView(operation.requestId, 'content', undefined, {
+              noticeId: `local-home-toast-${toastSequence}`,
+              messageId: '10',
+              text,
+            })
+          } else {
+            pushView(operation.requestId)
+          }
+        }
+        try {
+          const permissionResult = typeof options.permissionFlow === 'function'
+            ? options.permissionFlow(operation)
+            : true
+          if (permissionResult && typeof permissionResult.then === 'function') {
+            permissionResult.then(finishPermissionFlow).catch(() => finishPermissionFlow(false))
+          } else {
+            finishPermissionFlow(permissionResult)
+          }
+        } catch {
+          finishPermissionFlow(false)
+        }
+      }
       if (operation.type === 'refresh') beginLoading(operation.requestId)
       if (operation.type === 'refresh_credit') beginLoading(operation.requestId)
       if (operation.type === 'toggle_product_selection') {
@@ -101,12 +136,12 @@ export function createLocalHomeViewProvider(controller, options = {}) {
       const finishPermissionFlow = (accepted) => {
         permissionPending = false
         if (isDestroyed) return
-        const text = getProjectMessage('10')
+        const text = getProjectMessage('20')
         if (accepted === true && text) {
           noticeSequence += 1
           pushView(operation.requestId, 'content', {
             noticeId: `local-home-notice-${noticeSequence}`,
-            messageId: '10',
+            messageId: '20',
             text,
           })
           return

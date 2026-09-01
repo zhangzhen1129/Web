@@ -5,7 +5,6 @@ import HomeError from './HomeError.vue'
 import HomeSteps from './HomeSteps.vue'
 import lockIcon from '../../../assets/home/lock.svg'
 import refreshIcon from '../../../assets/home/refresh.svg'
-import { getMultiPushHomeState } from '../providers/localMultiPushHomeViewData.js'
 
 defineOptions({ name: 'MultiPushHome' })
 const props = defineProps({
@@ -16,12 +15,17 @@ const props = defineProps({
 const emit = defineEmits(['action'])
 const isSelectorOpen = ref(false)
 const submitted = ref(false)
-const state = computed(() => getMultiPushHomeState(props.data))
+const state = computed(() => {
+  if (props.data?.primaryAction === 'apply') return 'available-and-active'
+  if (props.data?.primaryAction === 'repay') return 'active-only'
+  if (props.data?.primaryAction === 'processing') return 'processing-only'
+  return 'invalid'
+})
 const products = computed(() => (props.data?.products ?? []).filter((item) => item.selectable === true))
 const selectedProducts = computed(() => products.value.filter((item) => item.selected === true))
 const canSubmit = computed(() => selectedProducts.value.length >= (props.data?.minimumSelectionCount ?? 1))
 const broadcastItem = computed(() => props.data?.broadcast?.items?.[props.broadcastIndex] || null)
-const canRefreshCredit = computed(() => !props.data?.locked && ['available-only', 'available-active'].includes(state.value))
+const canRefreshCredit = computed(() => !props.data?.locked && props.data?.refreshEnabled === true)
 watch(() => props.data, () => { submitted.value = false })
 function openSelector() { if (products.value.length > 0) isSelectorOpen.value = true }
 function closeSelector() { isSelectorOpen.value = false }
@@ -40,6 +44,10 @@ function primaryAction() {
 }
 function refreshCredit() {
   if (canRefreshCredit.value && !props.creditRefreshPending) emit('action', { type: 'REFRESH_CREDIT' })
+}
+
+function isApprovedIconUrl(value) {
+  return typeof value === 'string' && (/^https:\/\//.test(value) || value.startsWith('/'))
 }
 </script>
 
@@ -78,19 +86,19 @@ function refreshCredit() {
       <div v-if="isSelectorOpen" class="product-selector" role="dialog" aria-modal="true" @touchstart.stop
         @touchmove.stop @touchend.stop @touchcancel.stop @pointerdown.stop @pointermove.stop @pointerup.stop
         @pointercancel.stop @wheel.stop>
-        <button class="product-selector__scrim" type="button" aria-label="Close" @click="closeSelector" />
+        <button class="product-selector__scrim" type="button" @click="closeSelector" />
         <section class="product-selector__sheet">
-          <button class="product-selector__close" type="button" aria-label="Close" @click="closeSelector">×</button>
+          <button class="product-selector__close" type="button" @click="closeSelector">×</button>
           <div class="product-selector__list">
             <button v-for="product in products" :key="product.id" class="product-selector__item"
               :class="{ 'product-selector__item--selected': product.selected }" type="button" role="checkbox"
               :aria-checked="product.selected" @click="toggleProduct(product)">
-              <span class="product-selector__icon" aria-hidden="true"></span>
-              <span class="product-selector__details"><strong>{{ product.name }}</strong><small>Monto del préstamo
-                  <em>{{
-                    product.loanAmountText || product.amountRangeText }}</em></small><small>Vence el <em>{{
-                      product.dueDateText || product.interestText }}</em></small></span>
-              <span v-if="product.isReloan" class="product-selector__badge">Volver a prestar</span>
+              <span class="product-selector__icon" aria-hidden="true">
+                <img v-if="isApprovedIconUrl(product.iconUrl)" :src="product.iconUrl" alt="" />
+              </span>
+              <span class="product-selector__details"><strong>{{ product.name }}</strong><small>{{ data.loanAmountLabelText }}
+                  <em>{{ product.loanAmountText }}</em></small><small>{{ data.dueDateLabelText }} <em>{{ product.dueDateText }}</em></small></span>
+              <span v-if="product.isReloan" class="product-selector__badge">{{ data.reloanLabelText }}</span>
             </button>
           </div>
           <div class="product-selector__footer"><button type="button" :disabled="!canSubmit || submitted" @click="submitSelection">{{
@@ -352,10 +360,10 @@ function refreshCredit() {
   place-items: center;
   border-radius: .20513rem;
   background: #d8d8d8;
-  color: #155dfc;
-  font-size: .61538rem;
-  font-weight: 700;
+  overflow: hidden;
 }
+
+.product-selector__icon img { width: 100%; height: 100%; object-fit: cover; }
 
 .product-selector__details {
   display: grid;

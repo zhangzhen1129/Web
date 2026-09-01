@@ -30,11 +30,11 @@ function createInitialState() {
     multiPushViewData: null,
     errorData: null,
     overlayNotice: null,
+    toastNotice: null,
     diagnosticCode: null,
     broadcastIndex: 0,
     isRefreshPending: false,
     isCreditRefreshPending: false,
-    isRetryPending: false,
     isVisible: true,
     isDestroyed: false,
   }
@@ -59,10 +59,9 @@ export function createHomeController(options = {}) {
 
   function getMultiPushViewMode(viewData) {
     if (!viewData) return null
-    if (viewData.availableProductCount > 0 && viewData.activeLoanCount > 0) return 'available_and_active'
-    if (viewData.availableProductCount > 0) return 'available_only'
-    if (viewData.activeLoanCount > 0) return 'active_only'
-    if (viewData.allProcessing) return 'processing_only'
+    if (viewData.primaryAction === 'apply') return 'available_and_active'
+    if (viewData.primaryAction === 'repay') return 'active_only'
+    if (viewData.primaryAction === 'processing') return 'processing_only'
     return null
   }
 
@@ -71,7 +70,6 @@ export function createHomeController(options = {}) {
   let activeLoadingRequestId = null
   let refreshOperationId = null
   let creditRefreshOperationId = null
-  let retryOperationId = null
   let broadcastTimerId = null
   const listeners = new Set()
   const modelRequestIds = new Set()
@@ -146,6 +144,7 @@ export function createHomeController(options = {}) {
       multiPushViewData: null,
       errorData: null,
       overlayNotice: null,
+      toastNotice: null,
       diagnosticCode: 'INVALID_HOME_VIEW',
       broadcastIndex: 0,
     }
@@ -158,7 +157,6 @@ export function createHomeController(options = {}) {
     if (payload.sourceOperationId && isTerminal) pendingOperationIds.delete(payload.sourceOperationId)
     if (payload.sourceOperationId === refreshOperationId && isTerminal) refreshOperationId = null
     if (payload.sourceOperationId === creditRefreshOperationId && isTerminal) creditRefreshOperationId = null
-    if (payload.sourceOperationId === retryOperationId) retryOperationId = null
   }
 
   function updateHomeView(payload) {
@@ -200,11 +198,11 @@ export function createHomeController(options = {}) {
       multiPushViewData: payload.multiPushViewData ? cloneValue(payload.multiPushViewData) : null,
       errorData: payload.errorData ? cloneValue(payload.errorData) : null,
       overlayNotice: payload.overlayNotice ? cloneValue(payload.overlayNotice) : null,
+      toastNotice: payload.toastNotice ? cloneValue(payload.toastNotice) : null,
       diagnosticCode: null,
       broadcastIndex: 0,
       isRefreshPending: refreshOperationId !== null,
       isCreditRefreshPending: creditRefreshOperationId !== null,
-      isRetryPending: retryOperationId !== null,
     }
     startBroadcast()
     notify()
@@ -251,14 +249,13 @@ export function createHomeController(options = {}) {
     if (operation.type === OPERATION_TYPE.REFRESH) return state.pageStatus === PAGE_STATUS.CONTENT
     if (operation.type === OPERATION_TYPE.REFRESH_CREDIT) {
       const multiPushAvailable = state.homeMode === HOME_MODE.MULTI_PUSH
-        && ['available_only', 'available_and_active'].includes(lastViewMode)
+        && state.multiPushViewData?.refreshEnabled === true
         && state.multiPushViewData?.locked !== true
       const cashLoanSummary = state.homeMode === HOME_MODE.CASH_LOAN
         && state.viewData?.creditSummary?.refreshEnabled === true
         && state.viewData.creditSummary.locked !== true
       return state.pageStatus === PAGE_STATUS.CONTENT && (multiPushAvailable || cashLoanSummary)
     }
-    if (operation.type === OPERATION_TYPE.RETRY) return Boolean(state.errorData?.retryVisible)
     return false
   }
 
@@ -282,18 +279,15 @@ export function createHomeController(options = {}) {
 
     if (operation.type === OPERATION_TYPE.REFRESH && refreshOperationId !== null) return
     if (operation.type === OPERATION_TYPE.REFRESH_CREDIT && creditRefreshOperationId !== null) return
-    if (operation.type === OPERATION_TYPE.RETRY && retryOperationId !== null) return
 
     operationRequestIds.add(operation.requestId)
     pendingOperationIds.add(operation.requestId)
     if (operation.type === OPERATION_TYPE.REFRESH) refreshOperationId = operation.requestId
     if (operation.type === OPERATION_TYPE.REFRESH_CREDIT) creditRefreshOperationId = operation.requestId
-    if (operation.type === OPERATION_TYPE.RETRY) retryOperationId = operation.requestId
     state = {
       ...state,
       isRefreshPending: refreshOperationId !== null,
       isCreditRefreshPending: creditRefreshOperationId !== null,
-      isRetryPending: retryOperationId !== null,
     }
     notify()
 
@@ -357,19 +351,14 @@ export function createHomeController(options = {}) {
     }
   }
 
-  function retry() {
-    return makeOperation(OPERATION_TYPE.RETRY)
-  }
-
   function hide() {
     if (state.isDestroyed || !state.isVisible) return
     hideLoading()
     stopBroadcast()
     refreshOperationId = null
     creditRefreshOperationId = null
-    retryOperationId = null
     pendingOperationIds.clear()
-    state = { ...state, isVisible: false, overlayNotice: null, isRefreshPending: false, isCreditRefreshPending: false, isRetryPending: false }
+    state = { ...state, isVisible: false, overlayNotice: null, toastNotice: null, isRefreshPending: false, isCreditRefreshPending: false }
     notify()
   }
 
@@ -394,16 +383,15 @@ export function createHomeController(options = {}) {
     stopBroadcast()
     refreshOperationId = null
     creditRefreshOperationId = null
-    retryOperationId = null
     pendingOperationIds.clear()
     state = {
       ...state,
       isVisible: false,
       isDestroyed: true,
       overlayNotice: null,
+      toastNotice: null,
       isRefreshPending: false,
       isCreditRefreshPending: false,
-      isRetryPending: false,
     }
     listeners.clear()
   }
@@ -421,7 +409,6 @@ export function createHomeController(options = {}) {
     toggleProductSelection,
     submitSelectedProducts,
     selectAdjacentAmount,
-    retry,
     hide,
     show,
     destroy,

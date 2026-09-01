@@ -166,9 +166,9 @@ test('requires expanded credit labels and rejects conditional field violations',
   controller.updateHomeView({
     requestId: 'model-error',
     pageStatus: PAGE_STATUS.ERROR,
-    errorData: { messageText: 'error', retryVisible: false, retryText: 'unexpected' },
+    errorData: { messageText: 'error', retryVisible: false },
   })
-  assert.ok(diagnostics.at(-1).issues.some((issue) => issue.code === 'unexpected_field'))
+  assert.ok(diagnostics.at(-1).issues.some((issue) => issue.code === 'unknown_field'))
 })
 
 test('emits page operation types with unique ids and exact data', () => {
@@ -184,20 +184,12 @@ test('emits page operation types with unique ids and exact data', () => {
   assert.equal(controller.primaryAction(), 'operation-2')
   assert.equal(controller.selectAmount('amount-c'), 'operation-3')
   assert.equal(controller.selectTerm('term-b'), 'operation-4')
-  controller.updateHomeView({
-    requestId: 'model-3',
-    pageStatus: PAGE_STATUS.ERROR,
-    errorData: { messageText: 'error', retryVisible: true, retryText: 'retry' },
-  })
-  assert.equal(controller.retry(), 'operation-5')
-
   assert.deepEqual(operations.map((operation) => operation.type), Object.values(OPERATION_TYPE))
-  assert.equal(new Set(operations.map((operation) => operation.requestId)).size, 5)
+  assert.equal(new Set(operations.map((operation) => operation.requestId)).size, 4)
   assert.deepEqual(operations[1].data, { amountKey: 'amount-a', termKey: 'term-a' })
   assert.deepEqual(operations[2].data, { amountKey: 'amount-c' })
   assert.deepEqual(operations[3].data, { termKey: 'term-b' })
   assert.equal(Object.hasOwn(operations[0], 'data'), false)
-  assert.equal(Object.hasOwn(operations[4], 'data'), false)
 })
 
 test('display text changes do not change operation semantics', () => {
@@ -379,34 +371,6 @@ test('cash-loan credit summary can opt into the same refresh operation without s
   controller.updateHomeView(contentPayload('cash-credit-2', { sourceOperationId: 'operation-1', viewData }))
   assert.equal(controller.getState().isCreditRefreshPending, false)
   controller.destroy()
-})
-
-test('retry remains locked until a matching update and lifecycle cleanup cancels pending state', () => {
-  const operations = []
-  const controller = createHomeController({
-    onOperation: (operation) => operations.push(operation),
-    createRequestId: createSequentialIdFactory(),
-  })
-  controller.updateHomeView(contentPayload('model-1'))
-  controller.updateHomeView({
-    requestId: 'error-1',
-    pageStatus: PAGE_STATUS.ERROR,
-    errorData: { messageText: 'error', retryVisible: true, retryText: 'retry' },
-  })
-  controller.retry()
-  controller.retry()
-  assert.equal(operations.length, 1)
-  assert.equal(controller.getState().isRetryPending, true)
-
-  controller.updateHomeView({
-    requestId: 'error-2',
-    sourceOperationId: 'old-operation',
-    pageStatus: PAGE_STATUS.ERROR,
-    errorData: { messageText: 'error', retryVisible: true, retryText: 'retry' },
-  })
-  assert.equal(controller.getState().isRetryPending, true)
-  controller.hide()
-  assert.equal(controller.getState().isRetryPending, false)
 })
 
 test('broadcast uses one manageable two-second timer and cleans it on hide and destroy', () => {

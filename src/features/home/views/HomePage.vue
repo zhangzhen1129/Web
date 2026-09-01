@@ -1,8 +1,9 @@
 <script setup>
 import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue'
-import { Loading, PullRefresh, Skeleton } from 'vant'
+import { Loading, PullRefresh, Skeleton, showToast } from 'vant'
 import 'vant/es/pull-refresh/style'
 import 'vant/es/skeleton/style'
+import 'vant/es/toast/style'
 import { createHomeController } from '../index.js'
 import { createNativePageLoadingAdapter } from '../pageLoadingPort.js'
 import { createLocalHomeViewProvider } from '../providers/localHomeViewProvider.js'
@@ -46,6 +47,14 @@ const multiPushData = computed(() => state.value.multiPushViewData)
 const broadcastItem = computed(() => data.value?.broadcast?.items?.[state.value.broadcastIndex] || null)
 const isMultiPush = computed(() => state.value.homeMode === 'multi_push')
 const overlayNotice = computed(() => state.value.overlayNotice)
+let handledToastId = null
+
+watch(() => state.value.toastNotice?.noticeId, (noticeId) => {
+  if (!noticeId || noticeId === handledToastId) return
+  handledToastId = noticeId
+  const toast = state.value.toastNotice
+  if (toast?.text) showToast({ message: toast.text, forbidClick: true })
+})
 
 function syncMainTabs(nextState) {
   if (nextState?.homeMode === 'multi_push' && Array.isArray(nextState.multiPushViewData?.tabs)) {

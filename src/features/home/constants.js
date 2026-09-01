@@ -27,7 +27,6 @@ const operationTypes = {
   PRIMARY_ACTION: 'primary_action',
   SELECT_AMOUNT: 'select_amount',
   SELECT_TERM: 'select_term',
-  RETRY: 'retry',
 }
 Object.defineProperties(operationTypes, {
   REFRESH_CREDIT: { value: 'refresh_credit', enumerable: false },
