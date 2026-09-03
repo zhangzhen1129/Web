@@ -5,8 +5,9 @@ import 'vant/es/pull-refresh/style'
 import 'vant/es/skeleton/style'
 import 'vant/es/toast/style'
 import { createHomeController } from '../index.js'
+import { createHomeBrowserPort } from '../homeBrowserPort.js'
 import { createNativePageLoadingAdapter } from '../pageLoadingPort.js'
-import { createLocalHomeViewProvider } from '../providers/localHomeViewProvider.js'
+import { createHomeDataProvider } from '../providers/homeDataProvider.js'
 import CreditSummary from '../components/CreditSummary.vue'
 import HomeBroadcast from '../components/HomeBroadcast.vue'
 import HomeError from '../components/HomeError.vue'
@@ -15,7 +16,7 @@ import HomeSteps from '../components/HomeSteps.vue'
 import ProductSelection from '../components/ProductSelection.vue'
 import MultiPushHome from '../components/MultiPushHome.vue'
 import HomeOverlayNotice from '../components/HomeOverlayNotice.vue'
-import { APP_MODE, appModeState, setMultiPushTabs } from '../../shell/appModeStore.js'
+import { APP_MODE, setAppMode, setHomeTabs } from '../../shell/appModeStore.js'
 import { useGlobalStore } from '../../../shared/globalStore/globalStore.js'
 import { createNativeAppInfoBootstrap } from '../../../shared/globalStore/nativeAppInfoBootstrap.js'
 import { createNativeTokenBootstrap } from '../../../shared/globalStore/nativeTokenBootstrap.js'
@@ -28,14 +29,15 @@ defineOptions({ name: 'HomePage' })
 
 const viewProvider = ref(null)
 const globalStore = useGlobalStore()
+const browserPort = createHomeBrowserPort()
 const controller = createHomeController({
   loadingPort: createNativePageLoadingAdapter(),
   onOperation(operation) {
-    window.dispatchEvent(new CustomEvent('dinero-pro:home-operation', { detail: operation }))
+    browserPort.emitOperation(operation)
     viewProvider.value?.handleOperation(operation)
   },
   onDiagnostic(diagnostic) {
-    window.dispatchEvent(new CustomEvent('dinero-pro:home-diagnostic', { detail: diagnostic }))
+    browserPort.emitDiagnostic(diagnostic)
   },
 })
 controller.updateHomeView({ requestId: `home-setup-${Date.now()}`, pageStatus: 'loading' })
@@ -58,15 +60,18 @@ watch(() => state.value.toastNotice?.noticeId, (noticeId) => {
 
 function syncMainTabs(nextState) {
   if (nextState?.homeMode === 'multi_push' && Array.isArray(nextState.multiPushViewData?.tabs)) {
-    setMultiPushTabs(nextState.multiPushViewData.tabs)
-  } else if (nextState?.homeMode === 'cash_loan') {
-    setMultiPushTabs([])
+    setAppMode(APP_MODE.MULTI_PUSH)
+    setHomeTabs(nextState.multiPushViewData.tabs)
+  } else if (nextState?.homeMode === 'cash_loan' && Array.isArray(nextState.viewData?.tabs)) {
+    setAppMode(APP_MODE.CASH_LOAN)
+    setHomeTabs(nextState.viewData.tabs)
   }
 }
 
 let unsubscribe
 let hasBeenActivated = false
 let isDisposed = false
+let needsBrowserReturnReload = false
 void initializeHomeProvider()
 
 function refresh() {
@@ -84,8 +89,21 @@ function handleMultiPushAction(action) {
   if (action?.type === 'SUBMIT_SELECTED_PRODUCTS') return controller.submitSelectedProducts(action.productIds)
 }
 function handleVisibilityChange() {
-  if (document.hidden) controller.hide()
+  if (document.hidden) {
+    controller.hide()
+  }
   else controller.show()
+}
+function handlePageHide() {
+  needsBrowserReturnReload = true
+  controller.hide()
+}
+
+function handlePageShow() {
+  controller.show()
+  if (!needsBrowserReturnReload || !viewProvider.value) return
+  needsBrowserReturnReload = false
+  viewProvider.value.reload()
 }
 
 onActivated(() => {
@@ -107,10 +125,12 @@ onMounted(async () => {
   state.value = controller.getState()
   syncMainTabs(state.value)
   controller.show()
-  window.updateHomeView = controller.updateHomeView
-  window.addEventListener('pagehide', controller.hide)
-  window.addEventListener('pageshow', controller.show)
-  document.addEventListener('visibilitychange', handleVisibilityChange)
+  browserPort.mount({
+    updateHomeView: controller.updateHomeView,
+    onPageHide: handlePageHide,
+    onPageShow: handlePageShow,
+    onVisibilityChange: handleVisibilityChange,
+  })
 })
 
 function runInitializationStep(factory, requestFn) {
@@ -135,31 +155,24 @@ async function initializeHomeProvider() {
   await runInitializationStep(createNativeTokenBootstrap, getNativeCachedToken)
   await runInitializationStep(createNativeThirdPartySdkIdentifiersBootstrap, getThirdPartySdkIdentifiers)
   if (isDisposed) return
-  const currentMode = appModeState.mode === APP_MODE.MULTI_PUSH ? 'multi_push' : 'apply'
-  const initialViewMode = import.meta.env.DEV
-    ? new URLSearchParams(window.location.hash.split('?')[1] ?? '').get('viewMode')
-    : null
-  if (!viewProvider.value) viewProvider.value = createLocalHomeViewProvider(controller, {
-    initialMode: initialViewMode === 'rejected' ? 'rejected' : currentMode,
-  })
+  if (!viewProvider.value) viewProvider.value = createHomeDataProvider(controller, globalStore)
   viewProvider.value.start()
+  if (needsBrowserReturnReload) {
+    needsBrowserReturnReload = false
+    viewProvider.value.reload()
+  }
 }
 
 onBeforeUnmount(() => {
   isDisposed = true
-  window.removeEventListener('pagehide', controller.hide)
-  window.removeEventListener('pageshow', controller.show)
-  document.removeEventListener('visibilitychange', handleVisibilityChange)
-  if (window.updateHomeView === controller.updateHomeView) delete window.updateHomeView
+  browserPort.unmount()
   unsubscribe?.()
   viewProvider.value?.destroy?.()
   controller.destroy()
   hasBeenActivated = false
+  needsBrowserReturnReload = false
 })
 
-watch(() => appModeState.mode, (nextMode) => {
-  viewProvider.value?.setHomeMode(nextMode === APP_MODE.MULTI_PUSH ? 'multi_push' : 'apply')
-})
 </script>
 
 <template>
@@ -225,7 +238,7 @@ watch(() => appModeState.mode, (nextMode) => {
       </div>
     </main>
   </PullRefresh>
-  <HomeOverlayNotice :notice="overlayNotice" />
+  <HomeOverlayNotice :notice="overlayNotice" @close="controller.dismissOverlayNotice" />
 </template>
 
 <style src="./homePage.css"></style>

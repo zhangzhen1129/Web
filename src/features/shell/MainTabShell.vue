@@ -1,22 +1,18 @@
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, watch } from 'vue'
+import { computed, nextTick, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import HomeTabs from '../home/components/HomeTabs.vue'
 import { ROUTE_PATH } from '../../router/index.js'
-import { appModeState, readInitialAppMode, setAppMode, shouldShowRepaymentTab } from './appModeStore.js'
+import { appModeState, shouldShowRepaymentTab } from './appModeStore.js'
 import { hideNativeTabBar } from './nativeTabBar.js'
 
 const route = useRoute()
 const router = useRouter()
 const tabScrollPositions = new Map()
 
-const tabDefinitions = computed(() => [
-  { key: 'home', text: 'Préstamos', iconResourceKey: 'home', routePath: ROUTE_PATH.HOME },
-  ...(shouldShowRepaymentTab(appModeState.mode)
-    ? [{ key: 'repayment', text: 'Reembolso', iconResourceKey: 'repayment', routePath: ROUTE_PATH.REPAYMENT }]
-    : []),
-  { key: 'account', text: 'Mi cuenta', iconResourceKey: 'account', routePath: ROUTE_PATH.MINE },
-])
+const tabDefinitions = computed(() => appModeState.homeTabs
+  .filter((tab) => tab.enabled !== false && (tab.key !== 'repayment' || shouldShowRepaymentTab()))
+  .map((tab) => ({ ...tab, routePath: tab.key === 'home' ? ROUTE_PATH.HOME : tab.key === 'repayment' ? ROUTE_PATH.REPAYMENT : ROUTE_PATH.MINE })))
 
 const tabs = computed(() => tabDefinitions.value.map((tab) => ({
   ...tab,
@@ -68,20 +64,11 @@ function ensureRouteAllowed() {
 
 onMounted(() => {
   hideNativeTabBar()
-  setAppMode(readInitialAppMode(route.query.appMode))
-  if (import.meta.env.DEV) window.updateAppMode = setAppMode
   ensureRouteAllowed()
 })
 
 watch(() => appModeState.mode, ensureRouteAllowed)
-watch(() => route.query.appMode, (nextMode) => {
-  if (nextMode !== undefined) setAppMode(readInitialAppMode(nextMode))
-})
 watch(() => route.path, ensureRouteAllowed)
-
-onBeforeUnmount(() => {
-  if (import.meta.env.DEV && window.updateAppMode === setAppMode) delete window.updateAppMode
-})
 </script>
 
 <template>

@@ -201,8 +201,10 @@ function validateOverlayNotice(value, path, issues) {
 function validateToastNotice(value, path, issues) {
   if (!validateExactKeys(value, new Set(['noticeId', 'messageId', 'text']), path, issues)) return
   validateRequiredString(value.noticeId, `${path}.noticeId`, issues)
-  validateRequiredString(value.messageId, `${path}.messageId`, issues)
-  if (!TOAST_MESSAGE_IDS.has(value.messageId)) addIssue(issues, `${path}.messageId`, 'invalid_enum')
+  if (hasOwn(value, 'messageId')) {
+    validateRequiredString(value.messageId, `${path}.messageId`, issues)
+    if (!TOAST_MESSAGE_IDS.has(value.messageId)) addIssue(issues, `${path}.messageId`, 'invalid_enum')
+  }
   validateRequiredString(value.text, `${path}.text`, issues)
 }
 
@@ -269,8 +271,8 @@ function validateErrorData(value, path, issues) {
 function validateMultiPushProduct(value, path, issues) {
   const keys = new Set(['id', 'name', 'iconUrl', 'loanAmountText', 'dueDateText', 'minAmount', 'isReloan', 'selectable', 'selected'])
   if (!validateExactKeys(value, keys, path, issues)) return
-  for (const key of ['id', 'name', 'iconUrl', 'loanAmountText', 'dueDateText']) validateRequiredString(value[key], `${path}.${key}`, issues)
-  if (!/^https:\/\//.test(value.iconUrl) && !value.iconUrl.startsWith('/')) addIssue(issues, `${path}.iconUrl`, 'invalid_resource_url')
+  for (const key of ['id', 'name', 'loanAmountText', 'dueDateText']) validateRequiredString(value[key], `${path}.${key}`, issues)
+  if (hasOwn(value, 'iconUrl') && (!/^https:\/\//.test(value.iconUrl) && !value.iconUrl.startsWith('/'))) addIssue(issues, `${path}.iconUrl`, 'invalid_resource_url')
   if (typeof value.minAmount !== 'number' || !Number.isFinite(value.minAmount) || value.minAmount < 0) addIssue(issues, `${path}.minAmount`, 'required_non_negative_number')
   validateBoolean(value.isReloan, `${path}.isReloan`, issues)
   if (hasOwn(value, 'selectable')) validateBoolean(value.selectable, `${path}.selectable`, issues)
@@ -308,7 +310,7 @@ function validateMultiPushViewData(value, path, issues) {
   const hasActive = value.activeLoanCount > 0
   if (value.primaryAction === 'repay' && !hasActive) addIssue(issues, `${path}.primaryAction`, 'repay_state_mismatch')
   if (value.primaryAction === 'processing' && (!value.allProcessing || hasAvailable || hasActive)) addIssue(issues, `${path}.primaryAction`, 'processing_state_mismatch')
-  if (value.primaryAction === 'apply' && !hasAvailable) addIssue(issues, `${path}.primaryAction`, 'apply_state_mismatch')
+  if (value.primaryAction === 'apply' && !hasAvailable && value.products.length !== 0) addIssue(issues, `${path}.primaryAction`, 'apply_state_mismatch')
   for (const key of ['loanAmountLabelText', 'dueDateLabelText', 'reloanLabelText']) {
     if (hasOwn(value, key)) validateRequiredString(value[key], `${path}.${key}`, issues)
   }
@@ -337,14 +339,16 @@ export function validateHomeViewPayload(payload) {
   if (!PAGE_STATUSES.has(payload.pageStatus)) addIssue(issues, 'payload.pageStatus', 'invalid_enum')
 
   if (payload.pageStatus === PAGE_STATUS.CONTENT || payload.pageStatus === PAGE_STATUS.REFRESHING) {
-    // Accept legacy cash-loan payloads while the upstream adapter migrates to homeMode.
-    const homeMode = payload.homeMode ?? (hasOwn(payload, 'viewData') ? HOME_MODE.CASH_LOAN : null)
+    const homeMode = payload.homeMode
     if (!HOME_MODES.has(homeMode)) addIssue(issues, 'payload.homeMode', 'invalid_enum')
     if (homeMode === HOME_MODE.CASH_LOAN) {
       if (!VIEW_MODES.has(payload.viewMode)) addIssue(issues, 'payload.viewMode', 'invalid_enum')
       if (!hasOwn(payload, 'viewData')) addIssue(issues, 'payload.viewData', 'required_field')
       else validateHomeViewData(payload.viewData, 'payload.viewData', issues)
-      if (hasOwn(payload, 'overlayNotice')) validateOverlayNotice(payload.overlayNotice, 'payload.overlayNotice', issues)
+      if (hasOwn(payload, 'overlayNotice')) {
+        if (payload.pageStatus === PAGE_STATUS.REFRESHING) addIssue(issues, 'payload.overlayNotice', 'unexpected_field')
+        else validateOverlayNotice(payload.overlayNotice, 'payload.overlayNotice', issues)
+      }
       if (hasOwn(payload, 'toastNotice')) addIssue(issues, 'payload.toastNotice', 'unexpected_field')
       rejectPresentFields(payload, ['multiPushViewData', 'errorData'], issues)
     } else if (homeMode === HOME_MODE.MULTI_PUSH) {

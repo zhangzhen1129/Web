@@ -34,7 +34,7 @@ function reportDiagnostic(code) {
 function removeSharedCallback() {
   if (typeof window === 'undefined') return
   try {
-    if (window[CALLBACK_NAME]) delete window[CALLBACK_NAME]
+    if (window[CALLBACK_NAME] === handleReply) delete window[CALLBACK_NAME]
   } catch {
     reportDiagnostic('BRIDGE_CALLBACK_CLEANUP_FAILED')
   }
@@ -61,7 +61,7 @@ function isValidReply(reply) {
     || typeof reply.message !== 'string'
   ) return false
 
-  return APP_INFO_FIELDS.every((field) => reply[field] === undefined || typeof reply[field] === 'string')
+  return APP_INFO_FIELDS.every((field) => typeof reply[field] === 'string')
 }
 
 function handleReply(reply) {

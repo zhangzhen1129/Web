@@ -228,29 +228,25 @@ test('local provider keeps product selections isolated by view mode', () => {
   controller.destroy()
 })
 
-test('rejected status stays quiet until a successful primary action permission flow', async () => {
+test('rejected status only emits the page operation and does not initiate a permission flow', () => {
   let provider
-  let resolvePermission
-  const controller = createHomeController({ onOperation: (operation) => provider.handleOperation(operation) })
+  const operations = []
+  const controller = createHomeController({ onOperation: (operation) => {
+    operations.push(operation)
+    provider.handleOperation(operation)
+  } })
   provider = createLocalHomeViewProvider(controller, {
     initialMode: 'rejected',
     initialLoading: false,
     schedule: () => 0,
-    permissionFlow: () => new Promise((resolve) => { resolvePermission = resolve }),
   })
 
   provider.start()
   assert.equal(controller.getState().overlayNotice, null)
   controller.primaryAction()
   assert.equal(controller.getState().overlayNotice, null)
-  resolvePermission(true)
-  await Promise.resolve()
-  await Promise.resolve()
-  assert.deepEqual(controller.getState().overlayNotice, {
-    noticeId: 'local-home-notice-1',
-    messageId: '20',
-    text: 'Por favor, inténtelo de nuevo después de 0:00!',
-  })
+  assert.equal(operations.length, 1)
+  assert.equal(operations[0].type, 'primary_action')
 
   provider.destroy()
   controller.destroy()

@@ -26,7 +26,7 @@ function reportDiagnostic(code) {
 function removeSharedCallback() {
   if (typeof window === 'undefined') return
   try {
-    if (window[CALLBACK_NAME]) delete window[CALLBACK_NAME]
+    if (window[CALLBACK_NAME] === handleReply) delete window[CALLBACK_NAME]
   } catch {
     reportDiagnostic('BRIDGE_CALLBACK_CLEANUP_FAILED')
   }
@@ -46,6 +46,11 @@ function isValidReply(reply) {
     && reply.operation === 'get'
     && reply.cacheKey === CACHE_KEY
     && (reply.status === 'completed' || reply.status === 'error')
+    && typeof reply.message === 'string'
+    && typeof reply.cacheValue === 'string'
+    && typeof reply.hit === 'boolean'
+    && typeof reply.storagePolicy === 'string'
+    && Number.isInteger(reply.expiresAtMillis)
 }
 
 function handleReply(reply) {
@@ -142,6 +147,7 @@ export function getNativeCachedToken(consumer = () => {}) {
     const accepted = synchronousResult?.action === 'persistent_cache_handle'
       && synchronousResult.requestId === requestId
       && synchronousResult.status === 'accepted'
+      && typeof synchronousResult.message === 'string'
     if (!accepted) {
       cleanup(record)
       reportDiagnostic('BRIDGE_REQUEST_NOT_ACCEPTED')

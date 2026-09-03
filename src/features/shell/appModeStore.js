@@ -9,7 +9,7 @@ export const APP_MODE = Object.freeze({
 
 const state = reactive({
   mode: APP_MODE.CASH_LOAN,
-  multiPushTabs: [],
+  homeTabs: [],
   diagnosticCode: null,
 })
 
@@ -33,40 +33,29 @@ export function setAppMode(value) {
   const normalized = normalizeAppMode(value)
   if (!normalized) {
     state.mode = APP_MODE.CASH_LOAN
-    state.multiPushTabs = []
+    state.homeTabs = []
     state.diagnosticCode = 'INVALID_APP_MODE'
     dispatchAppModeEvent('dinero-pro:app-mode-diagnostic', { code: state.diagnosticCode })
     return false
   }
 
   state.mode = normalized
-  if (normalized !== APP_MODE.MULTI_PUSH) state.multiPushTabs = []
   state.diagnosticCode = null
   dispatchAppModeEvent('dinero-pro:app-mode-change', { mode: normalized })
   return true
 }
 
-export function setMultiPushTabs(tabs) {
-  state.multiPushTabs = Array.isArray(tabs) ? tabs.map((tab) => ({ ...tab })) : []
+export function setHomeTabs(tabs) {
+  state.homeTabs = Array.isArray(tabs) ? tabs.map((tab) => ({ ...tab })) : []
 }
 
-export function shouldShowRepaymentTab(mode = state.mode, tabs = state.multiPushTabs) {
+export function setMultiPushTabs(tabs) {
+  setHomeTabs(tabs)
+}
+
+export function shouldShowRepaymentTab(mode = state.mode, tabs = state.homeTabs) {
   if (mode !== APP_MODE.MULTI_PUSH) return false
   return tabs.some((tab) => tab?.key === 'repayment' && tab.enabled !== false)
-}
-
-export function readInitialAppMode(candidate) {
-  const direct = normalizeAppMode(Array.isArray(candidate) ? candidate[0] : candidate)
-  if (direct) return direct
-  if (typeof window === 'undefined') return APP_MODE.CASH_LOAN
-
-  const searchParams = new URLSearchParams(window.location.search)
-  const searchMode = normalizeAppMode(searchParams.get('appMode'))
-  if (searchMode) return searchMode
-
-  const hashQuery = window.location.hash.includes('?') ? window.location.hash.split('?').slice(1).join('?') : ''
-  const hashMode = normalizeAppMode(new URLSearchParams(hashQuery).get('appMode'))
-  return hashMode ?? APP_MODE.CASH_LOAN
 }
 
 export const appModeState = readonly(state)

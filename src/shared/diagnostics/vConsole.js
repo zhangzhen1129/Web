@@ -30,7 +30,11 @@ export function createVConsoleManager({ loadVConsole, diagnostic = reportDiagnos
         return instance
       })
       .catch(() => {
-        diagnostic('VCONSOLE_INIT_FAILED')
+        try {
+          diagnostic('VCONSOLE_INIT_FAILED')
+        } catch {
+          return null
+        }
         return null
       })
       .finally(() => {

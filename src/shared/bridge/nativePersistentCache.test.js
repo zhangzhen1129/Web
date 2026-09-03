@@ -20,6 +20,21 @@ function installBridge() {
   return calls
 }
 
+function createCacheReply(requestId, status = 'completed') {
+  return {
+    action: 'persistent_cache_handle',
+    requestId,
+    status,
+    message: status,
+    operation: 'get',
+    cacheKey: 'Token',
+    cacheValue: status === 'completed' ? 'redacted-test-value' : '',
+    hit: status === 'completed',
+    storagePolicy: status === 'completed' ? 'persistent' : '',
+    expiresAtMillis: 0,
+  }
+}
+
 test('queries Token through the documented shared callback and cleans up after terminal reply', () => {
   const calls = installBridge()
   const results = []
@@ -35,14 +50,14 @@ test('queries Token through the documented shared callback and cleans up after t
   assert.equal(calls[0].replyHandler, calls[1].replyHandler)
   assert.equal(getNativePersistentCacheRegistrySize(), 2)
 
-  const reply = { action: 'persistent_cache_handle', requestId: first, status: 'completed', operation: 'get', cacheKey: 'Token', cacheValue: 'redacted-test-value', hit: true }
+  const reply = createCacheReply(first)
   globalThis.window[calls[0].replyHandler.replace('window.', '')](reply)
   assert.deepEqual(results, [reply])
   assert.equal(getNativePersistentCacheRegistrySize(), 1)
 
   globalThis.window[calls[0].replyHandler.replace('window.', '')](reply)
   assert.deepEqual(results, [reply])
-  globalThis.window[calls[1].replyHandler.replace('window.', '')]({ action: 'persistent_cache_handle', requestId: second, status: 'error', operation: 'get', cacheKey: 'Token' })
+  globalThis.window[calls[1].replyHandler.replace('window.', '')](createCacheReply(second, 'error'))
   assert.equal(getNativePersistentCacheRegistrySize(), 0)
   assert.equal(typeof globalThis.window.__dineroProPersistentCacheReply, 'undefined')
 })
@@ -93,6 +108,26 @@ test('cleans up immediately when the synchronous response rejects or mismatches 
       handlePersistentCache(payload) {
         const request = JSON.parse(payload)
         return JSON.stringify({ action: 'persistent_cache_handle', requestId: `${request.requestId}-other`, status: 'error' })
+      },
+    },
+  }
+
+  assert.equal(getNativeCachedToken(() => {}), null)
+  assert.equal(getNativePersistentCacheRegistrySize(), 0)
+  assert.equal(typeof globalThis.window.__dineroProPersistentCacheReply, 'undefined')
+})
+
+test('rejects an accepted synchronous response missing its required message', () => {
+  globalThis.window = {
+    dispatchEvent() {},
+    plahub: {
+      handlePersistentCache(payload) {
+        const request = JSON.parse(payload)
+        return JSON.stringify({
+          action: 'persistent_cache_handle',
+          requestId: request.requestId,
+          status: 'accepted',
+        })
       },
     },
   }

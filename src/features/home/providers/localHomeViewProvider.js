@@ -35,9 +35,7 @@ export function createLocalHomeViewProvider(controller, options = {}) {
   let requestSequence = 0
   let initialLoadingTimerId = null
   let isDestroyed = false
-  let noticeSequence = 0
   let toastSequence = 0
-  let permissionPending = false
 
   function createRequestId(prefix) {
     requestSequence += 1
@@ -82,36 +80,16 @@ export function createLocalHomeViewProvider(controller, options = {}) {
   function handleOperation(operation) {
     if (currentMode === 'multi_push') {
       if (operation.type === 'primary_action') {
-        const selectedProducts = (currentMultiPushData?.products ?? []).filter((item) => item.selectable && item.selected)
-        if (currentMultiPushData?.primaryAction !== 'apply' || selectedProducts.length > 0) return
-        if (permissionPending) return
-        permissionPending = true
-        const finishPermissionFlow = (accepted) => {
-          permissionPending = false
-          if (isDestroyed) return
+        if (currentMultiPushData?.primaryAction !== 'apply') return
+        if ((currentMultiPushData?.products ?? []).length === 0) {
           const text = getProjectMessage('10')
-          if (accepted === true && text) {
-            toastSequence += 1
-            pushView(operation.requestId, 'content', undefined, {
-              noticeId: `local-home-toast-${toastSequence}`,
-              messageId: '10',
-              text,
-            })
-          } else {
-            pushView(operation.requestId)
-          }
-        }
-        try {
-          const permissionResult = typeof options.permissionFlow === 'function'
-            ? options.permissionFlow(operation)
-            : true
-          if (permissionResult && typeof permissionResult.then === 'function') {
-            permissionResult.then(finishPermissionFlow).catch(() => finishPermissionFlow(false))
-          } else {
-            finishPermissionFlow(permissionResult)
-          }
-        } catch {
-          finishPermissionFlow(false)
+          if (!text) return
+          toastSequence += 1
+          pushView(operation.requestId, 'content', undefined, {
+            noticeId: `local-home-toast-${toastSequence}`,
+            messageId: '10',
+            text,
+          })
         }
       }
       if (operation.type === 'refresh') beginLoading(operation.requestId)
@@ -127,38 +105,6 @@ export function createLocalHomeViewProvider(controller, options = {}) {
         const amount = selected.reduce((total, item) => total + item.minAmount, 0)
         currentMultiPushData = { ...currentMultiPushData, products, selectedProductCount: selected.length, productCountText: `${selected.length} productos`, selectedMinimumAmount: `S/ ${amount.toLocaleString('en-US')}`, availableAmount: `S/ ${amount.toLocaleString('en-US')}` }
         pushView(operation.requestId)
-      }
-      return
-    }
-    if (operation.type === 'primary_action' && currentMode === 'rejected') {
-      if (permissionPending) return
-      permissionPending = true
-      const finishPermissionFlow = (accepted) => {
-        permissionPending = false
-        if (isDestroyed) return
-        const text = getProjectMessage('20')
-        if (accepted === true && text) {
-          noticeSequence += 1
-          pushView(operation.requestId, 'content', {
-            noticeId: `local-home-notice-${noticeSequence}`,
-            messageId: '20',
-            text,
-          })
-          return
-        }
-        pushView(operation.requestId)
-      }
-      try {
-        const permissionResult = typeof options.permissionFlow === 'function'
-          ? options.permissionFlow(operation)
-          : true
-        if (permissionResult && typeof permissionResult.then === 'function') {
-          permissionResult.then(finishPermissionFlow).catch(() => finishPermissionFlow(false))
-        } else {
-          finishPermissionFlow(permissionResult)
-        }
-      } catch {
-        finishPermissionFlow(false)
       }
       return
     }
@@ -205,7 +151,6 @@ export function createLocalHomeViewProvider(controller, options = {}) {
     if (initialLoadingTimerId !== null) clearSchedule(initialLoadingTimerId)
     initialLoadingTimerId = null
     currentMultiPushData = null
-    permissionPending = false
   }
 
   function setHomeMode(mode) {

@@ -370,6 +370,13 @@ export function createHomeController(options = {}) {
     notify()
   }
 
+  function dismissOverlayNotice() {
+    if (state.isDestroyed || !state.overlayNotice) return false
+    state = { ...state, overlayNotice: null }
+    notify()
+    return true
+  }
+
   function subscribe(listener) {
     if (typeof listener !== 'function') throw new TypeError('listener must be a function')
     if (state.isDestroyed) return () => {}
@@ -411,6 +418,7 @@ export function createHomeController(options = {}) {
     selectAdjacentAmount,
     hide,
     show,
+    dismissOverlayNotice,
     destroy,
   })
 }

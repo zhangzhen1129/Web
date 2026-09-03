@@ -29,6 +29,7 @@ export {
 } from './nativeOneClickPermissions.js'
 
 export {
+  cancelNativeDataCollectionConsumer,
   getNativeDataCollectionRegistrySize,
   nativeDataCollectionBridge,
   queryNativeAppListFetchResult,

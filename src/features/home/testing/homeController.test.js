@@ -45,6 +45,7 @@ function contentPayload(requestId, overrides = {}) {
   return {
     requestId,
     pageStatus: PAGE_STATUS.CONTENT,
+    homeMode: 'cash_loan',
     viewMode: 'apply',
     viewData: createViewData(),
     ...overrides,
@@ -122,6 +123,17 @@ test('strictly accepts valid models and isolates input mutations', () => {
   assert.doesNotThrow(() => createNoopPageLoadingAdapter().show('request'))
 })
 
+test('rejects a content model without an explicit home mode', () => {
+  const controller = createHomeController()
+  const payload = contentPayload('missing-home-mode')
+  delete payload.homeMode
+
+  controller.updateHomeView(payload)
+
+  assert.equal(controller.getState().pageStatus, PAGE_STATUS.ERROR)
+  controller.destroy()
+})
+
 test('invalid fields, enums, selections, and duplicate model ids enter diagnostic error state', () => {
   const diagnostics = []
   const controller = createHomeController({ onDiagnostic: (diagnostic) => diagnostics.push(diagnostic) })
@@ -169,6 +181,21 @@ test('requires expanded credit labels and rejects conditional field violations',
     errorData: { messageText: 'error', retryVisible: false },
   })
   assert.ok(diagnostics.at(-1).issues.some((issue) => issue.code === 'unknown_field'))
+})
+
+test('rejects overlay notices during refreshing models', () => {
+  const diagnostics = []
+  const controller = createHomeController({ onDiagnostic: (diagnostic) => diagnostics.push(diagnostic) })
+  const payload = contentPayload('refreshing-overlay', {
+    pageStatus: PAGE_STATUS.REFRESHING,
+    overlayNotice: { noticeId: 'notice-1', messageId: '20', text: 'notice text' },
+  })
+
+  controller.updateHomeView(payload)
+
+  assert.equal(controller.getState().pageStatus, PAGE_STATUS.ERROR)
+  assert.ok(diagnostics[0].issues.some((issue) => issue.path === 'payload.overlayNotice' && issue.code === 'unexpected_field'))
+  controller.destroy()
 })
 
 test('emits page operation types with unique ids and exact data', () => {
@@ -421,6 +448,21 @@ test('multi-push broadcast rotates from multi-push view data', () => {
   assert.equal(controller.getState().broadcastIndex, 1)
   controller.destroy()
   assert.equal(clock.activeCount(), 0)
+})
+
+test('dismisses an active overlay notice without emitting a page operation', () => {
+  const operations = []
+  const controller = createHomeController({ onOperation: (operation) => operations.push(operation) })
+  controller.updateHomeView(contentPayload('overlay-notice-1', {
+    overlayNotice: { noticeId: 'notice-1', messageId: '20', text: 'notice text' },
+  }))
+
+  assert.deepEqual(controller.getState().overlayNotice, { noticeId: 'notice-1', messageId: '20', text: 'notice text' })
+  assert.equal(controller.dismissOverlayNotice(), true)
+  assert.equal(controller.getState().overlayNotice, null)
+  assert.deepEqual(operations, [])
+  assert.equal(controller.dismissOverlayNotice(), false)
+  controller.destroy()
 })
 
 test('destroy releases subscriptions and rejects subsequent work without throwing', () => {

@@ -4,50 +4,66 @@ const CALLBACK_SCOPE = 'perCall'
 const CAPABILITIES = Object.freeze({
   appListTrigger: Object.freeze({
     action: 'app_list_fetch_trigger',
+    callbackShape: 'records',
     callbackPrefix: '__dineroProAppListTriggerReply',
     method: 'triggerAppListFetch',
+    progressStatuses: new Set(),
     terminalStatuses: new Set(['SUCCESS', 'ERR_IN_PROGRESS', 'ERR_TIMEOUT', 'ERR_FETCH_FAILED', 'ERR_NO_RECORDS']),
   }),
   appListQuery: Object.freeze({
     action: 'app_list_fetch_result',
+    callbackShape: 'records',
     callbackPrefix: '__dineroProAppListQueryReply',
     method: 'queryAppListFetchResult',
+    progressStatuses: new Set(['IN_PROGRESS']),
     terminalStatuses: new Set(['SUCCESS', 'ERR_NOT_TRIGGERED', 'ERR_CACHE_EXPIRED', 'ERR_FETCH_FAILED', 'ERR_NO_RECORDS']),
   }),
   callLogTrigger: Object.freeze({
     action: 'call_log_fetch_trigger',
+    callbackShape: 'records',
     callbackPrefix: '__dineroProCallLogTriggerReply',
     method: 'triggerCallLogFetch',
+    progressStatuses: new Set(),
     terminalStatuses: new Set(['SUCCESS', 'ERR_IN_PROGRESS', 'ERR_PERMISSION_DENIED', 'ERR_TIMEOUT', 'ERR_FETCH_FAILED', 'ERR_NO_RECORDS']),
   }),
   callLogQuery: Object.freeze({
     action: 'call_log_fetch_result',
+    callbackShape: 'records',
     callbackPrefix: '__dineroProCallLogQueryReply',
     method: 'queryCallLogFetchResult',
+    progressStatuses: new Set(['IN_PROGRESS']),
     terminalStatuses: new Set(['SUCCESS', 'ERR_NOT_TRIGGERED', 'ERR_CACHE_EXPIRED', 'ERR_FETCH_FAILED', 'ERR_NO_RECORDS']),
   }),
   deviceBase: Object.freeze({
     action: 'pla_fetch_device_base',
+    callbackShape: 'deviceBase',
     callbackPrefix: '__dineroProDeviceBaseReply',
     method: 'fetchDeviceBase',
+    progressStatuses: new Set(),
     terminalStatuses: new Set(['SUCCESS', 'ERR_IN_PROGRESS', 'ERR_TIMEOUT', 'ERR_FETCH_FAILED']),
   }),
   deviceInfo: Object.freeze({
     action: 'pla_fetch_device_info',
+    callbackShape: 'deviceInfo',
     callbackPrefix: '__dineroProDeviceInfoReply',
     method: 'fetchDeviceInfo',
+    progressStatuses: new Set(),
     terminalStatuses: new Set(['SUCCESS', 'ERR_IN_PROGRESS', 'ERR_TIMEOUT', 'ERR_FETCH_FAILED']),
   }),
   smsTrigger: Object.freeze({
     action: 'sms_fetch_trigger',
+    callbackShape: 'sms',
     callbackPrefix: '__dineroProSmsTriggerReply',
     method: 'triggerSmsFetch',
+    progressStatuses: new Set(),
     terminalStatuses: new Set(['SUCCESS', 'ERR_IN_PROGRESS', 'ERR_PERMISSION_DENIED', 'ERR_TIMEOUT', 'ERR_FETCH_FAILED', 'ERR_NO_RECORDS']),
   }),
   smsQuery: Object.freeze({
     action: 'sms_fetch_result',
+    callbackShape: 'sms',
     callbackPrefix: '__dineroProSmsQueryReply',
     method: 'querySmsFetchResult',
+    progressStatuses: new Set(['IN_PROGRESS']),
     terminalStatuses: new Set(['SUCCESS', 'ERR_NOT_TRIGGERED', 'ERR_CACHE_EXPIRED', 'ERR_FETCH_FAILED', 'ERR_NO_RECORDS']),
   }),
 })
@@ -75,11 +91,19 @@ function isObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
 
-function hasValidDocumentedDataTypes(reply) {
-  if (reply.recordCount !== undefined && (!Number.isInteger(reply.recordCount) || reply.recordCount < 0)) return false
-  if (reply.templateResult !== undefined && !isObject(reply.templateResult)) return false
-  if (reply.deviceBaseData !== undefined && !isObject(reply.deviceBaseData)) return false
-  return reply.skipKeywordFilter === undefined
+function hasValidDocumentedDataTypes(reply, capability) {
+  if (capability.callbackShape === 'deviceBase') return isObject(reply.deviceBaseData)
+  if (capability.callbackShape === 'deviceInfo') {
+    return isObject(reply.zzvvcr)
+      && isObject(reply.zzvvcr.vb45fW4q4EMiK)
+      && typeof reply.zzvvcr.vb45fW4q4EMiK.xcmgx7mBm === 'string'
+  }
+
+  const hasRecords = isObject(reply.templateResult)
+    && Number.isInteger(reply.recordCount)
+    && reply.recordCount >= 0
+  if (!hasRecords) return false
+  return capability.callbackShape !== 'sms'
     || reply.skipKeywordFilter === null
     || typeof reply.skipKeywordFilter === 'boolean'
 }
@@ -91,6 +115,28 @@ function cleanup(record) {
     if (window[record.callbackName] === record.callback) delete window[record.callbackName]
   } catch {
     reportDiagnostic('BRIDGE_CALLBACK_CLEANUP_FAILED', record.capability.method)
+  }
+}
+
+function notifyFailure(record, code) {
+  record.completed = true
+  cleanup(record)
+  if (record.consumerCanceled || !record.onFailure) return
+  try {
+    record.onFailure({ capability: record.capability.method, code })
+  } catch {
+    reportDiagnostic('BRIDGE_CALLBACK_FAILURE_CONSUMER_FAILED', record.capability.method)
+  }
+}
+
+function notifyProgress(record, reply) {
+  record.completed = true
+  cleanup(record)
+  if (record.consumerCanceled || !record.onProgress) return
+  try {
+    record.onProgress(reply)
+  } catch {
+    reportDiagnostic('BRIDGE_CALLBACK_PROGRESS_FAILED', record.capability.method)
   }
 }
 
@@ -108,7 +154,7 @@ function isValidReply(reply, record) {
     && reply.requestId === record.requestId
     && typeof reply.status === 'string'
     && typeof reply.message === 'string'
-    && hasValidDocumentedDataTypes(reply)
+    && hasValidDocumentedDataTypes(reply, record.capability)
 }
 
 function registerCallback(record) {
@@ -126,7 +172,7 @@ function registerCallback(record) {
   }
 }
 
-function invokeCapability(capability, extraPayload, consumer = () => {}) {
+function invokeCapability(capability, extraPayload, consumer = () => {}, options = {}) {
   if (typeof consumer !== 'function') {
     reportDiagnostic('BRIDGE_CALLBACK_INVALID_CONSUMER', capability.method)
     return null
@@ -148,6 +194,9 @@ function invokeCapability(capability, extraPayload, consumer = () => {}) {
     capability,
     completed: false,
     consumer,
+    onProgress: typeof options.onProgress === 'function' ? options.onProgress : null,
+    onFailure: typeof options.onFailure === 'function' ? options.onFailure : null,
+    consumerCanceled: false,
     registryKey,
     requestId,
     status: 'pending',
@@ -159,18 +208,28 @@ function invokeCapability(capability, extraPayload, consumer = () => {}) {
       return
     }
     if (!isValidReply(reply, record)) {
-      if (isObject(reply) && reply.requestId === requestId) cleanup(record)
+      if (isObject(reply) && reply.requestId === requestId) {
+        notifyFailure(record, 'invalid_callback_payload')
+      }
       reportDiagnostic('BRIDGE_CALLBACK_INVALID_PAYLOAD', capability.method)
       return
     }
 
     record.status = reply.status
-    if (!capability.terminalStatuses.has(reply.status)) return
+    if (capability.progressStatuses.has(reply.status)) {
+      notifyProgress(record, reply)
+      return
+    }
+    if (!capability.terminalStatuses.has(reply.status)) {
+      notifyFailure(record, 'unexpected_callback_status')
+      reportDiagnostic('BRIDGE_CALLBACK_UNEXPECTED_STATUS', capability.method)
+      return
+    }
 
     record.completed = true
     cleanup(record)
     try {
-      consumer(reply)
+      if (!record.consumerCanceled) record.consumer(reply)
     } catch {
       reportDiagnostic('BRIDGE_CALLBACK_CONSUMER_FAILED', capability.method)
     }
@@ -195,20 +254,33 @@ function invokeCapability(capability, extraPayload, consumer = () => {}) {
   return requestId
 }
 
-export function triggerNativeAppList(consumer = () => {}) { return invokeCapability(CAPABILITIES.appListTrigger, {}, consumer) }
-export function queryNativeAppListFetchResult(consumer = () => {}) { return invokeCapability(CAPABILITIES.appListQuery, {}, consumer) }
-export function triggerNativeCallFetch(consumer = () => {}) { return invokeCapability(CAPABILITIES.callLogTrigger, {}, consumer) }
-export function queryNativeCallFetchResult(consumer = () => {}) { return invokeCapability(CAPABILITIES.callLogQuery, {}, consumer) }
-export function queryNativeDevBaseFetchResult(consumer = () => {}) { return invokeCapability(CAPABILITIES.deviceBase, {}, consumer) }
-export function queryNativeDeviceFetchResult(consumer = () => {}) { return invokeCapability(CAPABILITIES.deviceInfo, {}, consumer) }
-export function queryNativeSmsFetchResult(consumer = () => {}) { return invokeCapability(CAPABILITIES.smsQuery, {}, consumer) }
+export function triggerNativeAppList(consumer = () => {}, options) { return invokeCapability(CAPABILITIES.appListTrigger, {}, consumer, options) }
+export function queryNativeAppListFetchResult(consumer = () => {}, options) { return invokeCapability(CAPABILITIES.appListQuery, {}, consumer, options) }
+export function triggerNativeCallFetch(consumer = () => {}, options) { return invokeCapability(CAPABILITIES.callLogTrigger, {}, consumer, options) }
+export function queryNativeCallFetchResult(consumer = () => {}, options) { return invokeCapability(CAPABILITIES.callLogQuery, {}, consumer, options) }
+export function queryNativeDevBaseFetchResult(consumer = () => {}, options) { return invokeCapability(CAPABILITIES.deviceBase, {}, consumer, options) }
+export function queryNativeDeviceFetchResult(consumer = () => {}, options) { return invokeCapability(CAPABILITIES.deviceInfo, {}, consumer, options) }
+export function queryNativeSmsFetchResult(consumer = () => {}, options) { return invokeCapability(CAPABILITIES.smsQuery, {}, consumer, options) }
 
-export function triggerNativeSmsFetch(skipKeywordFilter, consumer = () => {}) {
+export function triggerNativeSmsFetch(skipKeywordFilter, consumer = () => {}, options) {
   if (typeof skipKeywordFilter !== 'boolean') {
     reportDiagnostic('BRIDGE_INVALID_SMS_FILTER', CAPABILITIES.smsTrigger.method)
     return null
   }
-  return invokeCapability(CAPABILITIES.smsTrigger, { skipKeywordFilter }, consumer)
+  return invokeCapability(CAPABILITIES.smsTrigger, { skipKeywordFilter }, consumer, options)
+}
+
+export function cancelNativeDataCollectionConsumer(requestId) {
+  if (typeof requestId !== 'string' || requestId.length === 0) return false
+  for (const record of registry.values()) {
+    if (record.requestId !== requestId || record.completed) continue
+    record.consumerCanceled = true
+    record.consumer = () => {}
+    record.onProgress = null
+    record.onFailure = null
+    return true
+  }
+  return false
 }
 
 export function getNativeDataCollectionRegistrySize() { return registry.size }
@@ -219,6 +291,7 @@ export const nativeDataCollectionBridge = Object.freeze({
   queryNativeDevBaseFetchResult,
   queryNativeDeviceFetchResult,
   queryNativeSmsFetchResult,
+  cancelNativeDataCollectionConsumer,
   triggerNativeAppList,
   triggerNativeCallFetch,
   triggerNativeSmsFetch,

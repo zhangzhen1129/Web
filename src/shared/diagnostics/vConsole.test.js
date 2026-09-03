@@ -64,6 +64,20 @@ test('contains loader and constructor failures without retaining an instance', a
   }
 })
 
+test('contains diagnostic reporter failures after initialization errors', async () => {
+  const manager = createVConsoleManager({
+    loadVConsole() {
+      return Promise.reject(new Error('sensitive loader detail'))
+    },
+    diagnostic() {
+      throw new Error('diagnostic unavailable')
+    },
+  })
+
+  assert.equal(await manager.initializeForEnvironment(false, true), null)
+  assert.equal(manager.getInstance(), null)
+})
+
 test('rejects non-boolean environment inputs', async () => {
   const { instances, manager } = createHarness()
   assert.equal(await manager.initializeForEnvironment(false, 'false'), null)

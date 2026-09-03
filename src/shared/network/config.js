@@ -2,6 +2,7 @@ import { createNetworkError, NETWORK_ERROR_CATEGORY } from './errors.js'
 import { useGlobalStore } from '../globalStore/globalStore.js'
 
 const TIMEOUT_KEY = 'VITE_API_TIMEOUT_MS'
+export const DEFAULT_API_TIMEOUT_MS = 60_000
 
 function readApiHostFromGlobalStore() {
   try {
@@ -12,9 +13,12 @@ function readApiHostFromGlobalStore() {
 }
 
 export function readNetworkSettings(environment = import.meta.env, readApiHost = readApiHostFromGlobalStore) {
+  const configuredTimeout = environment?.[TIMEOUT_KEY]
   return {
     baseUrl: readApiHost(),
-    timeoutMs: Number(environment?.[TIMEOUT_KEY]),
+    timeoutMs: configuredTimeout === undefined || configuredTimeout === null || configuredTimeout === ''
+      ? DEFAULT_API_TIMEOUT_MS
+      : Number(configuredTimeout),
   }
 }
 

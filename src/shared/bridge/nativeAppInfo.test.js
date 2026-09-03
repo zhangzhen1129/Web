@@ -90,13 +90,13 @@ test('isolates unavailable, rejected, malformed, and throwing bridge calls', () 
   assert.equal(getNativeAppInfoRegistrySize(), 0)
 })
 
-test('rejects malformed and unknown callbacks without delivering data', () => {
+test('rejects callbacks with missing required app fields and unknown requests', () => {
   const calls = installBridge()
   const results = []
   const requestId = getNativeAppInfo((reply) => results.push(reply))
   const callback = window[calls[0].replyHandler.replace('window.', '')]
 
-  callback({ action: 'app_info_fetch', requestId, status: 'success', message: 'missing fields', androidId: 123 })
+  callback({ action: 'app_info_fetch', requestId, status: 'success', message: 'missing fields' })
   assert.deepEqual(results, [])
   assert.equal(getNativeAppInfoRegistrySize(), 0)
 
@@ -112,4 +112,29 @@ test('does not overwrite an existing controlled callback', () => {
   assert.equal(calls.length, 0)
   assert.equal(getNativeAppInfoRegistrySize(), 0)
   assert.equal(window.__dineroProAppInfoReply, existing)
+})
+
+test('does not delete a replacement function while cleaning a shared callback record', () => {
+  const calls = installBridge()
+  const requestId = getNativeAppInfo(() => {})
+  const registeredCallback = window.__dineroProAppInfoReply
+  const replacement = () => {}
+  window.__dineroProAppInfoReply = replacement
+
+  registeredCallback({
+    action: 'app_info_fetch',
+    requestId,
+    status: 'success',
+    message: 'success',
+    packageId: 'com.example.app',
+    packageName: 'Example',
+    appVersion: '12',
+    appVersionName: '1.2.0',
+    appName: 'Example',
+    androidId: 'redacted-android-id',
+  })
+
+  assert.equal(calls.length, 1)
+  assert.equal(getNativeAppInfoRegistrySize(), 0)
+  assert.equal(window.__dineroProAppInfoReply, replacement)
 })
