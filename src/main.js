@@ -20,6 +20,7 @@ try {
   app.use(pinia)
   app.use(router)
   const globalStore = useGlobalStore(pinia)
+  globalStore.hydrateGlobal()
   app.mount('#app')
 } catch {
   runtimeRecovery.handleStartupFailure()

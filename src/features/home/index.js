@@ -1,3 +1,6 @@
 export { BROADCAST_INTERVAL_MS, OPERATION_TYPE, PAGE_STATUS, VIEW_MODE } from './constants.js'
 export { createHomeController } from './homeController.js'
+export { createHomeFlowController } from './homeFlowController.js'
+export { createHomeRouteConsumer, resolveCashLoanRoute, resolveHomeRouteIntent, ROUTE_TARGETS } from './homeRoute.js'
 export { createNativePageLoadingAdapter, createNoopPageLoadingAdapter } from './pageLoadingPort.js'
+export { createHomeHostService, HOME_HOST_ERROR_CODES, HOME_HOST_PERMISSIONS } from './services/homeHostService.js'

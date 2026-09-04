@@ -4,7 +4,7 @@ import { Loading, PullRefresh, Skeleton, showToast } from 'vant'
 import 'vant/es/pull-refresh/style'
 import 'vant/es/skeleton/style'
 import 'vant/es/toast/style'
-import { createHomeController } from '../index.js'
+import { createHomeController, createHomeHostService } from '../index.js'
 import { createHomeBrowserPort } from '../homeBrowserPort.js'
 import { createNativePageLoadingAdapter } from '../pageLoadingPort.js'
 import { createHomeDataProvider } from '../providers/homeDataProvider.js'
@@ -18,20 +18,16 @@ import MultiPushHome from '../components/MultiPushHome.vue'
 import HomeOverlayNotice from '../components/HomeOverlayNotice.vue'
 import { APP_MODE, setAppMode, setHomeTabs } from '../../shell/appModeStore.js'
 import { useGlobalStore } from '../../../shared/globalStore/globalStore.js'
-import { createNativeAppInfoBootstrap } from '../../../shared/globalStore/nativeAppInfoBootstrap.js'
-import { createNativeTokenBootstrap } from '../../../shared/globalStore/nativeTokenBootstrap.js'
-import { createNativeThirdPartySdkIdentifiersBootstrap } from '../../../shared/globalStore/nativeThirdPartySdkIdentifiersBootstrap.js'
-import { getNativeAppInfo } from '../../../shared/bridge/nativeAppInfo.js'
-import { getNativeCachedToken } from '../../../shared/bridge/nativePersistentCache.js'
-import { getThirdPartySdkIdentifiers } from '../../../shared/bridge/nativeThirdPartySdkIdentifiers.js'
 
 defineOptions({ name: 'HomePage' })
 
 const viewProvider = ref(null)
 const globalStore = useGlobalStore()
+const homeHostService = createHomeHostService({ globalStore })
+const initCycleId = `home-init-${Date.now().toString(36)}`
 const browserPort = createHomeBrowserPort()
 const controller = createHomeController({
-  loadingPort: createNativePageLoadingAdapter(),
+  loadingPort: createNativePageLoadingAdapter(homeHostService),
   onOperation(operation) {
     browserPort.emitOperation(operation)
     viewProvider.value?.handleOperation(operation)
@@ -133,27 +129,8 @@ onMounted(async () => {
   })
 })
 
-function runInitializationStep(factory, requestFn) {
-  return new Promise((resolve) => {
-    let settled = false
-    try {
-      const bootstrap = factory((consumer) => requestFn((reply) => {
-        consumer(reply)
-        if (!settled) { settled = true; resolve() }
-      }))
-      const requestId = bootstrap.request(globalStore)
-      if (!requestId && !settled) { settled = true; resolve() }
-    } catch {
-      if (!settled) { settled = true; resolve() }
-    }
-  })
-}
-
 async function initializeHomeProvider() {
-  globalStore.hydrateGlobal()
-  await runInitializationStep(createNativeAppInfoBootstrap, getNativeAppInfo)
-  await runInitializationStep(createNativeTokenBootstrap, getNativeCachedToken)
-  await runInitializationStep(createNativeThirdPartySdkIdentifiersBootstrap, getThirdPartySdkIdentifiers)
+  await homeHostService.initializeHomeHostContext({ initCycleId })
   if (isDisposed) return
   if (!viewProvider.value) viewProvider.value = createHomeDataProvider(controller, globalStore)
   viewProvider.value.start()
@@ -165,6 +142,7 @@ async function initializeHomeProvider() {
 
 onBeforeUnmount(() => {
   isDisposed = true
+  homeHostService.disposeHomeHostInit({ initCycleId })
   browserPort.unmount()
   unsubscribe?.()
   viewProvider.value?.destroy?.()

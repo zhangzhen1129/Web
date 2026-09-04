@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { clearAll, clearFeature, get, remove, set } from './localStorageCache.js'
+import { clearAll, clearFeature, get, getResult, remove, set } from './localStorageCache.js'
 
 class MemoryStorage {
   #entries = new Map()
@@ -62,6 +62,38 @@ test('returns fallback and discards missing, malformed, and invalid envelope ent
   storage.setItem(cacheKey('feature:broken-envelope'), JSON.stringify({ version: 1 }))
   assert.equal(get('feature:broken-envelope', 'fallback', { version: 1 }), 'fallback')
   assert.equal(storage.getItem(cacheKey('feature:broken-envelope')), null)
+})
+
+test('reports found, not-found, and failed reads without changing get fallback behavior', () => {
+  const storage = new MemoryStorage()
+  useStorage(storage)
+  assert.deepEqual(getResult('feature:missing', { version: 1 }), { status: 'not_found' })
+  assert.equal(set('feature:entry', 'saved', { version: 1 }), true)
+  assert.deepEqual(getResult('feature:entry', { version: 1 }), { status: 'found', value: 'saved' })
+
+  storage.setItem(cacheKey('feature:broken'), '{')
+  assert.deepEqual(getResult('feature:broken', { version: 1 }), { status: 'failed' })
+  assert.equal(storage.getItem(cacheKey('feature:broken')), null)
+  assert.equal(get('feature:broken', 'fallback', { version: 1 }), 'fallback')
+})
+
+test('reports expired entries as not found and storage failures as failed', () => {
+  const storage = new MemoryStorage()
+  useStorage(storage)
+  const originalNow = Date.now
+  Date.now = () => 1000
+  try {
+    assert.equal(set('feature:temporary', 'saved', { version: 1, ttlMs: 1 }), true)
+    Date.now = () => 1001
+    assert.deepEqual(getResult('feature:temporary', { version: 1 }), { status: 'not_found' })
+  } finally {
+    Date.now = originalNow
+  }
+
+  const accessDenied = {}
+  Object.defineProperty(accessDenied, 'localStorage', { get() { throw new Error('access denied') } })
+  globalThis.window = accessDenied
+  assert.deepEqual(getResult('feature:entry', { version: 1 }), { status: 'failed' })
 })
 
 test('invalidates data when the schema version changes and permits a replacement value', () => {

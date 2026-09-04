@@ -1,5 +1,3 @@
-import { hideNativeLoading, showNativeLoading } from '../../shared/bridge/nativeLoading.js'
-
 export function createNoopPageLoadingAdapter() {
   return Object.freeze({
     show() {},
@@ -7,14 +5,21 @@ export function createNoopPageLoadingAdapter() {
   })
 }
 
-export function createNativePageLoadingAdapter() {
+export function createNativePageLoadingAdapter(homeHostService) {
+  if (
+    !homeHostService
+    || typeof homeHostService.showHomeHostLoading !== 'function'
+    || typeof homeHostService.hideHomeHostLoading !== 'function'
+  ) {
+    throw new TypeError('HomeHostService must provide loading lifecycle methods')
+  }
+
   return Object.freeze({
-    // The Android contract requires the global adapter to generate its own requestId.
-    show() {
-      showNativeLoading()
+    show(loadingCycleId) {
+      homeHostService.showHomeHostLoading({ loadingCycleId })
     },
-    hide() {
-      hideNativeLoading()
+    hide(loadingCycleId) {
+      homeHostService.hideHomeHostLoading({ loadingCycleId })
     },
   })
 }

@@ -114,32 +114,41 @@ export function set(key, value, options) {
 }
 
 export function get(key, fallback, options) {
+  const result = getResult(key, options)
+  return result.status === 'found' ? result.value : fallback
+}
+
+export function getResult(key, options) {
   const storageKey = createStorageKey(key)
   if (!storageKey || !options || !isPositiveInteger(options.version)) {
-    return fallback
+    return Object.freeze({ status: 'failed' })
   }
 
   const storage = resolveStorage()
   if (!storage) {
-    return fallback
+    return Object.freeze({ status: 'failed' })
   }
 
   try {
     const serialized = storage.getItem(storageKey)
     if (serialized === null) {
-      return fallback
+      return Object.freeze({ status: 'not_found' })
     }
 
     const envelope = JSON.parse(serialized)
-    if (!isValidEnvelope(envelope) || envelope.version !== options.version || (Object.hasOwn(envelope, 'expiresAt') && Date.now() >= envelope.expiresAt)) {
+    if (!isValidEnvelope(envelope) || envelope.version !== options.version) {
       discard(storage, storageKey)
-      return fallback
+      return Object.freeze({ status: 'failed' })
+    }
+    if (Object.hasOwn(envelope, 'expiresAt') && Date.now() >= envelope.expiresAt) {
+      discard(storage, storageKey)
+      return Object.freeze({ status: 'not_found' })
     }
 
-    return envelope.value
+    return Object.freeze({ status: 'found', value: envelope.value })
   } catch {
     discard(storage, storageKey)
-    return fallback
+    return Object.freeze({ status: 'failed' })
   }
 }
 

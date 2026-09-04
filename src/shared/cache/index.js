@@ -1,1 +1,1 @@
-export { clearAll, clearFeature, get, remove, set } from './localStorageCache.js'
+export { clearAll, clearFeature, get, getResult, remove, set } from './localStorageCache.js'
