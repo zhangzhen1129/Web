@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  cancelThirdPartySdkIdentifiersConsumer,
   getThirdPartySdkIdentifiers,
   getThirdPartySdkIdentifiersRegistrySize,
 } from './nativeThirdPartySdkIdentifiers.js'
@@ -181,4 +182,68 @@ test('does not overwrite an existing controlled callback', () => {
   assert.equal(calls.length, 0)
   assert.equal(getThirdPartySdkIdentifiersRegistrySize(), 0)
   assert.equal(window.__dineroProThirdPartySdkIdentifiersReply, existing)
+})
+
+test('reports exact failures and detaches the SDK identifier consumer', () => {
+  const failures = []
+  globalThis.window = { dispatchEvent() {} }
+  assert.equal(getThirdPartySdkIdentifiers(() => {}, { onFailure: (failure) => failures.push(failure) }), null)
+  assert.deepEqual(failures.pop(), { capability: 'fetchThirdPartySdkIdentifiers', code: 'BRIDGE_UNAVAILABLE' })
+
+  installBridge({
+    handler(request) {
+      return JSON.stringify({
+        action: 'third_party_sdk_identifier_fetch',
+        requestId: request.requestId,
+        status: 'busy',
+        message: 'busy',
+      })
+    },
+  })
+  assert.equal(getThirdPartySdkIdentifiers(() => {}, { onFailure: (failure) => failures.push(failure) }), null)
+  assert.deepEqual(failures.pop(), { capability: 'fetchThirdPartySdkIdentifiers', code: 'BRIDGE_NOT_ACCEPTED' })
+
+  installBridge({ handler() { return '{invalid-json' } })
+  assert.equal(getThirdPartySdkIdentifiers(() => {}, { onFailure: (failure) => failures.push(failure) }), null)
+  assert.deepEqual(failures.pop(), { capability: 'fetchThirdPartySdkIdentifiers', code: 'BRIDGE_CALL_FAILED' })
+
+  installBridge()
+  const originalStringify = JSON.stringify
+  try {
+    JSON.stringify = () => { throw new Error('serialization failure') }
+    assert.equal(getThirdPartySdkIdentifiers(() => {}, { onFailure: (failure) => failures.push(failure) }), null)
+  } finally {
+    JSON.stringify = originalStringify
+  }
+  assert.deepEqual(failures.pop(), { capability: 'fetchThirdPartySdkIdentifiers', code: 'BRIDGE_CALL_FAILED' })
+
+  let calls = installBridge()
+  const invalidRequestId = getThirdPartySdkIdentifiers(() => {}, { onFailure: (failure) => failures.push(failure) })
+  window[calls[0].replyHandler.replace('window.', '')]({
+    action: 'third_party_sdk_identifier_fetch',
+    requestId: invalidRequestId,
+    status: 'success',
+    message: 'invalid',
+  })
+  assert.deepEqual(failures.pop(), { capability: 'fetchThirdPartySdkIdentifiers', code: 'INVALID_CALLBACK' })
+
+  calls = installBridge()
+  const results = []
+  const requestId = getThirdPartySdkIdentifiers((reply) => results.push(reply), { onFailure: (failure) => failures.push(failure) })
+  const callback = window[calls[0].replyHandler.replace('window.', '')]
+  assert.equal(cancelThirdPartySdkIdentifiersConsumer(requestId), true)
+  assert.equal(cancelThirdPartySdkIdentifiersConsumer(requestId), true)
+  callback({
+    action: 'third_party_sdk_identifier_fetch',
+    requestId,
+    status: 'success',
+    message: 'success',
+    appsFlyerUid: 'redacted-apps-flyer-uid',
+    firebaseAppInstanceId: 'redacted-firebase-id',
+    googleAdvertisingId: 'redacted-advertising-id',
+  })
+  assert.deepEqual(results, [])
+  assert.deepEqual(failures, [])
+  assert.equal(getThirdPartySdkIdentifiersRegistrySize(), 0)
+  assert.equal(cancelThirdPartySdkIdentifiersConsumer(requestId), false)
 })

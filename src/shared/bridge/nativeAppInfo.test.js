@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  cancelNativeAppInfoConsumer,
   getNativeAppInfo,
   getNativeAppInfoRegistrySize,
 } from './nativeAppInfo.js'
@@ -137,4 +138,66 @@ test('does not delete a replacement function while cleaning a shared callback re
   assert.equal(calls.length, 1)
   assert.equal(getNativeAppInfoRegistrySize(), 0)
   assert.equal(window.__dineroProAppInfoReply, replacement)
+})
+
+test('reports exact failures and detaches the business consumer', () => {
+  const failures = []
+  globalThis.window = { dispatchEvent() {} }
+  assert.equal(getNativeAppInfo(() => {}, { onFailure: (failure) => failures.push(failure) }), null)
+  assert.deepEqual(failures.pop(), { capability: 'fetchAppInfo', code: 'BRIDGE_UNAVAILABLE' })
+
+  installBridge({
+    handler(request) {
+      return JSON.stringify({ action: 'app_info_fetch', requestId: request.requestId, status: 'busy', message: 'busy' })
+    },
+  })
+  assert.equal(getNativeAppInfo(() => {}, { onFailure: (failure) => failures.push(failure) }), null)
+  assert.deepEqual(failures.pop(), { capability: 'fetchAppInfo', code: 'BRIDGE_NOT_ACCEPTED' })
+
+  installBridge({ handler() { return '{invalid-json' } })
+  assert.equal(getNativeAppInfo(() => {}, { onFailure: (failure) => failures.push(failure) }), null)
+  assert.deepEqual(failures.pop(), { capability: 'fetchAppInfo', code: 'BRIDGE_CALL_FAILED' })
+
+  installBridge()
+  const originalStringify = JSON.stringify
+  try {
+    JSON.stringify = () => { throw new Error('serialization failure') }
+    assert.equal(getNativeAppInfo(() => {}, { onFailure: (failure) => failures.push(failure) }), null)
+  } finally {
+    JSON.stringify = originalStringify
+  }
+  assert.deepEqual(failures.pop(), { capability: 'fetchAppInfo', code: 'BRIDGE_CALL_FAILED' })
+
+  let calls = installBridge()
+  const invalidRequestId = getNativeAppInfo(() => {}, { onFailure: (failure) => failures.push(failure) })
+  window[calls[0].replyHandler.replace('window.', '')]({
+    action: 'app_info_fetch',
+    requestId: invalidRequestId,
+    status: 'success',
+    message: 'invalid',
+  })
+  assert.deepEqual(failures.pop(), { capability: 'fetchAppInfo', code: 'INVALID_CALLBACK' })
+
+  calls = installBridge()
+  const results = []
+  const requestId = getNativeAppInfo((reply) => results.push(reply), { onFailure: (failure) => failures.push(failure) })
+  const callback = window[calls[0].replyHandler.replace('window.', '')]
+  assert.equal(cancelNativeAppInfoConsumer(requestId), true)
+  assert.equal(cancelNativeAppInfoConsumer(requestId), true)
+  callback({
+    action: 'app_info_fetch',
+    requestId,
+    status: 'success',
+    message: 'success',
+    packageId: 'com.example.app',
+    packageName: 'Example',
+    appVersion: '12',
+    appVersionName: '1.2.0',
+    appName: 'Example',
+    androidId: 'redacted-android-id',
+  })
+  assert.deepEqual(results, [])
+  assert.deepEqual(failures, [])
+  assert.equal(getNativeAppInfoRegistrySize(), 0)
+  assert.equal(cancelNativeAppInfoConsumer(requestId), false)
 })

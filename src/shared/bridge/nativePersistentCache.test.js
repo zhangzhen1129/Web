@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
+  cancelNativeCachedTokenConsumer,
   getNativeCachedToken,
   getNativePersistentCacheRegistrySize,
 } from './nativePersistentCache.js'
@@ -135,4 +136,55 @@ test('rejects an accepted synchronous response missing its required message', ()
   assert.equal(getNativeCachedToken(() => {}), null)
   assert.equal(getNativePersistentCacheRegistrySize(), 0)
   assert.equal(typeof globalThis.window.__dineroProPersistentCacheReply, 'undefined')
+})
+
+test('reports exact failures and detaches the token consumer', () => {
+  const failures = []
+  globalThis.window = { dispatchEvent() {} }
+  assert.equal(getNativeCachedToken(() => {}, { onFailure: (failure) => failures.push(failure) }), null)
+  assert.deepEqual(failures.pop(), { capability: 'handlePersistentCache', code: 'BRIDGE_UNAVAILABLE' })
+
+  globalThis.window = {
+    dispatchEvent() {},
+    plahub: {
+      handlePersistentCache(payload) {
+        const request = JSON.parse(payload)
+        return JSON.stringify({ action: 'persistent_cache_handle', requestId: request.requestId, status: 'busy', message: 'busy' })
+      },
+    },
+  }
+  assert.equal(getNativeCachedToken(() => {}, { onFailure: (failure) => failures.push(failure) }), null)
+  assert.deepEqual(failures.pop(), { capability: 'handlePersistentCache', code: 'BRIDGE_NOT_ACCEPTED' })
+
+  globalThis.window.plahub.handlePersistentCache = () => '{invalid-json'
+  assert.equal(getNativeCachedToken(() => {}, { onFailure: (failure) => failures.push(failure) }), null)
+  assert.deepEqual(failures.pop(), { capability: 'handlePersistentCache', code: 'BRIDGE_CALL_FAILED' })
+
+  installBridge()
+  const originalStringify = JSON.stringify
+  try {
+    JSON.stringify = () => { throw new Error('serialization failure') }
+    assert.equal(getNativeCachedToken(() => {}, { onFailure: (failure) => failures.push(failure) }), null)
+  } finally {
+    JSON.stringify = originalStringify
+  }
+  assert.deepEqual(failures.pop(), { capability: 'handlePersistentCache', code: 'BRIDGE_CALL_FAILED' })
+
+  const calls = installBridge()
+  const invalidRequestId = getNativeCachedToken(() => {}, { onFailure: (failure) => failures.push(failure) })
+  const callback = window[calls[0].replyHandler.replace('window.', '')]
+  callback({ requestId: invalidRequestId, status: 'completed' })
+  assert.deepEqual(failures.pop(), { capability: 'handlePersistentCache', code: 'INVALID_CALLBACK' })
+
+  const nextCalls = installBridge()
+  const results = []
+  const requestId = getNativeCachedToken((reply) => results.push(reply), { onFailure: (failure) => failures.push(failure) })
+  const nextCallback = window[nextCalls[0].replyHandler.replace('window.', '')]
+  assert.equal(cancelNativeCachedTokenConsumer(requestId), true)
+  assert.equal(cancelNativeCachedTokenConsumer(requestId), true)
+  nextCallback(createCacheReply(requestId))
+  assert.deepEqual(results, [])
+  assert.deepEqual(failures, [])
+  assert.equal(getNativePersistentCacheRegistrySize(), 0)
+  assert.equal(cancelNativeCachedTokenConsumer(requestId), false)
 })

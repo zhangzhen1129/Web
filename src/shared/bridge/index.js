@@ -5,24 +5,28 @@ export {
 } from './nativeLoading.js'
 
 export {
+  cancelNativeCachedTokenConsumer,
   getNativeCachedToken,
   getNativePersistentCacheRegistrySize,
   nativePersistentCacheBridge,
 } from './nativePersistentCache.js'
 
 export {
+  cancelNativeAppInfoConsumer,
   getNativeAppInfo,
   getNativeAppInfoRegistrySize,
   nativeAppInfoBridge,
 } from './nativeAppInfo.js'
 
 export {
+  cancelThirdPartySdkIdentifiersConsumer,
   getThirdPartySdkIdentifiers,
   getThirdPartySdkIdentifiersRegistrySize,
   nativeThirdPartySdkIdentifiersBridge,
 } from './nativeThirdPartySdkIdentifiers.js'
 
 export {
+  cancelNativeOneClickPermissionConsumer,
   getNativeOneClickPermissionRegistrySize,
   nativeOneClickPermissionsBridge,
   requestNativeOneClickPermissions,

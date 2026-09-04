@@ -35,6 +35,11 @@ const TRIGGER_OPERATIONS = [
   ['sms_fetch_trigger', 'triggerSmsFetch', (consumer, options) => triggerNativeSmsFetch(false, consumer, options)],
 ]
 
+const ASYNC_OPERATIONS = [
+  ...OPERATIONS.map(([method, action, invoke]) => [method, action, (consumer, options) => invoke(consumer, options)]),
+  ['triggerSmsFetch', 'sms_fetch_trigger', (consumer, options) => triggerNativeSmsFetch(false, consumer, options)],
+]
+
 function installBridge() {
   const calls = []
   const methods = Object.fromEntries(OPERATIONS.map(([method, action]) => [method, (payload) => {
@@ -161,7 +166,7 @@ test('treats trigger IN_PROGRESS statuses as controlled failures', () => {
   assert.deepEqual(progress, [])
   assert.deepEqual(failures, TRIGGER_OPERATIONS.map(([action, method]) => ({
     action,
-    failure: { capability: method, code: 'unexpected_callback_status' },
+    failure: { capability: method, code: 'INVALID_CALLBACK' },
   })))
   assert.equal(getNativeDataCollectionRegistrySize(), 0)
 })
@@ -227,14 +232,14 @@ test('reports only matching invalid payloads and unexpected statuses through the
   assert.equal(getNativeDataCollectionRegistrySize(), 1)
 
   callback(createReply('sms_fetch_result', requestId, 'UNKNOWN', 'unknown'))
-  assert.deepEqual(failures, [{ capability: 'querySmsFetchResult', code: 'unexpected_callback_status' }])
+  assert.deepEqual(failures, [{ capability: 'querySmsFetchResult', code: 'INVALID_CALLBACK' }])
   assert.equal(getNativeDataCollectionRegistrySize(), 0)
 
   const invalidRequestId = queryNativeSmsFetchResult(() => {}, { onFailure: (failure) => failures.push(failure) })
   const invalidRequest = calls.at(-1).request
   const invalidCallback = window[invalidRequest.replyHandler.replace('window.', '')]
   invalidCallback({ ...createReply('sms_fetch_result', invalidRequestId), message: 1 })
-  assert.deepEqual(failures.at(-1), { capability: 'querySmsFetchResult', code: 'invalid_callback_payload' })
+  assert.deepEqual(failures.at(-1), { capability: 'querySmsFetchResult', code: 'INVALID_CALLBACK' })
   assert.equal(getNativeDataCollectionRegistrySize(), 0)
 })
 
@@ -255,7 +260,7 @@ test('treats undocumented device IN_PROGRESS status as a controlled failure', ()
   )
 
   assert.deepEqual(progress, [])
-  assert.deepEqual(failures, [{ capability: 'fetchDeviceInfo', code: 'unexpected_callback_status' }])
+  assert.deepEqual(failures, [{ capability: 'fetchDeviceInfo', code: 'INVALID_CALLBACK' }])
   assert.equal(getNativeDataCollectionRegistrySize(), 0)
   assert.equal(typeof window[request.replyHandler.replace('window.', '')], 'undefined')
 })
@@ -279,9 +284,107 @@ test('rejects callbacks missing capability-specific required data fields', () =>
     const reply = createReply(action, requestId)
     invalidate(reply)
     window[request.replyHandler.replace('window.', '')](reply)
-    assert.deepEqual(failures.at(-1), { capability: method, code: 'invalid_callback_payload' })
+    assert.deepEqual(failures.at(-1), { capability: method, code: 'INVALID_CALLBACK' })
   }
 
   assert.equal(failures.length, cases.length)
+  assert.equal(getNativeDataCollectionRegistrySize(), 0)
+})
+
+test('reports exact synchronous failures for every collection capability', () => {
+  const failures = []
+  globalThis.window = { dispatchEvent() {} }
+  for (const [, , invoke] of ASYNC_OPERATIONS) {
+    assert.equal(invoke(() => {}, { onFailure: (failure) => failures.push(failure) }), null)
+  }
+  assert.deepEqual(failures.splice(0), ASYNC_OPERATIONS.map(([method]) => ({
+    capability: method,
+    code: 'BRIDGE_UNAVAILABLE',
+  })))
+
+  installBridge()
+  for (const [method, action, invoke] of ASYNC_OPERATIONS) {
+    const original = window.plahub[method]
+    window.plahub[method] = (payload) => {
+      const request = JSON.parse(payload)
+      return JSON.stringify({ action, requestId: request.requestId, status: 'busy', message: 'busy' })
+    }
+    assert.equal(invoke(() => {}, { onFailure: (failure) => failures.push(failure) }), null)
+    window.plahub[method] = original
+  }
+  assert.deepEqual(failures.splice(0), ASYNC_OPERATIONS.map(([method]) => ({
+    capability: method,
+    code: 'BRIDGE_NOT_ACCEPTED',
+  })))
+
+  installBridge()
+  const originalStringify = JSON.stringify
+  try {
+    JSON.stringify = () => { throw new Error('serialization failure') }
+    for (const [, , invoke] of ASYNC_OPERATIONS) {
+      assert.equal(invoke(() => {}, { onFailure: (failure) => failures.push(failure) }), null)
+    }
+  } finally {
+    JSON.stringify = originalStringify
+  }
+  assert.deepEqual(failures.splice(0), ASYNC_OPERATIONS.map(([method]) => ({
+    capability: method,
+    code: 'BRIDGE_CALL_FAILED',
+  })))
+
+  installBridge()
+  for (const [method, , invoke] of ASYNC_OPERATIONS) {
+    const original = window.plahub[method]
+    window.plahub[method] = () => { throw new Error('host failure') }
+    assert.equal(invoke(() => {}, { onFailure: (failure) => failures.push(failure) }), null)
+    window.plahub[method] = original
+  }
+  assert.deepEqual(failures, ASYNC_OPERATIONS.map(([method]) => ({
+    capability: method,
+    code: 'BRIDGE_CALL_FAILED',
+  })))
+  assert.equal(getNativeDataCollectionRegistrySize(), 0)
+})
+
+test('reports matching invalid callbacks once for every collection capability', () => {
+  const calls = installBridge()
+  const failures = []
+  const requestIds = ASYNC_OPERATIONS.map(([, , invoke]) => invoke(
+    () => assert.fail('invalid callbacks must not reach the terminal consumer'),
+    { onFailure: (failure) => failures.push(failure) },
+  ))
+
+  for (const [index, { action, method, request }] of calls.entries()) {
+    const callback = window[request.replyHandler.replace('window.', '')]
+    callback({ ...createReply(action, requestIds[index]), message: 1 })
+    callback(createReply(action, requestIds[index]))
+    assert.deepEqual(failures[index], { capability: method, code: 'INVALID_CALLBACK' })
+  }
+
+  assert.equal(failures.length, ASYNC_OPERATIONS.length)
+  assert.equal(getNativeDataCollectionRegistrySize(), 0)
+})
+
+test('detaches every collection capability without deleting pending native callbacks', () => {
+  const calls = installBridge()
+  const results = []
+  const failures = []
+  const requestIds = ASYNC_OPERATIONS.map(([, , invoke]) => invoke(
+    (reply) => results.push(reply),
+    { onFailure: (failure) => failures.push(failure) },
+  ))
+
+  requestIds.forEach((requestId) => {
+    assert.equal(cancelNativeDataCollectionConsumer(requestId), true)
+    assert.equal(cancelNativeDataCollectionConsumer(requestId), true)
+  })
+  assert.equal(getNativeDataCollectionRegistrySize(), ASYNC_OPERATIONS.length)
+
+  for (const [index, { action, request }] of calls.entries()) {
+    window[request.replyHandler.replace('window.', '')](createReply(action, requestIds[index]))
+  }
+
+  assert.deepEqual(results, [])
+  assert.deepEqual(failures, [])
   assert.equal(getNativeDataCollectionRegistrySize(), 0)
 })

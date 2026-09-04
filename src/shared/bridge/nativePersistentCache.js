@@ -1,3 +1,9 @@
+import {
+  BRIDGE_FAILURE_CODES,
+  deliverBridgeFailure,
+  normalizeFailureOptions,
+} from './bridgeFailure.js'
+
 const BRIDGE_OBJECT = 'plahub'
 const METHOD = 'handlePersistentCache'
 const CALLBACK_NAME = '__dineroProPersistentCacheReply'
@@ -37,6 +43,17 @@ function cleanup(record) {
   if (registry.size === 0) removeSharedCallback()
 }
 
+function notifyFailure(record, code) {
+  record.completed = true
+  cleanup(record)
+  if (record.consumerCanceled) return
+  deliverBridgeFailure(record.onFailure, code, METHOD, reportDiagnostic)
+}
+
+function notifyImmediateFailure(onFailure, code) {
+  deliverBridgeFailure(onFailure, code, METHOD, reportDiagnostic)
+}
+
 function isValidReply(reply) {
   return reply !== null
     && typeof reply === 'object'
@@ -65,7 +82,7 @@ function handleReply(reply) {
     : null
 
   if (!isValidReply(reply)) {
-    if (record) cleanup(record)
+    if (record) notifyFailure(record, BRIDGE_FAILURE_CODES.invalidCallback)
     reportDiagnostic('BRIDGE_CALLBACK_INVALID_PAYLOAD')
     return
   }
@@ -82,6 +99,7 @@ function handleReply(reply) {
     return
   }
   record.completed = true
+  if (record.consumerCanceled) return
 
   try {
     record.consumer(reply)
@@ -108,19 +126,29 @@ function ensureSharedCallback() {
 /** Query the Android persistent cache entry named Token.
  * The callback remains application-scoped so a route change cannot cancel it.
  */
-export function getNativeCachedToken(consumer = () => {}) {
+export function getNativeCachedToken(consumer = () => {}, options) {
+  const failureOptions = normalizeFailureOptions(options)
+  if (!failureOptions.valid) {
+    reportDiagnostic('BRIDGE_INVALID_OPTIONS')
+    return null
+  }
   if (typeof consumer !== 'function') {
     reportDiagnostic('BRIDGE_CALLBACK_INVALID_CONSUMER')
+    notifyImmediateFailure(failureOptions.onFailure, BRIDGE_FAILURE_CODES.invalidArgument)
     return null
   }
 
   const bridge = typeof window === 'undefined' ? undefined : window[BRIDGE_OBJECT]
   if (!bridge || typeof bridge[METHOD] !== 'function') {
     reportDiagnostic('BRIDGE_METHOD_UNAVAILABLE')
+    notifyImmediateFailure(failureOptions.onFailure, BRIDGE_FAILURE_CODES.unavailable)
     return null
   }
 
-  if (!ensureSharedCallback()) return null
+  if (!ensureSharedCallback()) {
+    notifyImmediateFailure(failureOptions.onFailure, BRIDGE_FAILURE_CODES.callFailed)
+    return null
+  }
 
   const registryKey = createId('persistent-cache')
   const requestId = createId('cache-get')
@@ -131,30 +159,44 @@ export function getNativeCachedToken(consumer = () => {}) {
     requestId,
     status: 'pending',
     completed: false,
+    consumerCanceled: false,
     consumer,
+    onFailure: failureOptions.onFailure,
   }
   registry.set(registryKey, record)
 
-  const payload = JSON.stringify({
-    requestId,
-    replyHandler: `window.${CALLBACK_NAME}`,
-    operation: 'get',
-    cacheKey: CACHE_KEY,
-  })
+  let payload
+  try {
+    payload = JSON.stringify({
+      requestId,
+      replyHandler: `window.${CALLBACK_NAME}`,
+      operation: 'get',
+      cacheKey: CACHE_KEY,
+    })
+  } catch {
+    notifyFailure(record, BRIDGE_FAILURE_CODES.callFailed)
+    reportDiagnostic('BRIDGE_CALL_FAILED')
+    return null
+  }
 
   try {
     const synchronousResult = JSON.parse(bridge[METHOD](payload))
     const accepted = synchronousResult?.action === 'persistent_cache_handle'
       && synchronousResult.requestId === requestId
-      && synchronousResult.status === 'accepted'
+      && typeof synchronousResult.status === 'string'
       && typeof synchronousResult.message === 'string'
     if (!accepted) {
-      cleanup(record)
+      notifyFailure(record, BRIDGE_FAILURE_CODES.callFailed)
+      reportDiagnostic('BRIDGE_CALL_FAILED')
+      return null
+    }
+    if (synchronousResult.status !== 'accepted') {
+      notifyFailure(record, BRIDGE_FAILURE_CODES.notAccepted)
       reportDiagnostic('BRIDGE_REQUEST_NOT_ACCEPTED')
       return null
     }
   } catch {
-    cleanup(record)
+    notifyFailure(record, BRIDGE_FAILURE_CODES.callFailed)
     reportDiagnostic('BRIDGE_CALL_FAILED')
     return null
   }
@@ -162,8 +204,21 @@ export function getNativeCachedToken(consumer = () => {}) {
   return requestId
 }
 
+export function cancelNativeCachedTokenConsumer(requestId) {
+  if (typeof requestId !== 'string' || requestId.length === 0) return false
+  const record = [...registry.values()].find((entry) => entry.requestId === requestId)
+  if (!record || record.completed) return false
+  record.consumerCanceled = true
+  record.consumer = () => {}
+  record.onFailure = null
+  return true
+}
+
 export function getNativePersistentCacheRegistrySize() {
   return registry.size
 }
 
-export const nativePersistentCacheBridge = Object.freeze({ getNativeCachedToken })
+export const nativePersistentCacheBridge = Object.freeze({
+  cancelNativeCachedTokenConsumer,
+  getNativeCachedToken,
+})

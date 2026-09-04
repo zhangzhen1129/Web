@@ -1,3 +1,9 @@
+import {
+  BRIDGE_FAILURE_CODES,
+  deliverBridgeFailure,
+  normalizeFailureOptions,
+} from './bridgeFailure.js'
+
 const BRIDGE_OBJECT = 'plahub'
 const METHOD = 'fetchAppInfo'
 const CALLBACK_NAME = '__dineroProAppInfoReply'
@@ -45,6 +51,17 @@ function cleanup(record) {
   if (registry.size === 0) removeSharedCallback()
 }
 
+function notifyFailure(record, code) {
+  record.completed = true
+  cleanup(record)
+  if (record.consumerCanceled) return
+  deliverBridgeFailure(record.onFailure, code, METHOD, reportDiagnostic)
+}
+
+function notifyImmediateFailure(onFailure, code) {
+  deliverBridgeFailure(onFailure, code, METHOD, reportDiagnostic)
+}
+
 function findRecord(reply) {
   if (!reply || typeof reply !== 'object' || Array.isArray(reply) || typeof reply.requestId !== 'string') return null
   return [...registry.values()].find((entry) => entry.requestId === reply.requestId) ?? null
@@ -67,7 +84,7 @@ function isValidReply(reply) {
 function handleReply(reply) {
   const record = findRecord(reply)
   if (!isValidReply(reply)) {
-    if (record) cleanup(record)
+    if (record) notifyFailure(record, BRIDGE_FAILURE_CODES.invalidCallback)
     reportDiagnostic(record ? 'BRIDGE_CALLBACK_INVALID_PAYLOAD' : 'BRIDGE_CALLBACK_UNKNOWN_REQUEST')
     return
   }
@@ -83,6 +100,7 @@ function handleReply(reply) {
     return
   }
   record.completed = true
+  if (record.consumerCanceled) return
 
   try {
     record.consumer(reply)
@@ -107,25 +125,42 @@ function ensureSharedCallback() {
 }
 
 function isAcceptedResponse(response, requestId) {
-  return response?.action === 'app_info_fetch'
-    && response.requestId === requestId
-    && response.status === 'accepted'
+  if (
+    !response
+    || typeof response !== 'object'
+    || Array.isArray(response)
+    || response.action !== 'app_info_fetch'
+    || response.requestId !== requestId
+    || typeof response.status !== 'string'
+    || typeof response.message !== 'string'
+  ) return BRIDGE_FAILURE_CODES.callFailed
+  return response.status === 'accepted' ? null : BRIDGE_FAILURE_CODES.notAccepted
 }
 
 /** Query app information through the documented Android Bridge capability. */
-export function getNativeAppInfo(consumer = () => {}) {
+export function getNativeAppInfo(consumer = () => {}, options) {
+  const failureOptions = normalizeFailureOptions(options)
+  if (!failureOptions.valid) {
+    reportDiagnostic('BRIDGE_INVALID_OPTIONS')
+    return null
+  }
   if (typeof consumer !== 'function') {
     reportDiagnostic('BRIDGE_CALLBACK_INVALID_CONSUMER')
+    notifyImmediateFailure(failureOptions.onFailure, BRIDGE_FAILURE_CODES.invalidArgument)
     return null
   }
 
   const bridge = typeof window === 'undefined' ? undefined : window[BRIDGE_OBJECT]
   if (!bridge || typeof bridge[METHOD] !== 'function') {
     reportDiagnostic('BRIDGE_METHOD_UNAVAILABLE')
+    notifyImmediateFailure(failureOptions.onFailure, BRIDGE_FAILURE_CODES.unavailable)
     return null
   }
 
-  if (!ensureSharedCallback()) return null
+  if (!ensureSharedCallback()) {
+    notifyImmediateFailure(failureOptions.onFailure, BRIDGE_FAILURE_CODES.callFailed)
+    return null
+  }
 
   const registryKey = createId('app-info')
   const requestId = createId('app-info-fetch')
@@ -136,24 +171,34 @@ export function getNativeAppInfo(consumer = () => {}) {
     requestId,
     status: 'pending',
     completed: false,
+    consumerCanceled: false,
     consumer,
+    onFailure: failureOptions.onFailure,
   }
   registry.set(registryKey, record)
 
-  const payload = JSON.stringify({
-    requestId,
-    replyHandler: `window.${CALLBACK_NAME}`,
-  })
+  let payload
+  try {
+    payload = JSON.stringify({
+      requestId,
+      replyHandler: `window.${CALLBACK_NAME}`,
+    })
+  } catch {
+    notifyFailure(record, BRIDGE_FAILURE_CODES.callFailed)
+    reportDiagnostic('BRIDGE_CALL_FAILED')
+    return null
+  }
 
   try {
     const synchronousResult = JSON.parse(bridge[METHOD](payload))
-    if (!isAcceptedResponse(synchronousResult, requestId)) {
-      cleanup(record)
-      reportDiagnostic('BRIDGE_REQUEST_NOT_ACCEPTED')
+    const failureCode = isAcceptedResponse(synchronousResult, requestId)
+    if (failureCode) {
+      notifyFailure(record, failureCode)
+      reportDiagnostic(failureCode === BRIDGE_FAILURE_CODES.notAccepted ? 'BRIDGE_REQUEST_NOT_ACCEPTED' : 'BRIDGE_CALL_FAILED')
       return null
     }
   } catch {
-    cleanup(record)
+    notifyFailure(record, BRIDGE_FAILURE_CODES.callFailed)
     reportDiagnostic('BRIDGE_CALL_FAILED')
     return null
   }
@@ -161,8 +206,21 @@ export function getNativeAppInfo(consumer = () => {}) {
   return requestId
 }
 
+export function cancelNativeAppInfoConsumer(requestId) {
+  if (typeof requestId !== 'string' || requestId.length === 0) return false
+  const record = [...registry.values()].find((entry) => entry.requestId === requestId)
+  if (!record || record.completed) return false
+  record.consumerCanceled = true
+  record.consumer = () => {}
+  record.onFailure = null
+  return true
+}
+
 export function getNativeAppInfoRegistrySize() {
   return registry.size
 }
 
-export const nativeAppInfoBridge = Object.freeze({ getNativeAppInfo })
+export const nativeAppInfoBridge = Object.freeze({
+  cancelNativeAppInfoConsumer,
+  getNativeAppInfo,
+})

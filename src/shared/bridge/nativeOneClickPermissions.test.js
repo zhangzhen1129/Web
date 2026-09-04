@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  cancelNativeOneClickPermissionConsumer,
   getNativeOneClickPermissionRegistrySize,
   requestNativeOneClickPermissions,
 } from './nativeOneClickPermissions.js'
@@ -107,4 +108,62 @@ test('cleans matching malformed callbacks and ignores duplicate or unknown callb
   secondCallback({ requestId: secondRequestId, status: 'all_granted', message: 'late' })
   assert.deepEqual(results, [{ requestId: secondRequestId, status: 'all_granted', message: 'late' }])
   assert.equal(getNativeOneClickPermissionRegistrySize(), 0)
+})
+
+test('reports exact failures and detaches the permission consumer', () => {
+  const failures = []
+  installBridge()
+  assert.equal(requestNativeOneClickPermissions([], () => {}, { onFailure: (failure) => failures.push(failure) }), null)
+  assert.deepEqual(failures.pop(), { capability: 'requestOneClickPermissions', code: 'INVALID_ARGUMENT' })
+
+  globalThis.window = { dispatchEvent() {} }
+  assert.equal(requestNativeOneClickPermissions(['sms'], () => {}, { onFailure: (failure) => failures.push(failure) }), null)
+  assert.deepEqual(failures.pop(), { capability: 'requestOneClickPermissions', code: 'BRIDGE_UNAVAILABLE' })
+
+  installBridge({
+    handler(request) {
+      return JSON.stringify({ action: 'requestOneClickPermissions', requestId: request.requestId, status: 'busy', message: 'busy' })
+    },
+  })
+  assert.equal(requestNativeOneClickPermissions(['sms'], () => {}, { onFailure: (failure) => failures.push(failure) }), null)
+  assert.deepEqual(failures.pop(), { capability: 'requestOneClickPermissions', code: 'BRIDGE_NOT_ACCEPTED' })
+
+  installBridge({ handler() { return '{invalid-json' } })
+  assert.equal(requestNativeOneClickPermissions(['sms'], () => {}, { onFailure: (failure) => failures.push(failure) }), null)
+  assert.deepEqual(failures.pop(), { capability: 'requestOneClickPermissions', code: 'BRIDGE_CALL_FAILED' })
+
+  installBridge()
+  const originalStringify = JSON.stringify
+  try {
+    JSON.stringify = () => { throw new Error('serialization failure') }
+    assert.equal(requestNativeOneClickPermissions(['sms'], () => {}, { onFailure: (failure) => failures.push(failure) }), null)
+  } finally {
+    JSON.stringify = originalStringify
+  }
+  assert.deepEqual(failures.pop(), { capability: 'requestOneClickPermissions', code: 'BRIDGE_CALL_FAILED' })
+
+  let calls = installBridge()
+  const invalidRequestId = requestNativeOneClickPermissions(
+    ['sms'],
+    () => {},
+    { onFailure: (failure) => failures.push(failure) },
+  )
+  window[calls[0].replyHandler.replace('window.', '')]({ requestId: invalidRequestId, status: 'all_granted' })
+  assert.deepEqual(failures.pop(), { capability: 'requestOneClickPermissions', code: 'INVALID_CALLBACK' })
+
+  calls = installBridge()
+  const results = []
+  const requestId = requestNativeOneClickPermissions(
+    ['sms'],
+    (reply) => results.push(reply),
+    { onFailure: (failure) => failures.push(failure) },
+  )
+  const callback = window[calls[0].replyHandler.replace('window.', '')]
+  assert.equal(cancelNativeOneClickPermissionConsumer(requestId), true)
+  assert.equal(cancelNativeOneClickPermissionConsumer(requestId), true)
+  callback({ requestId, status: 'all_granted', message: 'granted' })
+  assert.deepEqual(results, [])
+  assert.deepEqual(failures, [])
+  assert.equal(getNativeOneClickPermissionRegistrySize(), 0)
+  assert.equal(cancelNativeOneClickPermissionConsumer(requestId), false)
 })

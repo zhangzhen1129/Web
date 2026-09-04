@@ -1,3 +1,9 @@
+import {
+  BRIDGE_FAILURE_CODES,
+  deliverBridgeFailure,
+  normalizeFailureOptions,
+} from './bridgeFailure.js'
+
 const BRIDGE_OBJECT = 'plahub'
 const METHOD = 'requestOneClickPermissions'
 const CALLBACK_SCOPE = 'perCall'
@@ -42,11 +48,28 @@ function cleanup(record) {
   }
 }
 
+function notifyFailure(record, code) {
+  record.completed = true
+  cleanup(record)
+  if (record.consumerCanceled) return
+  deliverBridgeFailure(record.onFailure, code, METHOD, reportDiagnostic)
+}
+
+function notifyImmediateFailure(onFailure, code) {
+  deliverBridgeFailure(onFailure, code, METHOD, reportDiagnostic)
+}
+
 function isAcceptedResponse(response, requestId) {
-  return response?.action === METHOD
-    && response.requestId === requestId
-    && response.status === 'accepted'
-    && typeof response.message === 'string'
+  if (
+    !response
+    || typeof response !== 'object'
+    || Array.isArray(response)
+    || response.action !== METHOD
+    || response.requestId !== requestId
+    || typeof response.status !== 'string'
+    || typeof response.message !== 'string'
+  ) return BRIDGE_FAILURE_CODES.callFailed
+  return response.status === 'accepted' ? null : BRIDGE_FAILURE_CODES.notAccepted
 }
 
 function isValidReply(reply, requestId) {
@@ -59,20 +82,28 @@ function isValidReply(reply, requestId) {
 }
 
 /** Request documented Android permissions and deliver the all-granted callback. */
-export function requestNativeOneClickPermissions(permissions, consumer = () => {}) {
+export function requestNativeOneClickPermissions(permissions, consumer = () => {}, options) {
+  const failureOptions = normalizeFailureOptions(options)
+  if (!failureOptions.valid) {
+    reportDiagnostic('BRIDGE_INVALID_OPTIONS')
+    return null
+  }
   const normalizedPermissions = normalizePermissions(permissions)
   if (!normalizedPermissions) {
     reportDiagnostic('BRIDGE_INVALID_PERMISSION_SET')
+    notifyImmediateFailure(failureOptions.onFailure, BRIDGE_FAILURE_CODES.invalidArgument)
     return null
   }
   if (typeof consumer !== 'function') {
     reportDiagnostic('BRIDGE_CALLBACK_INVALID_CONSUMER')
+    notifyImmediateFailure(failureOptions.onFailure, BRIDGE_FAILURE_CODES.invalidArgument)
     return null
   }
 
   const bridge = typeof window === 'undefined' ? undefined : window[BRIDGE_OBJECT]
   if (!bridge || typeof bridge[METHOD] !== 'function') {
     reportDiagnostic('BRIDGE_METHOD_UNAVAILABLE')
+    notifyImmediateFailure(failureOptions.onFailure, BRIDGE_FAILURE_CODES.unavailable)
     return null
   }
 
@@ -86,7 +117,9 @@ export function requestNativeOneClickPermissions(permissions, consumer = () => {
     callbackName,
     callbackScope: CALLBACK_SCOPE,
     completed: false,
+    consumerCanceled: false,
     consumer,
+    onFailure: failureOptions.onFailure,
     callback: null,
   }
 
@@ -100,13 +133,14 @@ export function requestNativeOneClickPermissions(permissions, consumer = () => {
       return
     }
     if (!isValidReply(reply, requestId)) {
-      cleanup(record)
+      notifyFailure(record, BRIDGE_FAILURE_CODES.invalidCallback)
       reportDiagnostic('BRIDGE_CALLBACK_INVALID_PAYLOAD')
       return
     }
 
     record.completed = true
     cleanup(record)
+    if (record.consumerCanceled) return
     try {
       record.consumer(reply)
     } catch {
@@ -118,30 +152,40 @@ export function requestNativeOneClickPermissions(permissions, consumer = () => {
   try {
     if (typeof window[callbackName] !== 'undefined') {
       reportDiagnostic('BRIDGE_CALLBACK_NAME_CONFLICT')
+      notifyImmediateFailure(failureOptions.onFailure, BRIDGE_FAILURE_CODES.callFailed)
       return null
     }
     window[callbackName] = callback
   } catch {
     reportDiagnostic('BRIDGE_CALLBACK_REGISTRATION_FAILED')
+    notifyImmediateFailure(failureOptions.onFailure, BRIDGE_FAILURE_CODES.callFailed)
     return null
   }
 
   registry.set(registryKey, record)
-  const payload = JSON.stringify({
-    requestId,
-    replyHandler: callbackPath,
-    permissions: normalizedPermissions,
-  })
+  let payload
+  try {
+    payload = JSON.stringify({
+      requestId,
+      replyHandler: callbackPath,
+      permissions: normalizedPermissions,
+    })
+  } catch {
+    notifyFailure(record, BRIDGE_FAILURE_CODES.callFailed)
+    reportDiagnostic('BRIDGE_CALL_FAILED')
+    return null
+  }
 
   try {
     const synchronousResult = JSON.parse(bridge[METHOD](payload))
-    if (!isAcceptedResponse(synchronousResult, requestId)) {
-      cleanup(record)
-      reportDiagnostic('BRIDGE_REQUEST_NOT_ACCEPTED')
+    const failureCode = isAcceptedResponse(synchronousResult, requestId)
+    if (failureCode) {
+      notifyFailure(record, failureCode)
+      reportDiagnostic(failureCode === BRIDGE_FAILURE_CODES.notAccepted ? 'BRIDGE_REQUEST_NOT_ACCEPTED' : 'BRIDGE_CALL_FAILED')
       return null
     }
   } catch {
-    cleanup(record)
+    notifyFailure(record, BRIDGE_FAILURE_CODES.callFailed)
     reportDiagnostic('BRIDGE_CALL_FAILED')
     return null
   }
@@ -149,8 +193,21 @@ export function requestNativeOneClickPermissions(permissions, consumer = () => {
   return requestId
 }
 
+export function cancelNativeOneClickPermissionConsumer(requestId) {
+  if (typeof requestId !== 'string' || requestId.length === 0) return false
+  const record = [...registry.values()].find((entry) => entry.requestId === requestId)
+  if (!record || record.completed) return false
+  record.consumerCanceled = true
+  record.consumer = () => {}
+  record.onFailure = null
+  return true
+}
+
 export function getNativeOneClickPermissionRegistrySize() {
   return registry.size
 }
 
-export const nativeOneClickPermissionsBridge = Object.freeze({ requestNativeOneClickPermissions })
+export const nativeOneClickPermissionsBridge = Object.freeze({
+  cancelNativeOneClickPermissionConsumer,
+  requestNativeOneClickPermissions,
+})

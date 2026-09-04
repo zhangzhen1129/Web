@@ -1,3 +1,9 @@
+import {
+  BRIDGE_FAILURE_CODES,
+  deliverBridgeFailure,
+  normalizeFailureOptions,
+} from './bridgeFailure.js'
+
 const BRIDGE_OBJECT = 'plahub'
 const CALLBACK_SCOPE = 'perCall'
 
@@ -129,6 +135,13 @@ function notifyFailure(record, code) {
   }
 }
 
+function notifyImmediateFailure(options, code, capability) {
+  const failureOptions = normalizeFailureOptions(options)
+  deliverBridgeFailure(failureOptions.onFailure, code, capability.method, (diagnosticCode) => {
+    reportDiagnostic(diagnosticCode, capability.method)
+  })
+}
+
 function notifyProgress(record, reply) {
   record.completed = true
   cleanup(record)
@@ -173,14 +186,23 @@ function registerCallback(record) {
 }
 
 function invokeCapability(capability, extraPayload, consumer = () => {}, options = {}) {
+  const failureOptions = normalizeFailureOptions(options)
+  const progressValid = typeof options?.onProgress === 'undefined' || typeof options.onProgress === 'function'
+  if (!failureOptions.valid || !progressValid) {
+    reportDiagnostic('BRIDGE_INVALID_OPTIONS', capability.method)
+    notifyImmediateFailure(options, BRIDGE_FAILURE_CODES.invalidArgument, capability)
+    return null
+  }
   if (typeof consumer !== 'function') {
     reportDiagnostic('BRIDGE_CALLBACK_INVALID_CONSUMER', capability.method)
+    notifyImmediateFailure(options, BRIDGE_FAILURE_CODES.invalidArgument, capability)
     return null
   }
 
   const bridge = typeof window === 'undefined' ? undefined : window[BRIDGE_OBJECT]
   if (!bridge || typeof bridge[capability.method] !== 'function') {
     reportDiagnostic('BRIDGE_METHOD_UNAVAILABLE', capability.method)
+    notifyImmediateFailure(options, BRIDGE_FAILURE_CODES.unavailable, capability)
     return null
   }
 
@@ -195,7 +217,7 @@ function invokeCapability(capability, extraPayload, consumer = () => {}, options
     completed: false,
     consumer,
     onProgress: typeof options.onProgress === 'function' ? options.onProgress : null,
-    onFailure: typeof options.onFailure === 'function' ? options.onFailure : null,
+    onFailure: failureOptions.onFailure,
     consumerCanceled: false,
     registryKey,
     requestId,
@@ -209,7 +231,7 @@ function invokeCapability(capability, extraPayload, consumer = () => {}, options
     }
     if (!isValidReply(reply, record)) {
       if (isObject(reply) && reply.requestId === requestId) {
-        notifyFailure(record, 'invalid_callback_payload')
+        notifyFailure(record, BRIDGE_FAILURE_CODES.invalidCallback)
       }
       reportDiagnostic('BRIDGE_CALLBACK_INVALID_PAYLOAD', capability.method)
       return
@@ -221,7 +243,7 @@ function invokeCapability(capability, extraPayload, consumer = () => {}, options
       return
     }
     if (!capability.terminalStatuses.has(reply.status)) {
-      notifyFailure(record, 'unexpected_callback_status')
+      notifyFailure(record, BRIDGE_FAILURE_CODES.invalidCallback)
       reportDiagnostic('BRIDGE_CALLBACK_UNEXPECTED_STATUS', capability.method)
       return
     }
@@ -235,19 +257,39 @@ function invokeCapability(capability, extraPayload, consumer = () => {}, options
     }
   }
 
-  if (!registerCallback(record)) return null
+  if (!registerCallback(record)) {
+    notifyImmediateFailure(options, BRIDGE_FAILURE_CODES.callFailed, capability)
+    return null
+  }
   registry.set(registryKey, record)
-  const payload = JSON.stringify({ requestId, replyHandler: `window.${callbackName}`, ...extraPayload })
+  let payload
+  try {
+    payload = JSON.stringify({ requestId, replyHandler: `window.${callbackName}`, ...extraPayload })
+  } catch {
+    notifyFailure(record, BRIDGE_FAILURE_CODES.callFailed)
+    reportDiagnostic('BRIDGE_CALL_FAILED', capability.method)
+    return null
+  }
 
   try {
     const synchronousResult = JSON.parse(bridge[capability.method](payload))
+    const responseShapeValid = isObject(synchronousResult)
+      && synchronousResult.action === capability.action
+      && synchronousResult.requestId === requestId
+      && typeof synchronousResult.status === 'string'
+      && typeof synchronousResult.message === 'string'
+    if (!responseShapeValid) {
+      notifyFailure(record, BRIDGE_FAILURE_CODES.callFailed)
+      reportDiagnostic('BRIDGE_CALL_FAILED', capability.method)
+      return null
+    }
     if (!isAcceptedResponse(synchronousResult, capability, requestId)) {
-      cleanup(record)
+      notifyFailure(record, BRIDGE_FAILURE_CODES.notAccepted)
       reportDiagnostic('BRIDGE_REQUEST_NOT_ACCEPTED', capability.method)
       return null
     }
   } catch {
-    cleanup(record)
+    notifyFailure(record, BRIDGE_FAILURE_CODES.callFailed)
     reportDiagnostic('BRIDGE_CALL_FAILED', capability.method)
     return null
   }
@@ -265,6 +307,7 @@ export function queryNativeSmsFetchResult(consumer = () => {}, options) { return
 export function triggerNativeSmsFetch(skipKeywordFilter, consumer = () => {}, options) {
   if (typeof skipKeywordFilter !== 'boolean') {
     reportDiagnostic('BRIDGE_INVALID_SMS_FILTER', CAPABILITIES.smsTrigger.method)
+    notifyImmediateFailure(options, BRIDGE_FAILURE_CODES.invalidArgument, CAPABILITIES.smsTrigger)
     return null
   }
   return invokeCapability(CAPABILITIES.smsTrigger, { skipKeywordFilter }, consumer, options)
