@@ -46,9 +46,9 @@ export function createVConsoleManager({ loadVConsole, diagnostic = reportDiagnos
 
   return Object.freeze({
     initializeEnabled,
-    initializeForEnvironment(isProduction, isTestEnvironment = true) {
-      if (typeof isProduction !== 'boolean' || typeof isTestEnvironment !== 'boolean') return Promise.resolve(null)
-      const enableVConsole = !isProduction && isTestEnvironment
+    initializeForEnvironment(isProduction, isTestEnvironment = true, isTestBuild = false) {
+      if (typeof isProduction !== 'boolean' || typeof isTestEnvironment !== 'boolean' || typeof isTestBuild !== 'boolean') return Promise.resolve(null)
+      const enableVConsole = isTestBuild || (!isProduction && isTestEnvironment)
       return initializeEnabled(enableVConsole)
     },
     getInstance() {
@@ -66,9 +66,10 @@ function getApplicationManager() {
 
 export function initializeVConsole(isTestEnvironment = true) {
   if (typeof isTestEnvironment !== 'boolean') return Promise.resolve(null)
-  const enableVConsole = !import.meta.env.PROD && isTestEnvironment
+  const isTestBuild = import.meta.env.MODE === 'test'
+  const enableVConsole = isTestBuild || (!import.meta.env.PROD && isTestEnvironment)
   if (!enableVConsole) return Promise.resolve(null)
-  return getApplicationManager().initializeEnabled(enableVConsole)
+  return getApplicationManager().initializeForEnvironment(import.meta.env.PROD, isTestEnvironment, isTestBuild)
 }
 
 export function getVConsoleInstance() {

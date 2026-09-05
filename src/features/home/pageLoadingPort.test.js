@@ -24,10 +24,12 @@ test('rejects adapters without the complete host loading contract', () => {
   assert.throws(() => createNativePageLoadingAdapter({ showHomeHostLoading() {} }), /HomeHostService/)
 })
 
-test('home page composes initialization and loading through the semantic host service', () => {
+test('home page composes initialization and loading through the flow controller', () => {
   const source = readFileSync(new URL('./views/HomePage.vue', import.meta.url), 'utf8')
   assert.match(source, /createHomeHostService\(\{ globalStore \}\)/)
-  assert.match(source, /initializeHomeHostContext\(\{ initCycleId \}\)/)
-  assert.match(source, /disposeHomeHostInit\(\{ initCycleId \}\)/)
+  assert.match(source, /createHomeFlowController\(/)
+  assert.match(source, /dataProvider: viewProvider\.value/)
+  assert.match(source, /startHomeFlow\(\{ flowScopeId \}\)/)
+  assert.match(source, /disposeHomeFlow\(\{ flowScopeId \}\)/)
   assert.doesNotMatch(source, /shared\/bridge|nativeAppInfoBootstrap|nativeTokenBootstrap|nativeThirdPartySdkIdentifiersBootstrap/)
 })

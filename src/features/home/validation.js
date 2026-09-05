@@ -331,10 +331,11 @@ function rejectPresentFields(value, fields, issues) {
 
 export function validateHomeViewPayload(payload) {
   const issues = []
-  const keys = new Set(['requestId', 'sourceOperationId', 'pageStatus', 'homeMode', 'viewMode', 'viewData', 'multiPushViewData', 'errorData', 'overlayNotice', 'toastNotice'])
+  const keys = new Set(['requestId', 'revision', 'sourceOperationId', 'pageStatus', 'homeMode', 'viewMode', 'viewData', 'multiPushViewData', 'errorData', 'overlayNotice', 'toastNotice'])
   if (!validateExactKeys(payload, keys, 'payload', issues)) return issues
 
   validateRequiredString(payload.requestId, 'payload.requestId', issues)
+  if (hasOwn(payload, 'revision') && (!Number.isSafeInteger(payload.revision) || payload.revision < 0)) addIssue(issues, 'payload.revision', 'invalid_non_negative_integer')
   validateOptionalString(payload.sourceOperationId, 'payload.sourceOperationId', issues)
   if (!PAGE_STATUSES.has(payload.pageStatus)) addIssue(issues, 'payload.pageStatus', 'invalid_enum')
 
@@ -362,7 +363,8 @@ export function validateHomeViewPayload(payload) {
     else validateErrorData(payload.errorData, 'payload.errorData', issues)
     rejectPresentFields(payload, ['homeMode', 'viewMode', 'viewData', 'multiPushViewData', 'overlayNotice', 'toastNotice'], issues)
   } else if (payload.pageStatus === PAGE_STATUS.LOADING) {
-    rejectPresentFields(payload, ['homeMode', 'viewMode', 'viewData', 'multiPushViewData', 'errorData', 'overlayNotice', 'toastNotice'], issues)
+    rejectPresentFields(payload, ['homeMode', 'viewMode', 'viewData', 'multiPushViewData', 'errorData', 'overlayNotice'], issues)
+    if (hasOwn(payload, 'toastNotice')) validateToastNotice(payload.toastNotice, 'payload.toastNotice', issues)
   }
 
   return issues
@@ -419,7 +421,9 @@ export function validateHomeOperation(operation) {
   if (!validateExactKeys(operation, keys, 'operation', issues)) return issues
   validateRequiredString(operation.requestId, 'operation.requestId', issues)
   if (!OPERATION_TYPES.has(operation.type)) addIssue(issues, 'operation.type', 'invalid_enum')
-  if (!VIEW_MODES.has(operation.viewMode)) addIssue(issues, 'operation.viewMode', 'invalid_enum')
+  if (operation.type === OPERATION_TYPE.REFRESH) {
+    if (hasOwn(operation, 'viewMode') && !VIEW_MODES.has(operation.viewMode)) addIssue(issues, 'operation.viewMode', 'invalid_enum')
+  } else if (!VIEW_MODES.has(operation.viewMode)) addIssue(issues, 'operation.viewMode', 'invalid_enum')
   validateOperationData(operation, issues)
   return issues
 }

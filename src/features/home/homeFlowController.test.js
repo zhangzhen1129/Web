@@ -32,6 +32,7 @@ function createHarness(dataResultFactory) {
   const calls = []
   const views = []
   const intents = []
+  const intentContexts = []
   const host = {
     showHomeHostLoading: ({ loadingCycleId }) => calls.push(`show:${loadingCycleId}`),
     hideHomeHostLoading: ({ loadingCycleId }) => calls.push(`hide:${loadingCycleId}`),
@@ -48,11 +49,11 @@ function createHarness(dataResultFactory) {
   const controller = createHomeFlowController({
     createId: ids,
     updateHomeView: (payload) => views.push(payload),
-    emitHomeRouteIntent: (intent) => intents.push(intent),
+    emitHomeRouteIntent: (intent, context) => { intents.push(intent); intentContexts.push(context) },
     hostService: host,
     dataProvider: data,
   })
-  return { calls, views, intents, controller }
+  return { calls, views, intents, intentContexts, controller }
 }
 
 test('runs host initialization before initial data and emits one final model', async () => {
@@ -90,6 +91,11 @@ test('replaces an active load and ignores stale completion', async () => {
   await third
   assert.equal(harness.controller.getState().flowStatus, 'ready')
   assert.ok(harness.calls.some((item) => item.startsWith('cancelLoad:')))
+  const returnedLoading = harness.views.at(-2)
+  const returnedContent = harness.views.at(-1)
+  assert.equal(returnedLoading.pageStatus, 'loading')
+  assert.equal(returnedContent.pageStatus, 'content')
+  assert.notEqual(returnedLoading.requestId, returnedContent.requestId)
 })
 
 test('requires permission before native and emits semantic route intent', async () => {
@@ -111,6 +117,7 @@ test('requires permission before native and emits semantic route intent', async 
   const result = await harness.controller.handleHomeOperation({ flowScopeId: 'scope-c', operation: { requestId: 'primary-1', type: 'primary_action' } })
   assert.equal(result.status, 'completed')
   assert.deepEqual(harness.intents.map((item) => item.target), ['order_list'])
+  assert.equal(harness.intentContexts[0].permissionResult.status, 'granted')
   assert.equal(harness.calls.filter((item) => item.startsWith('permission:')).length, 1)
   assert.equal(harness.calls.filter((item) => item.startsWith('native:')).length, 0)
 })
@@ -161,10 +168,76 @@ test('refresh emits a refreshing content model and returns ready', async () => {
     snapshot: { mode: 'cash_loan', primaryActionEffect: null },
   }))
   await harness.controller.startHomeFlow({ flowScopeId: 'scope-refresh' })
-  const result = await harness.controller.handleHomeOperation({ flowScopeId: 'scope-refresh', operation: { requestId: 'refresh-1', type: 'refresh' } })
+  const result = await harness.controller.handleHomeOperation({ flowScopeId: 'scope-refresh', operation: { requestId: 'refresh-1', type: 'refresh', viewMode: 'apply' } })
   assert.equal(result.status, 'completed')
   assert.equal(harness.views.at(-2).pageStatus, 'refreshing')
   assert.equal(harness.views.at(-2).viewData.productSelection.selectedAmountKey, '100')
+  assert.equal(Object.hasOwn(harness.views.at(-2), 'tabs'), false)
+  assert.notEqual(harness.views.at(-2).requestId, harness.views.at(-1).requestId)
+})
+
+test('retries from an error state and loads a fresh model', async () => {
+  const harness = createHarness((input) => input.trigger === 'initial'
+    ? {
+        loadCycleId: input.loadCycleId,
+        viewRevision: input.viewRevision,
+        status: 'error',
+        viewPayload: {
+          requestId: input.loadCycleId,
+          revision: input.viewRevision,
+          pageStatus: 'error',
+          errorData: { messageText: 'Unable to load home data.' },
+        },
+      }
+    : {
+        loadCycleId: input.loadCycleId,
+        viewRevision: input.viewRevision,
+        status: 'content',
+        viewPayload: cashPayload(input.loadCycleId, input.viewRevision),
+        snapshot: { mode: 'cash_loan', primaryActionEffect: null },
+      })
+
+  const initial = await harness.controller.startHomeFlow({ flowScopeId: 'scope-error-retry' })
+  assert.equal(initial.status, 'error')
+  assert.equal(harness.controller.getState().flowStatus, 'business_failure')
+  assert.equal(harness.controller.getState().viewPayload.pageStatus, 'loading')
+  assert.equal(harness.controller.getState().viewPayload.toastNotice.text, 'Unable to load home data.')
+  assert.equal(harness.calls.filter((item) => item.startsWith('show:')).length, 1)
+  assert.equal(harness.calls.filter((item) => item.startsWith('hide:')).length, 1)
+  const result = await harness.controller.handleHomeOperation({
+    flowScopeId: 'scope-error-retry',
+    operation: { requestId: 'refresh-after-error', type: 'refresh' },
+  })
+
+  assert.equal(result.status, 'completed')
+  assert.deepEqual(harness.calls.filter((item) => item.startsWith('load:')), ['load:initial', 'load:refresh'])
+  assert.equal(harness.views.at(-2).pageStatus, 'loading')
+  assert.equal(harness.views.at(-1).pageStatus, 'content')
+  assert.equal(harness.calls.filter((item) => item.startsWith('show:')).length, 2)
+  assert.equal(harness.calls.filter((item) => item.startsWith('hide:')).length, 2)
+})
+
+test('clears the refresh lock when a failed load has no usable view model', async () => {
+  const harness = createHarness((input) => input.trigger === 'initial'
+    ? { loadCycleId: input.loadCycleId, viewRevision: input.viewRevision, status: 'error' }
+    : {
+        loadCycleId: input.loadCycleId,
+        viewRevision: input.viewRevision,
+        status: 'content',
+        viewPayload: cashPayload(input.loadCycleId, input.viewRevision),
+        snapshot: { mode: 'cash_loan', primaryActionEffect: null },
+      })
+
+  const initial = await harness.controller.startHomeFlow({ flowScopeId: 'scope-invalid-result' })
+  assert.equal(initial.status, 'error')
+  assert.equal(harness.controller.getState().viewPayload.toastNotice.text, 'Unable to load home data.')
+
+  const result = await harness.controller.handleHomeOperation({
+    flowScopeId: 'scope-invalid-result',
+    operation: { requestId: 'refresh-invalid-result', type: 'refresh' },
+  })
+  assert.equal(result.status, 'completed')
+  assert.deepEqual(harness.calls.filter((item) => item.startsWith('load:')), ['load:initial', 'load:refresh'])
 })
 
 test('rejects an empty primary action payload before requesting permission', async () => {

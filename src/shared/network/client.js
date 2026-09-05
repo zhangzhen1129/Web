@@ -3,6 +3,7 @@ import { readNetworkSettings, validateNetworkSettings } from './config.js'
 import { createCredentialHeaderProvider } from './credentials.js'
 import { createNetworkDiagnostics } from './diagnostics.js'
 import { createNetworkError, isNetworkError, NETWORK_ERROR_CATEGORY } from './errors.js'
+import { globalBusinessErrorHandler, isBusinessHandledError } from '../businessError/index.js'
 
 const SENSITIVE_PARAM_NAME = /(token|authorization|auth|password|captcha|phone|mobile|identity|card|device)/i
 const CONTROLLED_CREDENTIAL_HEADERS = Object.freeze([
@@ -11,6 +12,18 @@ const CONTROLLED_CREDENTIAL_HEADERS = Object.freeze([
   'cookie',
   'x-api-key',
 ])
+
+function logNetworkDiagnostic(entry) {
+  const mode = typeof import.meta.env === 'object' ? import.meta.env?.MODE : null
+  if (mode !== 'test' && mode !== 'development') return
+  if (typeof console?.info !== 'function') return
+  try { console.info('network-diagnostic', entry) } catch {}
+}
+
+function recordNetworkDiagnostic(diagnostics, entry) {
+  diagnostics.record(entry)
+  logNetworkDiagnostic(entry)
+}
 
 function createAxiosTransport(adapter) {
   return axios.create({ adapter })
@@ -92,6 +105,7 @@ export function createNetworkClient({
   resolveSettings = readNetworkSettings,
   credentialHeaderProvider = createCredentialHeaderProvider(),
   diagnostics = createNetworkDiagnostics(),
+  businessErrorHandler = globalBusinessErrorHandler,
   adapter,
 } = {}) {
   const transport = createAxiosTransport(adapter)
@@ -106,25 +120,27 @@ export function createNetworkClient({
     request.baseURL = settings.baseUrl
     request.timeout = settings.timeoutMs
     request.headers = headers
-    diagnostics.record({ type: 'request', protocolId: request.protocolId, method: request.method.toUpperCase(), path: request.url })
+    recordNetworkDiagnostic(diagnostics, { type: 'request', protocolId: request.protocolId, method: request.method.toUpperCase(), path: request.url })
     return request
   })
 
   transport.interceptors.response.use(
-    (response) => {
+    async (response) => {
       try {
         const validatedResponse = validateResponse(response, response.config.protocolId ?? response.config.meta?.protocolId)
-        diagnostics.record({ type: 'response', protocolId: validatedResponse.config.protocolId ?? validatedResponse.config.meta?.protocolId, status: validatedResponse.status })
+        recordNetworkDiagnostic(diagnostics, { type: 'response', protocolId: validatedResponse.config.protocolId ?? validatedResponse.config.meta?.protocolId, status: validatedResponse.status })
+        await businessErrorHandler.handleResponse(validatedResponse)
         return validatedResponse
       } catch (error) {
+        if (isBusinessHandledError(error)) return Promise.reject(error)
         const normalized = normalizeTransportError(error, response.config.protocolId ?? response.config.meta?.protocolId)
-        diagnostics.record({ type: 'error', protocolId: normalized.protocolId, category: normalized.category, status: normalized.status })
+        recordNetworkDiagnostic(diagnostics, { type: 'error', protocolId: normalized.protocolId, category: normalized.category, status: normalized.status })
         return Promise.reject(normalized)
       }
     },
     (error) => {
       const normalized = normalizeTransportError(error, error?.config?.protocolId ?? error?.config?.meta?.protocolId)
-      diagnostics.record({ type: 'error', protocolId: normalized.protocolId, category: normalized.category, status: normalized.status })
+      recordNetworkDiagnostic(diagnostics, { type: 'error', protocolId: normalized.protocolId, category: normalized.category, status: normalized.status })
       return Promise.reject(normalized)
     },
   )

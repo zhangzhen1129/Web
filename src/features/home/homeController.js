@@ -153,7 +153,9 @@ export function createHomeController(options = {}) {
   }
 
   function settlePendingOperations(payload) {
-    const isTerminal = payload.pageStatus === PAGE_STATUS.CONTENT || payload.pageStatus === PAGE_STATUS.ERROR
+    const isTerminal = payload.pageStatus === PAGE_STATUS.CONTENT
+      || payload.pageStatus === PAGE_STATUS.ERROR
+      || (payload.pageStatus === PAGE_STATUS.LOADING && Boolean(payload.sourceOperationId) && Boolean(payload.toastNotice))
     if (payload.sourceOperationId && isTerminal) pendingOperationIds.delete(payload.sourceOperationId)
     if (payload.sourceOperationId === refreshOperationId && isTerminal) refreshOperationId = null
     if (payload.sourceOperationId === creditRefreshOperationId && isTerminal) creditRefreshOperationId = null
@@ -215,7 +217,7 @@ export function createHomeController(options = {}) {
   }
 
   function operationMatchesCurrentState(operation) {
-    if (operation.viewMode !== lastViewMode) return false
+    if (operation.type !== OPERATION_TYPE.REFRESH && operation.viewMode !== lastViewMode) return false
     if (operation.type === OPERATION_TYPE.SELECT_AMOUNT) return optionIsEnabled('amount', operation.data.amountKey)
     if (operation.type === OPERATION_TYPE.SELECT_TERM) return optionIsEnabled('term', operation.data.termKey)
     if (operation.type === OPERATION_TYPE.PRIMARY_ACTION) {
@@ -246,7 +248,11 @@ export function createHomeController(options = {}) {
       return selectedIds.length >= (state.multiPushViewData?.minimumSelectionCount ?? 1)
         && JSON.stringify(selectedIds) === JSON.stringify(operation.data.productIds)
     }
-    if (operation.type === OPERATION_TYPE.REFRESH) return state.pageStatus === PAGE_STATUS.CONTENT
+    if (operation.type === OPERATION_TYPE.REFRESH) {
+      return state.pageStatus === PAGE_STATUS.CONTENT
+        || state.pageStatus === PAGE_STATUS.ERROR
+        || (state.pageStatus === PAGE_STATUS.LOADING && Boolean(state.toastNotice) && refreshOperationId === null)
+    }
     if (operation.type === OPERATION_TYPE.REFRESH_CREDIT) {
       const multiPushAvailable = state.homeMode === HOME_MODE.MULTI_PUSH
         && state.multiPushViewData?.refreshEnabled === true
@@ -296,7 +302,8 @@ export function createHomeController(options = {}) {
   }
 
   function makeOperation(type, data) {
-    const operation = { requestId: createRequestId(), type, viewMode: lastViewMode }
+    const operation = { requestId: createRequestId(), type }
+    if (lastViewMode !== null) operation.viewMode = lastViewMode
     if (data !== undefined) operation.data = data
     emitHomeOperation(operation)
     return operation.requestId

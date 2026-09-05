@@ -48,12 +48,10 @@ async function resolveInitialization(harness) {
     appVersion: '1', appVersionName: '1.0', androidId: 'android',
   })
   await Promise.resolve()
-  harness.pending.token.consumer({ status: 'completed', hit: false, cacheValue: '' })
-  await Promise.resolve()
   harness.pending.sdk.consumer({ status: 'partial_success', afId: '', fbId: '', gaId: '' })
 }
 
-test('initializes in fixed order, reuses one promise, and returns retained values without originals', async () => {
+test('initializes in fixed order, stores the static token, and does not invoke the Token Bridge', async () => {
   const harness = createHarness()
   const first = harness.service.initializeHomeHostContext({ initCycleId: 'init-1' })
   const duplicate = harness.service.initializeHomeHostContext({ initCycleId: 'init-1' })
@@ -61,11 +59,13 @@ test('initializes in fixed order, reuses one promise, and returns retained value
   assert.deepEqual(harness.calls, ['apiHost', 'appInfo'])
   await resolveInitialization(harness)
   const result = await first
-  assert.deepEqual(harness.calls.slice(0, 5), ['apiHost', 'appInfo', 'store:appName,packageName,packageId,appVersion,appVersionName,androidId', 'token', 'sdk'])
+  assert.deepEqual(harness.calls.slice(0, 5), ['apiHost', 'appInfo', 'store:appName,packageName,packageId,appVersion,appVersionName,androidId', 'store:token', 'sdk'])
   assert.equal(result.status, 'completed')
-  assert.deepEqual(result.steps.token, { status: 'retained', errorCode: null })
+  assert.deepEqual(result.steps.token, { status: 'updated', errorCode: null })
   assert.deepEqual(result.steps.sdkIdentifiers, { status: 'retained', errorCode: null })
-  assert.equal(JSON.stringify(result).includes('cached-token'), false)
+  assert.equal(harness.calls.includes('token'), false)
+  assert.equal(harness.store.token.length, 24)
+  assert.equal(JSON.stringify(result).includes(harness.store.token), false)
 })
 
 test('rejects malformed and concurrent init ids without additional Bridge calls', async () => {

@@ -3,6 +3,28 @@ const SHOW_METHOD = 'showLoading'
 const HIDE_METHOD = 'hideLoading'
 
 let requestSequence = 0
+const ENABLE_BROWSER_LOADING_MOCK = typeof import.meta.env === 'object'
+  && (import.meta.env?.MODE === 'development' || import.meta.env?.MODE === 'test')
+
+function updateBrowserLoading(visible) {
+  if (!ENABLE_BROWSER_LOADING_MOCK || typeof document === 'undefined') return
+  const existing = document.querySelector('[data-dinero-browser-loading]')
+  if (!visible) {
+    existing?.remove()
+    return
+  }
+  if (existing) return
+  const overlay = document.createElement('div')
+  overlay.className = 'browser-native-loading'
+  overlay.dataset.dineroBrowserLoading = ''
+  overlay.setAttribute('role', 'status')
+  overlay.setAttribute('aria-live', 'polite')
+  const spinner = document.createElement('span')
+  spinner.className = 'browser-native-loading__spinner'
+  spinner.setAttribute('aria-hidden', 'true')
+  overlay.append(spinner)
+  document.body.append(overlay)
+}
 
 function createRequestId(operation) {
   requestSequence += 1
@@ -23,6 +45,7 @@ function reportDiagnostic(code) {
 function invokeLoading(method) {
   const bridge = typeof window === 'undefined' ? undefined : window[BRIDGE_OBJECT]
   if (!bridge || typeof bridge[method] !== 'function') {
+    updateBrowserLoading(method === SHOW_METHOD)
     reportDiagnostic('BRIDGE_METHOD_UNAVAILABLE')
     return
   }
@@ -51,4 +74,3 @@ export const nativeLoadingBridge = Object.freeze({
   showNativeLoading,
   hideNativeLoading,
 })
-

@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import {
+  clearAll as clearApplicationCache,
   get as getPersistentValue,
   getResult as getPersistentResult,
   remove as removePersistentValue,
@@ -202,6 +203,7 @@ export const useGlobalStore = defineStore('globalStore', {
       return Object.freeze({ status: 'not_found', errorCode: null })
     },
     clearGlobal() {
+      const applicationCacheRemoved = clearApplicationCache()
       const tokenRemoved = removePersistentValue(GLOBAL_TOKEN_CACHE_KEY)
       const apiHostRemoved = removePersistentValue(GLOBAL_API_HOST_CACHE_KEY)
       const appInfoRemoved = GLOBAL_APP_INFO_FIELDS
@@ -213,7 +215,7 @@ export const useGlobalStore = defineStore('globalStore', {
       const multiPushRemoved = removePersistentValue(GLOBAL_MULTI_PUSH_CACHE_KEY)
       this.$patch(initialState())
       apiHostHydrationResults.delete(this)
-      return tokenRemoved && apiHostRemoved && appInfoRemoved && thirdPartySdkRemoved && multiPushRemoved
+      return applicationCacheRemoved && tokenRemoved && apiHostRemoved && appInfoRemoved && thirdPartySdkRemoved && multiPushRemoved
     },
   },
 })

@@ -7,9 +7,18 @@ export const APP_MODE = Object.freeze({
   REPAYMENT_HIDDEN: '3',
 })
 
+const DEFAULT_HOME_TABS = Object.freeze([
+  Object.freeze({ key: 'home', text: 'Pr\u00e9stamos', iconResourceKey: 'home', active: true, enabled: true }),
+  Object.freeze({ key: 'account', text: 'Mi cuenta', iconResourceKey: 'account', active: false, enabled: true }),
+])
+
+function createDefaultHomeTabs() {
+  return DEFAULT_HOME_TABS.map((tab) => ({ ...tab }))
+}
+
 const state = reactive({
   mode: APP_MODE.CASH_LOAN,
-  homeTabs: [],
+  homeTabs: createDefaultHomeTabs(),
   diagnosticCode: null,
 })
 
@@ -33,7 +42,7 @@ export function setAppMode(value) {
   const normalized = normalizeAppMode(value)
   if (!normalized) {
     state.mode = APP_MODE.CASH_LOAN
-    state.homeTabs = []
+    state.homeTabs = createDefaultHomeTabs()
     state.diagnosticCode = 'INVALID_APP_MODE'
     dispatchAppModeEvent('dinero-pro:app-mode-diagnostic', { code: state.diagnosticCode })
     return false
@@ -46,7 +55,9 @@ export function setAppMode(value) {
 }
 
 export function setHomeTabs(tabs) {
-  state.homeTabs = Array.isArray(tabs) ? tabs.map((tab) => ({ ...tab })) : []
+  state.homeTabs = Array.isArray(tabs) && tabs.length > 0
+    ? tabs.map((tab) => ({ ...tab }))
+    : createDefaultHomeTabs()
 }
 
 export function setMultiPushTabs(tabs) {

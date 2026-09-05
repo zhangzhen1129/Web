@@ -45,3 +45,10 @@ export {
   triggerNativeCallFetch,
   triggerNativeSmsFetch,
 } from './nativeDataCollection.js'
+
+export {
+  getNativeBusinessActionRegistrySize,
+  logoutToOtpLoginNative,
+  nativeBusinessActionsBridge,
+  openGooglePlayNative,
+} from './nativeBusinessActions.js'

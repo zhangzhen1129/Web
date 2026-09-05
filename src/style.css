@@ -19,7 +19,7 @@ body,
 html,
 body {
   overflow-x: hidden;
-  overflow-y: hidden;
+  overflow-y: auto;
 }
 
 body {
@@ -40,7 +40,7 @@ body {
   height: 100%;
   margin: 0;
   overflow-x: hidden;
-  overflow-y: auto;
+  overflow-y: visible;
   overscroll-behavior-y: contain;
   -webkit-overflow-scrolling: touch;
   -ms-overflow-style: none;
@@ -65,6 +65,69 @@ body {
 
 button {
   font: inherit;
+}
+
+.browser-native-loading {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, .16);
+  pointer-events: none;
+}
+
+.browser-native-loading__spinner {
+  width: .76923rem;
+  height: .76923rem;
+  border: .10256rem solid rgba(255, 255, 255, .5);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: browser-native-loading-spin 800ms linear infinite;
+}
+
+@keyframes browser-native-loading-spin { to { transform: rotate(360deg); } }
+
+/* Global business-code dialog: keeps the network-level prompt consistent
+   across every page while leaving feature dialogs unchanged. */
+.business-error-dialog.van-dialog {
+  width: 8.20513rem;
+  max-width: calc(100vw - 1.02564rem);
+  overflow: hidden;
+  border-radius: .41026rem;
+  background: #fff;
+  color: #323233;
+  font-family: Roboto, Arial, sans-serif;
+}
+
+.business-error-dialog .van-dialog__content {
+  padding: .61538rem .51282rem .30769rem;
+}
+
+.business-error-dialog .van-dialog__message {
+  padding: 0;
+  color: #323233;
+  font-size: .35897rem;
+  font-weight: 400;
+  line-height: .51282rem;
+  text-align: center;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.business-error-dialog .van-dialog__footer {
+  padding: .20513rem .51282rem .51282rem;
+}
+
+.business-error-dialog .van-dialog__confirm {
+  min-height: .92308rem;
+  border: 0;
+  border-radius: 999px;
+  background: #1989fa;
+  color: #fff;
+  font-size: .35897rem;
+  font-weight: 600;
+  line-height: .51282rem;
 }
 
 .main-tab-shell {

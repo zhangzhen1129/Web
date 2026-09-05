@@ -1,7 +1,15 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { APP_MODE, setAppMode, shouldShowRepaymentTab } from './appModeStore.js'
+import { APP_MODE, appModeState, setAppMode, setHomeTabs, shouldShowRepaymentTab } from './appModeStore.js'
+
+test('provides safe cash tabs before a home response is available', () => {
+  setAppMode(APP_MODE.CASH_LOAN)
+  setHomeTabs(null)
+
+  assert.deepEqual(appModeState.homeTabs.map((tab) => tab.key), ['home', 'account'])
+  assert.equal(shouldShowRepaymentTab(), false)
+})
 
 test('app mode controls repayment tab visibility', () => {
   assert.equal(shouldShowRepaymentTab(APP_MODE.CASH_LOAN), false)

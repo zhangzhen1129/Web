@@ -141,15 +141,28 @@ export function createHomeFlowController(options = {}) {
   }
   function loadingPayload(cycle, pageStatus = 'loading') {
     const previous = state.viewPayload
-    const tabs = Array.isArray(previous?.tabs) ? safeClone(previous.tabs) : fallbackTabs()
-    const payload = pageStatus === 'refreshing' && previous?.pageStatus === 'content'
-      ? { ...safeClone(previous), requestId: cycle.loadCycleId, revision: cycle.viewRevision, pageStatus, tabs, toastNotice: undefined, overlayNotice: undefined, errorData: undefined }
-      : { requestId: cycle.loadCycleId, revision: cycle.viewRevision, pageStatus, tabs }
+    const keepContentWhileRefreshing = pageStatus === 'refreshing' && previous?.pageStatus === 'content'
+    const payload = keepContentWhileRefreshing
+      ? { ...safeClone(previous), requestId: cycle.intermediateRequestId, revision: cycle.viewRevision, pageStatus, toastNotice: undefined, overlayNotice: undefined, errorData: undefined }
+      : { requestId: cycle.intermediateRequestId, revision: cycle.viewRevision, pageStatus: 'loading' }
+    delete payload.tabs
     delete payload.toastNotice
     delete payload.overlayNotice
     delete payload.errorData
     if (cycle.sourceOperationId) payload.sourceOperationId = cycle.sourceOperationId
     return payload
+  }
+  function failureLoadingPayload(cycle, result) {
+    const messageText = result?.error?.messageText
+      || result?.viewPayload?.errorData?.messageText
+      || 'Unable to load home data.'
+    return {
+      requestId: cycle.loadCycleId,
+      revision: cycle.viewRevision,
+      ...(cycle.sourceOperationId ? { sourceOperationId: cycle.sourceOperationId } : {}),
+      pageStatus: 'loading',
+      toastNotice: { noticeId: cycle.loadCycleId, text: messageText },
+    }
   }
   function sendPayload(payload) {
     try { updateHomeView(safeClone(payload)) } catch {}
@@ -165,22 +178,29 @@ export function createHomeFlowController(options = {}) {
       return makeResult(state.flowScopeId, cycle, 'canceled')
     }
     if (!result.viewPayload || result.viewPayload.requestId !== cycle.loadCycleId || result.viewPayload.revision !== cycle.viewRevision) {
+      const viewPayload = failureLoadingPayload(cycle, result)
+      state = { ...state, viewPayload: safeClone(viewPayload), flowStatus: 'business_failure' }
+      sendPayload(viewPayload)
+      notify()
       hideLoading(cycle.loadingCycleId)
       activeLoad = null
-      state = { ...state, flowStatus: 'error' }
-      notify()
+      if (cycle.sourceOperationId) {
+        activeOperation = null
+        state = { ...state, operationId: null }
+      }
       return makeResult(state.flowScopeId, cycle, 'error', resultError('INVALID_DATA_MODEL'))
     }
     const status = result.status
-    if (status === 'content' || status === 'business_failure' || status === 'error') {
-      if (result.viewPayload) {
-        state = { ...state, viewPayload: safeClone(result.viewPayload) }
-        sendPayload(result.viewPayload)
+    if (status === 'content' || status === 'business_failure' || status === 'error' || status === 'handled') {
+      const viewPayload = status === 'error' ? failureLoadingPayload(cycle, result) : result.viewPayload
+      if (viewPayload) {
+        state = { ...state, viewPayload: safeClone(viewPayload) }
+        sendPayload(viewPayload)
       }
       if (status === 'content' && result.snapshot) {
         state = { ...state, snapshot: safeClone(result.snapshot), snapshotRevision: state.snapshotRevision + 1, flowStatus: 'ready' }
       } else {
-        state = { ...state, flowStatus: status === 'business_failure' ? 'business_failure' : 'error' }
+        state = { ...state, flowStatus: status === 'error' || status === 'business_failure' || status === 'handled' ? 'business_failure' : 'error' }
       }
       notify()
       hideLoading(cycle.loadingCycleId)
@@ -203,8 +223,9 @@ export function createHomeFlowController(options = {}) {
     if (sourceOperationId) cancelOperation()
     const loadCycleId = allocate('load')
     const loadingCycleId = loadCycleId
+    const intermediateRequestId = allocate('view')
     const intermediateRevision = nextViewRevision()
-    const cycle = { loadCycleId, loadingCycleId, sourceOperationId, viewRevision: intermediateRevision, canceled: false }
+    const cycle = { loadCycleId, loadingCycleId, intermediateRequestId, sourceOperationId, viewRevision: intermediateRevision, canceled: false }
     state = { ...state, loadCycleId, loadingCycleId, flowStatus: intermediateStatus ?? 'loading_data' }
     showLoading(loadingCycleId)
     if (intermediateStatus) sendPayload(loadingPayload(cycle, intermediateStatus))
@@ -254,7 +275,8 @@ export function createHomeFlowController(options = {}) {
   }
 
   function operationValid(operation) {
-    if (!operation || typeof operation !== 'object' || Object.keys(operation).some((key) => !['requestId', 'type', 'data'].includes(key)) || !validId(operation.requestId) || !OPERATION_TYPES.has(operation.type)) return false
+    if (!operation || typeof operation !== 'object' || Object.keys(operation).some((key) => !['requestId', 'type', 'viewMode', 'data'].includes(key)) || !validId(operation.requestId) || !OPERATION_TYPES.has(operation.type)) return false
+    if (operation.viewMode !== undefined && (typeof operation.viewMode !== 'string' || operation.viewMode.length === 0)) return false
     if (handledOperations.has(operation.requestId)) return 'duplicate'
     if (operation.type === 'refresh' || operation.type === 'refresh_credit') return !Object.hasOwn(operation, 'data')
     const dataValue = operation.data
@@ -281,8 +303,13 @@ export function createHomeFlowController(options = {}) {
   function operationAllowed(operation) {
     const payload = state.viewPayload
     const snapshot = state.snapshot
+    if (operation.type === 'refresh') {
+      return Boolean(payload)
+        && ['content', 'error', 'loading'].includes(payload.pageStatus)
+        && ['ready', 'business_failure', 'error'].includes(state.flowStatus)
+    }
     if (!payload || payload.pageStatus !== 'content' || !snapshot) return false
-    if (operation.type === 'refresh' || operation.type === 'refresh_credit') return state.flowStatus === 'ready'
+    if (operation.type === 'refresh_credit') return state.flowStatus === 'ready'
     if (operation.type === 'select_amount') return snapshot.mode === 'cash_loan' && optionAvailable('amount', operation.data.amountKey)
     if (operation.type === 'select_term') return snapshot.mode === 'cash_loan' && optionAvailable('term', operation.data.termKey)
     if (operation.type === 'toggle_product_selection') {
@@ -369,7 +396,7 @@ export function createHomeFlowController(options = {}) {
     }
     if (effect === 'navigate_repayment_list' || effect === 'navigate_order_list') {
       const target = effect === 'navigate_repayment_list' ? 'repayment_list' : 'order_list'; const intent = { intentId: allocate('intent'), sourceOperationId: operation.requestId, target }
-      emitHomeRouteIntent(intent); activeOperation = null; setStatus('ready', { operationId: null }); return { operationId: operation.requestId, status: 'completed', effect: intent }
+      emitHomeRouteIntent(intent, { snapshot: state.snapshot, currentSnapshotRevision: state.snapshotRevision, permissionResult: permission }); activeOperation = null; setStatus('ready', { operationId: null }); return { operationId: operation.requestId, status: 'completed', effect: intent }
     }
     if ((effect === null || effect === undefined) && isCashPrimaryActionEligible(state.snapshot)) {
       const intent = {
@@ -378,7 +405,7 @@ export function createHomeFlowController(options = {}) {
         target: 'cash_loan_primary_action',
         snapshotRevision,
       }
-      emitHomeRouteIntent(intent)
+      emitHomeRouteIntent(intent, { snapshot: state.snapshot, currentSnapshotRevision: state.snapshotRevision, permissionResult: permission })
       activeOperation = null
       setStatus('ready', { operationId: null })
       return { operationId: operation.requestId, status: 'completed', effect: intent }
@@ -403,7 +430,7 @@ export function createHomeFlowController(options = {}) {
     if (operation.type === 'refresh' || operation.type === 'refresh_credit') {
       cancelOperation()
       const result = await runLoad({ trigger: operation.type, sourceOperationId: operation.requestId, intermediateStatus: 'refreshing' })
-      return { operationId: operation.requestId, status: result.status === 'canceled' ? 'canceled' : result.status === 'ready' || result.status === 'business_failure' ? 'completed' : 'failed' }
+      return { operationId: operation.requestId, status: result.status === 'canceled' ? 'canceled' : result.status === 'ready' || result.status === 'business_failure' || result.status === 'handled' ? 'completed' : 'failed' }
     }
     if (operation.type === 'select_amount' || operation.type === 'select_term' || operation.type === 'toggle_product_selection') { cancelOperation(); emitSelection(operation); return { operationId: operation.requestId, status: 'completed' } }
     if (operation.type === 'submit_selected_products') return { operationId: operation.requestId, status: 'completed' }
@@ -411,7 +438,7 @@ export function createHomeFlowController(options = {}) {
       const target = `${operation.data.tabKey}_tab`
       if (!TARGETS.has(target)) return { operationId: operation.requestId, status: 'failed', error: resultError('OPERATION_NOT_AVAILABLE') }
       const intent = { intentId: allocate('intent'), sourceOperationId: operation.requestId, target }
-      emitHomeRouteIntent(intent)
+      emitHomeRouteIntent(intent, { snapshot: state.snapshot, currentSnapshotRevision: state.snapshotRevision })
       return { operationId: operation.requestId, status: 'completed', effect: intent }
     }
     cancelOperation()

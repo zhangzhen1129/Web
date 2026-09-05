@@ -236,6 +236,8 @@ test('clearGlobal removes every authorized cache entry and resets every field', 
     gaId: 'redacted-advertising-id',
     isMultiPush: true,
   }), true)
+  window.localStorage.setItem('DineroPro:home:cached-model', 'stale')
+  window.localStorage.setItem('other-app:session', 'keep')
   assert.equal(store.clearGlobal(), true)
   assert.equal(store.token, null)
   assert.equal(store.apiHost, null)
@@ -246,4 +248,6 @@ test('clearGlobal removes every authorized cache entry and resets every field', 
   assert.deepEqual(store.initializeApiHostFromCurrentLocation(), { status: 'not_found', errorCode: null })
   for (const key of Object.values(GLOBAL_APP_INFO_CACHE_KEYS)) assert.equal(window.localStorage.getItem(`DineroPro:${key}`), null)
   for (const key of Object.values(GLOBAL_THIRD_PARTY_SDK_CACHE_KEYS)) assert.equal(window.localStorage.getItem(`DineroPro:${key}`), null)
+  assert.equal(window.localStorage.getItem('DineroPro:home:cached-model'), null)
+  assert.equal(window.localStorage.getItem('other-app:session'), 'keep')
 })

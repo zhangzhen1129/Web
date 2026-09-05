@@ -219,6 +219,23 @@ test('emits page operation types with unique ids and exact data', () => {
   assert.equal(Object.hasOwn(operations[0], 'data'), false)
 })
 
+test('allows refresh after an error, including an initial error without a view mode', () => {
+  const operations = []
+  const controller = createHomeController({
+    onOperation: (operation) => operations.push(operation),
+    createRequestId: createSequentialIdFactory(),
+  })
+  controller.updateHomeView({
+    requestId: 'error-model',
+    pageStatus: PAGE_STATUS.ERROR,
+    errorData: { messageText: 'Unable to load home data.' },
+  })
+
+  assert.equal(controller.refresh(), 'operation-1')
+  assert.deepEqual(operations, [{ requestId: 'operation-1', type: OPERATION_TYPE.REFRESH }])
+  assert.equal(controller.getState().isRefreshPending, true)
+})
+
 test('display text changes do not change operation semantics', () => {
   const operations = []
   const controller = createHomeController({ onOperation: (operation) => operations.push(operation) })
@@ -320,7 +337,7 @@ test('PageLoadingPort show and hide are deduplicated and preserve the opening re
   assert.deepEqual(loadingPort.calls.slice(-2), [['show', 'loading-3'], ['hide', 'loading-3']])
 })
 
-test('refresh keeps its pending operation through the associated skeleton and only accepts its completion', () => {
+test('refresh retains its pending operation until an associated terminal model arrives', () => {
   const operations = []
   const controller = createHomeController({
     onOperation: (operation) => operations.push(operation),
@@ -339,11 +356,16 @@ test('refresh keeps its pending operation through the associated skeleton and on
     requestId: 'model-refresh-loading',
     sourceOperationId: 'operation-1',
     pageStatus: PAGE_STATUS.LOADING,
+    toastNotice: { noticeId: 'business-failure', text: 'Service unavailable' },
   })
   assert.equal(controller.getState().pageStatus, PAGE_STATUS.LOADING)
-  assert.equal(controller.getState().isRefreshPending, true)
+  assert.equal(controller.getState().toastNotice.text, 'Service unavailable')
+  assert.equal(controller.getState().isRefreshPending, false)
 
-  controller.updateHomeView(contentPayload('model-complete', { sourceOperationId: 'operation-1' }))
+  const retryOperationId = controller.refresh()
+  assert.equal(operations.length, 2)
+
+  controller.updateHomeView(contentPayload('model-complete', { sourceOperationId: retryOperationId }))
   assert.equal(controller.getState().isRefreshPending, false)
 })
 

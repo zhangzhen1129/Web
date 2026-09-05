@@ -1,16 +1,16 @@
 <script setup>
 import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { Loading, PullRefresh, Skeleton, showToast } from 'vant'
 import 'vant/es/pull-refresh/style'
 import 'vant/es/skeleton/style'
 import 'vant/es/toast/style'
-import { createHomeController, createHomeHostService } from '../index.js'
+import { createHomeController, createHomeFlowController, createHomeHostService, createHomeRouteConsumer } from '../index.js'
 import { createHomeBrowserPort } from '../homeBrowserPort.js'
-import { createNativePageLoadingAdapter } from '../pageLoadingPort.js'
+import { createNoopPageLoadingAdapter } from '../pageLoadingPort.js'
 import { createHomeDataProvider } from '../providers/homeDataProvider.js'
 import CreditSummary from '../components/CreditSummary.vue'
 import HomeBroadcast from '../components/HomeBroadcast.vue'
-import HomeError from '../components/HomeError.vue'
 import HomePrimaryAction from '../components/HomePrimaryAction.vue'
 import HomeSteps from '../components/HomeSteps.vue'
 import ProductSelection from '../components/ProductSelection.vue'
@@ -23,14 +23,22 @@ defineOptions({ name: 'HomePage' })
 
 const viewProvider = ref(null)
 const globalStore = useGlobalStore()
+const router = useRouter()
+const homeRouteConsumer = createHomeRouteConsumer({ router })
 const homeHostService = createHomeHostService({ globalStore })
-const initCycleId = `home-init-${Date.now().toString(36)}`
+const flowScopeId = `home-flow-${Date.now().toString(36)}`
 const browserPort = createHomeBrowserPort()
+let flowController = null
+let activeRefreshPromise = null
 const controller = createHomeController({
-  loadingPort: createNativePageLoadingAdapter(homeHostService),
+  loadingPort: createNoopPageLoadingAdapter(),
   onOperation(operation) {
     browserPort.emitOperation(operation)
-    viewProvider.value?.handleOperation(operation)
+    const operationPromise = flowController
+      ? Promise.resolve(flowController.handleHomeOperation({ flowScopeId, operation }))
+      : Promise.resolve({ status: 'failed' })
+    if (operation.type === 'refresh') activeRefreshPromise = operationPromise
+    void operationPromise
   },
   onDiagnostic(diagnostic) {
     browserPort.emitDiagnostic(diagnostic)
@@ -70,10 +78,17 @@ let isDisposed = false
 let needsBrowserReturnReload = false
 void initializeHomeProvider()
 
-function refresh() {
+async function refresh() {
   if (state.value.isRefreshPending) return
   isRefreshing.value = true
   controller.refresh()
+  const operationPromise = activeRefreshPromise
+  try {
+    if (operationPromise) await operationPromise
+  } finally {
+    if (activeRefreshPromise === operationPromise) activeRefreshPromise = null
+    isRefreshing.value = false
+  }
 }
 
 function selectAmount(amountKey) { controller.selectAmount(amountKey) }
@@ -97,14 +112,14 @@ function handlePageHide() {
 
 function handlePageShow() {
   controller.show()
-  if (!needsBrowserReturnReload || !viewProvider.value) return
+  if (!needsBrowserReturnReload || !flowController) return
   needsBrowserReturnReload = false
-  viewProvider.value.reload()
+  void flowController.activateHome({ flowScopeId, reason: 'history_restore' })
 }
 
 onActivated(() => {
   controller.show()
-  if (hasBeenActivated) viewProvider.value?.reload?.()
+  if (hasBeenActivated) void flowController?.activateHome({ flowScopeId, reason: 'return_from_tab' })
   hasBeenActivated = true
 })
 
@@ -130,19 +145,26 @@ onMounted(async () => {
 })
 
 async function initializeHomeProvider() {
-  await homeHostService.initializeHomeHostContext({ initCycleId })
   if (isDisposed) return
-  if (!viewProvider.value) viewProvider.value = createHomeDataProvider(controller, globalStore)
-  viewProvider.value.start()
-  if (needsBrowserReturnReload) {
-    needsBrowserReturnReload = false
-    viewProvider.value.reload()
-  }
+  viewProvider.value = createHomeDataProvider({ store: globalStore })
+  flowController = createHomeFlowController({
+    hostService: homeHostService,
+    dataProvider: viewProvider.value,
+    updateHomeView: controller.updateHomeView,
+    emitHomeRouteIntent(routeIntent, context) {
+      void homeRouteConsumer.consumeHomeRouteIntent({
+        ...context,
+        routeIntent,
+        currentRoute: router.currentRoute.value,
+      })
+    },
+  })
+  await flowController.startHomeFlow({ flowScopeId })
 }
 
 onBeforeUnmount(() => {
   isDisposed = true
-  homeHostService.disposeHomeHostInit({ initCycleId })
+  flowController?.disposeHomeFlow({ flowScopeId })
   browserPort.unmount()
   unsubscribe?.()
   viewProvider.value?.destroy?.()
@@ -178,7 +200,6 @@ onBeforeUnmount(() => {
           :title="false"
           animate
         />
-        <HomeError v-if="state.pageStatus === 'error' && state.errorData" class="home-page__error-overlay" :error="state.errorData" />
       </div>
     </main>
     <MultiPushHome
