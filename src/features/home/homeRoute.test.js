@@ -72,13 +72,22 @@ test('maps tabs and lists while protecting primary list intents', () => {
   assert.equal(resolveHomeRouteIntent({ routeIntent: intent('repayment_list'), permissionResult: { status: 'failed', operationId: 'operation-1' } }).type, 'blocked')
 })
 
-test('consumer skips duplicate navigation and pushes named routes', async () => {
+test('consumer replaces tab navigation and pushes business routes', async () => {
   const calls = []
-  const router = { currentRoute: { value: { name: 'home', query: {} } }, push: async (location) => calls.push(location) }
+  const router = {
+    currentRoute: { value: { name: 'home', query: {} } },
+    push: async (location) => calls.push(['push', location]),
+    replace: async (location) => calls.push(['replace', location]),
+  }
   const consumer = createHomeRouteConsumer({ router })
   const ignored = await consumer.consumeHomeRouteIntent({ routeIntent: intent('home_tab'), currentRoute: router.currentRoute.value })
   assert.equal(ignored.type, 'ignored')
+  const tabNavigated = await consumer.consumeHomeRouteIntent({ routeIntent: intent('account_tab') })
+  assert.equal(tabNavigated.type, 'navigated')
   const navigated = await consumer.consumeHomeRouteIntent({ routeIntent: intent('order_list'), permissionResult: permission })
   assert.equal(navigated.type, 'navigated')
-  assert.deepEqual(calls, [{ name: 'orderList', query: {} }])
+  assert.deepEqual(calls, [
+    ['replace', { name: 'mine', query: {} }],
+    ['push', { name: 'orderList', query: {} }],
+  ])
 })

@@ -31,6 +31,16 @@ const PROJECT_MESSAGES = Object.freeze({
     es: 'Aplicar ahora',
     sw: 'Omba sasa',
   }),
+  '40': Object.freeze({
+    en: 'Verifying your information, please wait patiently.',
+    es: 'Verificando su información, por favor espere pacientemente.',
+    sw: 'Tunathibitisha maelezo yako, tafadhali subiri kwa subira.',
+  }),
+  '41': Object.freeze({
+    en: 'Upload failed. Please try again later.',
+    es: 'Carga fallida, inténtelo más tarde.',
+    sw: 'Upakiaji umeshindwa. Tafadhali jaribu tena baadaye.',
+  }),
 })
 
 export function getProjectMessage(messageId, language = CURRENT_LANGUAGE) {

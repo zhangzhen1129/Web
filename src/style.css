@@ -140,7 +140,6 @@ button {
 .main-tab-shell__viewport {
   width: 100%;
   min-height: 100%;
-  padding-top: var(--app-safe-area-top);
   overflow: visible;
 }
 

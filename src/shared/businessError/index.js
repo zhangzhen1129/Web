@@ -19,7 +19,7 @@ export function readGlobalBusinessError(data) {
   })
 }
 
-export function createBusinessHandledError({ code, message, protocolId = null, cause = null }) {
+export function createBusinessHandledError({ code, message, protocolId = null }) {
   const error = new Error(message || 'Business request was handled globally.')
   error.name = 'BusinessHandledError'
   error.businessCode = code
@@ -27,7 +27,6 @@ export function createBusinessHandledError({ code, message, protocolId = null, c
   error.protocolId = protocolId
   error.displayMessage = message || 'Business request was handled globally.'
   error.businessHandled = true
-  error.cause = cause
   return error
 }
 
@@ -73,7 +72,6 @@ export function createGlobalBusinessErrorHandler(options = {}) {
         code: businessError.code,
         message: businessError.message,
         protocolId: response?.config?.protocolId ?? response?.config?.meta?.protocolId ?? null,
-        cause: response?.data,
       })
 
       if (!activeDialogPromise) {

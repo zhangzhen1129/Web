@@ -135,8 +135,7 @@ export function createHomeUiSession(options = {}) {
     if (issues.length > 0) return issues
     if (modelRequestIds.has(payload.requestId)) issues.push({ path: 'payload.requestId', code: 'duplicate_request_id' })
     if (payload.revision <= state.revision) issues.push({ path: 'payload.revision', code: 'stale_revision' })
-    const sourceRequired = hasAcceptedModel || pendingOperation !== null
-    if (sourceRequired && !payload.sourceOperationId) {
+    if (pendingOperation && !payload.sourceOperationId) {
       issues.push({ path: 'payload.sourceOperationId', code: 'required_source_operation' })
     } else if (payload.sourceOperationId && payload.sourceOperationId !== pendingOperation?.requestId) {
       issues.push({ path: 'payload.sourceOperationId', code: 'operation_not_pending' })
@@ -161,9 +160,17 @@ export function createHomeUiSession(options = {}) {
       return false
     }
 
+    const isAssociatedRefresh = payload.sourceOperationId === pendingOperation?.requestId
+      && [HOME_OPERATION_TYPE.REFRESH, HOME_OPERATION_TYPE.REFRESH_CREDIT].includes(pendingOperation?.type)
+    const keepsRefreshOperation = isAssociatedRefresh
+      && (
+        payload.pageStatus === HOME_PAGE_STATUS.REFRESHING
+        || (payload.pageStatus === HOME_PAGE_STATUS.LOADING && !payload.toastNotice && state.pageStatus !== HOME_PAGE_STATUS.LOADING)
+      )
+
     modelRequestIds.add(payload.requestId)
     payload.multiPushViewData?.products?.forEach((product) => knownProductIds.add(product.productId))
-    if (payload.sourceOperationId) pendingOperation = null
+    if (payload.sourceOperationId && !keepsRefreshOperation) pendingOperation = null
     hasAcceptedModel = true
     const nextHomeMode = payload.homeMode ?? state.homeMode
     const nextViewMode = payload.viewMode ?? state.viewMode
@@ -185,7 +192,7 @@ export function createHomeUiSession(options = {}) {
       overlayVisible: Boolean(payload.overlayNotice),
       dialogOpen: state.dialogOpen && products.length > 0,
       broadcastIndex: 0,
-      pendingOperationType: null,
+      pendingOperationType: keepsRefreshOperation ? pendingOperation.type : null,
     }
     startBroadcast()
     notify()

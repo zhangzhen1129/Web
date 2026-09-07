@@ -47,7 +47,6 @@ export {
 } from './nativeDataCollection.js'
 
 export {
-  getNativeBusinessActionRegistrySize,
   logoutToOtpLoginNative,
   nativeBusinessActionsBridge,
   openGooglePlayNative,

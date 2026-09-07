@@ -159,6 +159,9 @@ async function main() {
         }).map((element) => element.className),
         rootCount: document.querySelectorAll('.unified-home').length,
         amountSourceCount: document.querySelectorAll('.unified-home__amount-card, .unified-home__credit').length,
+        primaryButtonFontSize: document.querySelector('.unified-home__primary')
+          ? getComputedStyle(document.querySelector('.unified-home__primary')).fontSize
+          : null,
       })`)
     }
 
@@ -187,12 +190,14 @@ async function main() {
       assert.ok(metrics.pageScrollContainers.length <= 1, `${scenario} has multiple page scroll containers`)
       assert.equal(metrics.rootCount, 1)
       assert.equal(metrics.amountSourceCount, 1)
+      assert.ok(Number.parseFloat(metrics.primaryButtonFontSize) <= 14, `${scenario} primary action font is too large`)
       await screenshot(`${scenario}-375x812`)
       results.push({ scenario, viewport: '375x812', metrics })
     }
 
     const compactMetrics = await navigate('scenario=cash-apply', { width: 360, height: 800 })
     assert.ok(compactMetrics.documentWidth <= compactMetrics.width, 'compact viewport has horizontal overflow')
+    assert.ok(Number.parseFloat(compactMetrics.primaryButtonFontSize) <= 14, 'compact primary action font is too large')
     await screenshot('cash-apply-360x800')
     results.push({ scenario: 'cash-apply', viewport: '360x800', metrics: compactMetrics })
 

@@ -1,6 +1,5 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import HomePage from '../features/home/views/HomePage.vue'
-import MinePage from '../features/shell/views/MinePage.vue'
 import RepaymentPage from '../features/shell/views/RepaymentPage.vue'
 import MainTabShell from '../features/shell/MainTabShell.vue'
 import RoutePlaceholder from './RoutePlaceholder.vue'
@@ -29,7 +28,7 @@ export const router = createRouter({
       children: [
         { path: ROUTE_PATH.HOME, name: 'home', component: HomePage, meta: { keepAlive: true, showTab: true, tabKey: 'home' } },
         { path: ROUTE_PATH.REPAYMENT, name: 'repayment', component: RepaymentPage, meta: { keepAlive: true, showTab: true, tabKey: 'repayment' } },
-        { path: ROUTE_PATH.MINE, name: 'mine', component: MinePage, meta: { keepAlive: true, showTab: true, tabKey: 'account' } },
+        { path: ROUTE_PATH.MINE, name: 'mine', component: RoutePlaceholder, props: { title: 'Mi cuenta' }, meta: { showTab: true, tabKey: 'account' } },
         { path: 'orderList', name: 'orderList', component: RoutePlaceholder, props: { title: 'Order list' } },
         { path: 'information', name: 'information', component: RoutePlaceholder, props: { title: 'Information' } },
         { path: 'contacts', name: 'contacts', component: RoutePlaceholder, props: { title: 'Contacts' } },

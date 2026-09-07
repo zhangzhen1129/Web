@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import HomeTabs from './features/home/components/HomeTabs.vue'
+import { createHomeRouteConsumer } from './features/home/homeRoute.js'
 import { ROUTE_PATH } from './router/index.js'
 import { appModeState, shouldShowRepaymentTab } from './features/shell/appModeStore.js'
 import { hideNativeTabBar } from './features/shell/nativeTabBar.js'
@@ -30,7 +31,9 @@ onBeforeUnmount(() => {
 
 const route = useRoute()
 const router = useRouter()
+const homeRouteConsumer = createHomeRouteConsumer({ router })
 const tabScrollPositions = new Map()
+let tabIntentSequence = 0
 
 const tabDefinitions = computed(() => appModeState.homeTabs
   .filter((tab) => tab.enabled !== false && (tab.key !== 'repayment' || shouldShowRepaymentTab()))
@@ -44,11 +47,16 @@ const tabs = computed(() => tabDefinitions.value.map((tab) => ({
 
 const showMainTabs = computed(() => route.meta.showTab === true)
 
-function replaceTab(tab) {
+async function navigateTabIntent(tab) {
   if (!tab.enabled || tab.active) return
   saveCurrentTabScrollPosition()
-  router.replace(tab.routePath)
-  if (tab.routePath === ROUTE_PATH.HOME) {
+  const target = tab.key === 'home' ? 'home_tab' : tab.key === 'repayment' ? 'repayment_tab' : 'account_tab'
+  const operationId = `tab-${Date.now().toString(36)}-${(tabIntentSequence += 1).toString(36)}`
+  const result = await homeRouteConsumer.consumeHomeRouteIntent({
+    routeIntent: { intentId: `intent-${operationId}`, sourceOperationId: operationId, target },
+    currentRoute: route,
+  })
+  if (result.type === 'navigated' && tab.routePath === ROUTE_PATH.HOME) {
     window.setTimeout(restoreHomeScrollPosition, 0)
     window.setTimeout(restoreHomeScrollPosition, 120)
   }
@@ -79,7 +87,8 @@ function restoreHomeScrollPosition() {
 }
 
 function ensureRouteAllowed() {
-  if (route.path === ROUTE_PATH.REPAYMENT && !shouldShowRepaymentTab(appModeState.mode)) router.replace(ROUTE_PATH.HOME)
+  if (route.path !== ROUTE_PATH.REPAYMENT || shouldShowRepaymentTab(appModeState.mode)) return
+  void homeRouteConsumer.navigate({ name: 'home', path: ROUTE_PATH.HOME, query: {} }, route, { replace: true })
 }
 
 onMounted(() => {
@@ -113,6 +122,6 @@ function handleAppWheel(event) {
   <div class="app" @wheel="handleAppWheel">
     <div class="safe-area-probe" aria-hidden="true"></div>
     <RouterView />
-    <HomeTabs v-if="showMainTabs" :tabs="tabs" @navigate="replaceTab" />
+    <HomeTabs v-if="showMainTabs" :tabs="tabs" @navigate="navigateTabIntent" />
   </div>
 </template>

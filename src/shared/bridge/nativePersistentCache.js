@@ -3,6 +3,7 @@ import {
   deliverBridgeFailure,
   normalizeFailureOptions,
 } from './bridgeFailure.js'
+import { logNativeBridgeCall } from './nativeCallLog.js'
 
 const BRIDGE_OBJECT = 'plahub'
 const METHOD = 'handlePersistentCache'
@@ -180,6 +181,7 @@ export function getNativeCachedToken(consumer = () => {}, options) {
   }
 
   try {
+    logNativeBridgeCall(METHOD)
     const synchronousResult = JSON.parse(bridge[METHOD](payload))
     const accepted = synchronousResult?.action === 'persistent_cache_handle'
       && synchronousResult.requestId === requestId

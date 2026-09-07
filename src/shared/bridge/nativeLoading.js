@@ -1,3 +1,5 @@
+import { logNativeBridgeCall } from './nativeCallLog.js'
+
 const BRIDGE_OBJECT = 'plahub'
 const SHOW_METHOD = 'showLoading'
 const HIDE_METHOD = 'hideLoading'
@@ -56,6 +58,7 @@ function invokeLoading(method) {
   try {
     // Loading methods return a synchronous JSON string, which is deliberately
     // ignored. The H5 API has no business result and never retries or throws.
+    logNativeBridgeCall(method)
     bridge[method](payload)
   } catch {
     reportDiagnostic('BRIDGE_CALL_FAILED')

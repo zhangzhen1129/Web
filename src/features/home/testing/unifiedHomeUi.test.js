@@ -115,18 +115,73 @@ test('invalid, duplicate and stale models retain the latest legal state', () => 
   assert.ok(diagnostics.some((item) => item.code === 'INVALID_HOME_VIEW'))
 })
 
-test('an initial model may omit sourceOperationId and later models may not', () => {
+test('lifecycle models may omit sourceOperationId when no UI operation is pending', () => {
   const { session } = createSession()
   const initial = createUnifiedHomeFixture('cash-apply')
   assert.equal(session.updateHomeView(initial), true)
 
-  const unsolicited = { ...structuredClone(initial), requestId: 'unsolicited', revision: 2 }
-  assert.equal(session.updateHomeView(unsolicited), false)
+  const returningLoading = { ...structuredClone(initial), requestId: 'return-loading', revision: 2, pageStatus: 'loading' }
+  delete returningLoading.homeMode
+  delete returningLoading.viewMode
+  delete returningLoading.viewData
+  assert.equal(session.updateHomeView(returningLoading), true)
+  assert.equal(session.getState().pageStatus, 'loading')
 
   const operationId = session.refresh()
-  assert.equal(session.updateHomeView(responseFor(initial, 'unknown-operation', 2)), false)
-  assert.equal(session.updateHomeView(responseFor(initial, operationId, 2)), true)
-  assert.equal(session.updateHomeView(responseFor(initial, operationId, 3)), false)
+  assert.equal(session.updateHomeView(responseFor(initial, 'unknown-operation', 3)), false)
+  assert.equal(session.updateHomeView(responseFor(initial, operationId, 3)), true)
+  assert.equal(session.updateHomeView(responseFor(initial, operationId, 4)), false)
+})
+
+test('refresh keeps its source operation through the loading skeleton until the terminal model arrives', () => {
+  const { session } = createSession()
+  const initial = createUnifiedHomeFixture('cash-apply')
+  assert.equal(session.updateHomeView(initial), true)
+
+  const operationId = session.refresh()
+  const loading = {
+    requestId: 'loading-2',
+    revision: 2,
+    pageStatus: 'loading',
+    tabs: structuredClone(initial.tabs),
+    sourceOperationId: operationId,
+  }
+  assert.equal(session.updateHomeView(loading), true)
+  assert.equal(session.getState().pageStatus, 'loading')
+  assert.equal(session.getState().pendingOperationType, HOME_OPERATION_TYPE.REFRESH)
+
+  const terminal = responseFor(initial, operationId, 3)
+  assert.equal(session.updateHomeView(terminal), true)
+  assert.equal(session.getState().pageStatus, 'content')
+  assert.equal(session.getState().pendingOperationType, null)
+})
+
+test('a business-failure loading model without a toast releases refresh after the request skeleton', () => {
+  const { session } = createSession()
+  const initial = createUnifiedHomeFixture('cash-apply')
+  assert.equal(session.updateHomeView(initial), true)
+
+  const operationId = session.refresh()
+  const requestLoading = {
+    requestId: 'loading-2',
+    revision: 2,
+    pageStatus: 'loading',
+    tabs: structuredClone(initial.tabs),
+    sourceOperationId: operationId,
+  }
+  assert.equal(session.updateHomeView(requestLoading), true)
+  assert.equal(session.getState().pendingOperationType, HOME_OPERATION_TYPE.REFRESH)
+
+  const businessFailure = {
+    requestId: 'loading-3',
+    revision: 3,
+    pageStatus: 'loading',
+    tabs: structuredClone(initial.tabs),
+    sourceOperationId: operationId,
+  }
+  assert.equal(session.updateHomeView(businessFailure), true)
+  assert.equal(session.getState().pageStatus, 'loading')
+  assert.equal(session.getState().pendingOperationType, null)
 })
 
 test('a newer operation replaces the previous sourceOperationId', () => {

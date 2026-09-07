@@ -21,6 +21,7 @@ const CANONICAL_STAGES = new Set([
   'identity_required', 'remittance_account_required', 'ready_to_apply',
   'reviewing', 'disbursing', 'repaying', 'rejected',
 ])
+const MAIN_TAB_TARGETS = new Set(['home_tab', 'repayment_tab', 'account_tab'])
 
 function isEmpty(value) {
   return value === undefined || value === null || value === ''
@@ -139,7 +140,7 @@ export function resolveHomeRouteIntent({ snapshot, currentSnapshotRevision, rout
 export function createHomeRouteConsumer({ router } = {}) {
   if (!router || typeof router.push !== 'function') throw new TypeError('router.push is required')
 
-  async function navigate(route, currentRoute) {
+  async function navigate(route, currentRoute, options = {}) {
     if (!route) return result('blocked', null, 'route_unavailable')
     const current = currentRoute ?? router.currentRoute?.value
     const currentName = current?.name
@@ -148,8 +149,10 @@ export function createHomeRouteConsumer({ router } = {}) {
     if (currentName === route.name && JSON.stringify(currentQuery) === JSON.stringify(nextQuery)) {
       return result('ignored', null, 'duplicate_navigation')
     }
+    const navigateWith = options.replace === true ? router.replace : router.push
+    if (typeof navigateWith !== 'function') return result('error', null, 'navigation_unavailable')
     try {
-      await router.push({ name: route.name, query: nextQuery })
+      await navigateWith.call(router, { name: route.name, query: nextQuery })
       return {
         ...result('navigated', route),
         routeName: route.name,
@@ -164,7 +167,7 @@ export function createHomeRouteConsumer({ router } = {}) {
   async function consumeHomeRouteIntent(context = {}) {
     const resolved = resolveHomeRouteIntent(context)
     if (resolved.type !== 'navigate') return resolved
-    return navigate(resolved.route, context.currentRoute)
+    return navigate(resolved.route, context.currentRoute, { replace: MAIN_TAB_TARGETS.has(context.routeIntent?.target) })
   }
 
   return Object.freeze({ consumeHomeRouteIntent, navigate })

@@ -1,16 +1,17 @@
 import {
   cancelNativeAppInfoConsumer,
+  cancelNativeCachedTokenConsumer,
   cancelNativeOneClickPermissionConsumer,
   cancelThirdPartySdkIdentifiersConsumer,
   getNativeAppInfo,
+  getNativeCachedToken,
   getThirdPartySdkIdentifiers,
   hideNativeLoading,
   requestNativeOneClickPermissions,
   showNativeLoading,
 } from "../../../shared/bridge/index.js";
-import { createNativeDataPlanService } from "./nativeDataPlan.js";
 
-const ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$/;
+const ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 const PERMISSIONS = Object.freeze(["sms", "camera", "phoneState", "location"]);
 const ERROR_CODES = Object.freeze({
   invalidArgument: "INVALID_ARGUMENT",
@@ -35,7 +36,10 @@ const APP_INFO_FIELDS = Object.freeze([
   "androidId",
 ]);
 const SDK_FIELDS = Object.freeze(["afId", "fbId", "gaId"]);
-const STATIC_TOKEN = "6a9ab65fe4b0d92c4ed9b99d";
+const DEVELOPMENT_TEST_TOKEN =
+  typeof import.meta.env === "object" && import.meta.env?.DEV === true
+    ? "6a9ab65fe4b0d92c4ed9b99d"
+    : null;
 
 function validId(value) {
   return typeof value === "string" && ID_PATTERN.test(value);
@@ -69,10 +73,14 @@ function invalidInitResult() {
 
 export function createHomeHostService(options = {}) {
   const store = options.globalStore;
+  const developmentTestToken = options.testToken ?? DEVELOPMENT_TEST_TOKEN;
   const bridge = {
     getNativeAppInfo: options.getNativeAppInfo ?? getNativeAppInfo,
     cancelNativeAppInfoConsumer:
       options.cancelNativeAppInfoConsumer ?? cancelNativeAppInfoConsumer,
+    getNativeCachedToken: options.getNativeCachedToken ?? getNativeCachedToken,
+    cancelNativeCachedTokenConsumer:
+      options.cancelNativeCachedTokenConsumer ?? cancelNativeCachedTokenConsumer,
     getThirdPartySdkIdentifiers:
       options.getThirdPartySdkIdentifiers ?? getThirdPartySdkIdentifiers,
     cancelThirdPartySdkIdentifiersConsumer:
@@ -87,10 +95,6 @@ export function createHomeHostService(options = {}) {
     showNativeLoading: options.showNativeLoading ?? showNativeLoading,
     hideNativeLoading: options.hideNativeLoading ?? hideNativeLoading,
   };
-  const nativeDataPlanService =
-    options.nativeDataPlanService ?? createNativeDataPlanService();
-  const executeDataPlan = nativeDataPlanService.executeNativeDataPlan;
-  const cancelDataPlan = nativeDataPlanService.cancelNativeDataPlan;
   const usedInitIds = new Set();
   const usedLoadingIds = new Set();
   const operationRecords = new Map();
@@ -179,15 +183,38 @@ export function createHomeHostService(options = {}) {
         }
       },
     );
-    if (context.disposed) steps.token = step("canceled", ERROR_CODES.canceled);
-    else {
+    if (typeof developmentTestToken === "string" && developmentTestToken.length > 0) {
       try {
-        steps.token = store?.setGlobal?.({ token: STATIC_TOKEN })
+        steps.token = store?.setGlobal?.({ token: developmentTestToken })
           ? step("updated")
           : step("failed", ERROR_CODES.storeUpdateFailed);
       } catch {
         steps.token = step("failed", ERROR_CODES.storeUpdateFailed);
       }
+    } else {
+      steps.token = await queryStep(
+        context,
+        bridge.getNativeCachedToken,
+        bridge.cancelNativeCachedTokenConsumer,
+        (reply) => {
+          if (reply?.status !== "completed")
+            return step("failed", ERROR_CODES.nativeFailed);
+          if (reply.hit !== true) {
+            return step(typeof store?.token === "string" && store.token.length > 0
+              ? "retained"
+              : "not_found");
+          }
+          if (typeof reply.cacheValue !== "string" || reply.cacheValue.length === 0)
+            return step("failed", ERROR_CODES.invalidCallback);
+          try {
+            return store?.setGlobal?.({ token: reply.cacheValue })
+              ? step("updated")
+              : step("failed", ERROR_CODES.storeUpdateFailed);
+          } catch {
+            return step("failed", ERROR_CODES.storeUpdateFailed);
+          }
+        },
+      );
     }
     steps.sdkIdentifiers = await queryStep(
       context,
@@ -269,9 +296,6 @@ export function createHomeHostService(options = {}) {
       hideHomeHostLoading({ loadingCycleId: activeLoadingId });
     if (activeOperationId)
       cancelHomeHostOperation({ operationId: activeOperationId });
-    try {
-      nativeDataPlanService.disposeNativeDataPlanService?.();
-    } catch {}
     operationRecords.clear();
     usedInitIds.clear();
     usedLoadingIds.clear();
@@ -323,17 +347,6 @@ export function createHomeHostService(options = {}) {
         );
       } catch {}
     }
-    if (record.planStatus === "pending") {
-      record.planStatus = "canceled";
-      record.resolvePlan({
-        operationId,
-        status: "canceled",
-        errorCode: reason,
-      });
-    }
-    try {
-      cancelDataPlan(operationId, reason);
-    } catch {}
     activeOperationId = null;
   }
   function replaceActiveOperation(nextOperationId) {
@@ -358,9 +371,6 @@ export function createHomeHostService(options = {}) {
       operationId,
       permissionStatus: null,
       permissionRequestId: null,
-      planMode: null,
-      planPromise: null,
-      planStatus: null,
     };
     activeOperationId = operationId;
     record.permissionPromise = new Promise((resolve) => {
@@ -393,82 +403,12 @@ export function createHomeHostService(options = {}) {
     return record.permissionPromise;
   }
 
-  function executeNativeDataPlan({ operationId, homeMode } = {}) {
-    if (
-      !validId(operationId) ||
-      !["cash_loan", "multi_push"].includes(homeMode)
-    )
-      return Promise.resolve({
-        operationId: null,
-        status: "failed",
-        errorCode: ERROR_CODES.invalidArgument,
-      });
-    const existing = operationRecords.get(operationId);
-    if (existing?.planPromise)
-      return existing.planMode === homeMode
-        ? existing.planPromise
-        : Promise.resolve({
-            operationId,
-            status: "failed",
-            errorCode: ERROR_CODES.invalidArgument,
-          });
-    if (existing?.permissionStatus && existing.permissionStatus !== "granted")
-      return Promise.resolve({
-        operationId,
-        status: "failed",
-        errorCode: ERROR_CODES.invalidArgument,
-      });
-    replaceActiveOperation(operationId);
-    const record = existing ?? {
-      operationId,
-      permissionStatus: null,
-      permissionRequestId: null,
-      planMode: null,
-      planPromise: null,
-      planStatus: null,
-    };
-    activeOperationId = operationId;
-    record.planMode = homeMode;
-    record.planStatus = "pending";
-    record.planPromise = new Promise((resolve) => {
-      record.resolvePlan = resolve;
-    });
-    const settle = (result) => {
-      if (record.planStatus !== "pending") return;
-      record.planStatus = result.status;
-      record.resolvePlan(result);
-    };
-    try {
-      Promise.resolve(
-        executeDataPlan(
-          { operationId, homeMode },
-          options.nativeDataPlanOptions,
-        ),
-      ).then(settle, () =>
-        settle({
-          operationId,
-          status: "failed",
-          errorCode: ERROR_CODES.internalFailed,
-        }),
-      );
-    } catch {
-      settle({
-        operationId,
-        status: "failed",
-        errorCode: ERROR_CODES.internalFailed,
-      });
-    }
-    operationRecords.set(operationId, record);
-    return record.planPromise;
-  }
-
   return Object.freeze({
     initializeHomeHostContext,
     disposeHomeHostInit,
     showHomeHostLoading,
     hideHomeHostLoading,
     requestHomePermissions,
-    executeNativeDataPlan,
     cancelHomeHostOperation,
   });
 }

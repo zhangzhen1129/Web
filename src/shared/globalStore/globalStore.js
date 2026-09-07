@@ -148,21 +148,8 @@ export const useGlobalStore = defineStore('globalStore', {
         if (Object.hasOwn(partial, field)) entries.push({ field, key: GLOBAL_THIRD_PARTY_SDK_CACHE_KEYS[field], version: GLOBAL_THIRD_PARTY_SDK_CACHE_VERSION, value: partial[field] })
       })
 
-      const snapshots = entries.map((entry) => ({
-        ...entry,
-        previous: getPersistentResult(entry.key, { version: entry.version }),
-      }))
-      const written = []
       for (const entry of entries) {
-        if (!setPersistentValue(entry.key, entry.value, { version: entry.version })) {
-          written.forEach((writtenEntry) => {
-            removePersistentValue(writtenEntry.key)
-            const snapshot = snapshots.find((item) => item.key === writtenEntry.key)?.previous
-            if (snapshot?.status === 'found') setPersistentValue(writtenEntry.key, snapshot.value, { version: writtenEntry.version })
-          })
-          return false
-        }
-        written.push(entry)
+        setPersistentValue(entry.key, entry.value, { version: entry.version })
       }
 
       fields.forEach((field) => { this[field] = nextValues[field] })

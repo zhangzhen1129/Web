@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
-  getNativeBusinessActionRegistrySize,
   logoutToOtpLoginNative,
   openGooglePlayNative,
 } from './nativeBusinessActions.js'
@@ -13,7 +12,7 @@ function installWindow(bridge) {
   }
 }
 
-test('openGooglePlayNative sends the documented request and cleans the terminal registration', () => {
+test('openGooglePlayNative sends the documented request without consuming a failure callback', () => {
   let payload
   installWindow({
     plahub: {
@@ -31,8 +30,8 @@ test('openGooglePlayNative sends the documented request and cleans the terminal 
 
   assert.equal(openGooglePlayNative(), true)
   assert.equal(payload.replyHandler, 'window.__dineroProGooglePlayReply')
-  assert.equal(getNativeBusinessActionRegistrySize(), 0)
-  assert.equal(window.__dineroProGooglePlayReply, undefined)
+  assert.equal(typeof window.__dineroProGooglePlayReply, 'function')
+  assert.doesNotThrow(() => window.__dineroProGooglePlayReply({ status: 'ERR_OPEN_FAILED' }))
 })
 
 test('business actions isolate missing and throwing Bridge methods', () => {
@@ -52,5 +51,4 @@ test('business actions isolate missing and throwing Bridge methods', () => {
   })
   assert.equal(logoutToOtpLoginNative(), false)
   assert.equal(openGooglePlayNative(), false)
-  assert.equal(getNativeBusinessActionRegistrySize(), 0)
 })

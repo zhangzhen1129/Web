@@ -432,8 +432,9 @@ img.unified-home__credit-state {
   border-radius: .41026rem;
   background: linear-gradient(90deg, var(--unified-home-blue), var(--unified-home-indigo), var(--unified-home-purple));
   color: #fff;
-  font-size: .41026rem;
+  font-size: .35897rem !important;
   font-weight: 800;
+  line-height: .51282rem;
 }
 
 .unified-home__primary:disabled {
@@ -659,8 +660,9 @@ img.unified-home__credit-state {
   border-radius: .41026rem;
   background: var(--unified-home-blue);
   color: #fff;
-  font-size: .41026rem;
+  font-size: .35897rem !important;
   font-weight: 800;
+  line-height: .51282rem;
 }
 
 .unified-home__dialog-action span {

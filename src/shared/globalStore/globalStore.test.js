@@ -144,7 +144,7 @@ test('initializes apiHost from current URL with controlled semantic results', ()
   assert.equal(store.apiHost, 'https://launch.example.test')
 })
 
-test('reports apiHost cache access and Store update failures without losing the old value', () => {
+test('retains memory updates when the cache is unavailable', () => {
   const store = useGlobalStore()
   assert.equal(store.setGlobal({ apiHost: 'https://cached.example.test' }), true)
 
@@ -159,13 +159,13 @@ test('reports apiHost cache access and Store update failures without losing the 
   window.localStorage.setItem = () => { throw new Error('quota exceeded') }
   window.location.search = '?apiHost=https%3A%2F%2Flaunch.example.test'
   assert.deepEqual(store.initializeApiHostFromCurrentLocation(), {
-    status: 'failed',
-    errorCode: 'STORE_UPDATE_FAILED',
+    status: 'updated',
+    errorCode: null,
   })
-  assert.equal(store.apiHost, 'https://cached.example.test')
+  assert.equal(store.apiHost, 'https://launch.example.test')
 })
 
-test('rolls back memory and earlier cache writes when a multi-field update fails', () => {
+test('updates memory even when a multi-field cache write fails', () => {
   const store = useGlobalStore()
   assert.equal(store.setGlobal({ token: 'old-token', apiHost: 'https://old.example.test' }), true)
   const originalSetItem = window.localStorage.setItem.bind(window.localStorage)
@@ -174,12 +174,12 @@ test('rolls back memory and earlier cache writes when a multi-field update fails
     originalSetItem(key, value)
   }
 
-  assert.equal(store.setGlobal({ token: 'new-token', apiHost: 'https://new.example.test' }), false)
-  assert.equal(store.token, 'old-token')
-  assert.equal(store.apiHost, 'https://old.example.test')
+  assert.equal(store.setGlobal({ token: 'new-token', apiHost: 'https://new.example.test' }), true)
+  assert.equal(store.token, 'new-token')
+  assert.equal(store.apiHost, 'https://new.example.test')
   assert.deepEqual(JSON.parse(window.localStorage.getItem('DineroPro:global:token')), {
     version: GLOBAL_TOKEN_CACHE_VERSION,
-    value: 'old-token',
+    value: 'new-token',
   })
   assert.deepEqual(JSON.parse(window.localStorage.getItem('DineroPro:global:api-host')), {
     version: GLOBAL_API_HOST_CACHE_VERSION,

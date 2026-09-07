@@ -73,6 +73,6 @@ test('creates a stable handled error without exposing the response body', () => 
   const error = createBusinessHandledError({ code: 4005, message: 'safe', protocolId: 'p', cause: { secret: 'hidden' } })
   assert.equal(error.businessHandled, true)
   assert.equal(error.protocolId, 'p')
-  assert.equal(error.cause.secret, 'hidden')
+  assert.equal(error.cause, undefined)
   assert.equal(error.displayMessage, 'safe')
 })

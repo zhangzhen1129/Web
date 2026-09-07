@@ -21,6 +21,7 @@ defineOptions({ name: 'UnifiedHomeView' })
 const props = defineProps({
   initialPayload: { type: Object, default: null },
   requestIdFactory: { type: Function, default: undefined },
+  showTabs: { type: Boolean, default: true },
 })
 const emit = defineEmits(['emitHomeOperation', 'diagnostic'])
 const session = createHomeUiSession({
@@ -151,9 +152,12 @@ defineExpose({
       <template #loading><Loading type="spinner" size=".8rem" /></template>
 
       <div class="unified-home__viewport">
-        <div v-if="state.pageStatus === HOME_PAGE_STATUS.LOADING || state.pageStatus === HOME_PAGE_STATUS.ERROR" class="unified-home__state">
+        <div v-if="state.pageStatus === HOME_PAGE_STATUS.LOADING" class="unified-home__state">
           <Skeleton class="unified-home__skeleton" :row="15" :title="false" animate />
-          <p v-if="state.pageStatus === HOME_PAGE_STATUS.ERROR && state.errorData" class="unified-home__error" role="alert">
+        </div>
+
+        <div v-else-if="state.pageStatus === HOME_PAGE_STATUS.ERROR" class="unified-home__state">
+          <p v-if="state.errorData" class="unified-home__error" role="alert">
             {{ state.errorData.messageText }}
           </p>
         </div>
@@ -268,7 +272,7 @@ defineExpose({
       </div>
     </PullRefresh>
 
-    <nav v-if="state.tabs.length" class="unified-home__tabs" :style="{ '--tab-count': state.tabs.length }" :aria-label="homeUiText.primaryNavigationLabel">
+    <nav v-if="props.showTabs && state.tabs.length" class="unified-home__tabs" :style="{ '--tab-count': state.tabs.length }" :aria-label="homeUiText.primaryNavigationLabel">
       <button
         v-for="tab in state.tabs"
         :key="tab.key"

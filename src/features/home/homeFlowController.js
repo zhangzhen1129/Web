@@ -15,6 +15,9 @@ const EFFECTS = new Set([
   'navigate_order_list', 'apply_order',
 ])
 const TARGETS = new Set(['home_tab', 'repayment_tab', 'account_tab', 'repayment_list', 'order_list'])
+const DATA_COLLECTION_STATUSES = new Set([
+  'collecting', 'uploading', 'success', 'collect_failed', 'upload_failed', 'cancelled', 'unavailable',
+])
 
 const safeClone = (value) => {
   if (value === undefined) return undefined
@@ -57,6 +60,8 @@ export function createHomeFlowController(options = {}) {
   const ui = options.ui ?? options.uiPort ?? {}
   const host = options.hostService ?? options.host ?? options
   const data = options.dataProvider ?? options.data ?? options
+  const dataCollection = options.dataCollectionService ?? null
+  const onDataCollectionStatus = asFunction(options.onDataCollectionStatus)
   const updateHomeView = asFunction(options.updateHomeView ?? ui.updateHomeView)
   const emitHomeRouteIntent = asFunction(options.emitHomeRouteIntent ?? options.emitRouteIntent)
   const getMessage = typeof options.getMessage === 'function' ? options.getMessage : (id) => getProjectMessage(id)
@@ -127,6 +132,7 @@ export function createHomeFlowController(options = {}) {
     const operation = activeOperation
     const operationId = operation?.operationId
     if (!operationId) return
+    operation.abortController?.abort()
     void call('cancelHomeHostOperation', { operationId })
     operation.cancelResolve?.({ operationId, status: 'canceled' })
     activeOperation = null
@@ -141,31 +147,25 @@ export function createHomeFlowController(options = {}) {
   }
   function loadingPayload(cycle, pageStatus = 'loading') {
     const previous = state.viewPayload
+    const tabs = Array.isArray(previous?.tabs) && previous.tabs.length > 0
+      ? safeClone(previous.tabs)
+      : fallbackTabs()
     const keepContentWhileRefreshing = pageStatus === 'refreshing' && previous?.pageStatus === 'content'
     const payload = keepContentWhileRefreshing
       ? { ...safeClone(previous), requestId: cycle.intermediateRequestId, revision: cycle.viewRevision, pageStatus, toastNotice: undefined, overlayNotice: undefined, errorData: undefined }
-      : { requestId: cycle.intermediateRequestId, revision: cycle.viewRevision, pageStatus: 'loading' }
-    delete payload.tabs
+      : { requestId: cycle.intermediateRequestId, revision: cycle.viewRevision, pageStatus: 'loading', tabs }
     delete payload.toastNotice
     delete payload.overlayNotice
     delete payload.errorData
     if (cycle.sourceOperationId) payload.sourceOperationId = cycle.sourceOperationId
     return payload
   }
-  function failureLoadingPayload(cycle, result) {
-    const messageText = result?.error?.messageText
-      || result?.viewPayload?.errorData?.messageText
-      || 'Unable to load home data.'
-    return {
-      requestId: cycle.loadCycleId,
-      revision: cycle.viewRevision,
-      ...(cycle.sourceOperationId ? { sourceOperationId: cycle.sourceOperationId } : {}),
-      pageStatus: 'loading',
-      toastNotice: { noticeId: cycle.loadCycleId, text: messageText },
-    }
-  }
   function sendPayload(payload) {
     try { updateHomeView(safeClone(payload)) } catch {}
+  }
+  function notifyDataCollectionStatus(operationId, status) {
+    if (!DATA_COLLECTION_STATUSES.has(status)) return
+    try { onDataCollectionStatus(Object.freeze({ operationId, status })) } catch {}
   }
   function acceptDataResult(cycle, result) {
     if (!activeLoad || activeLoad !== cycle || cycle.canceled || state.disposed) return makeResult(state.flowScopeId, cycle, 'canceled')
@@ -178,9 +178,7 @@ export function createHomeFlowController(options = {}) {
       return makeResult(state.flowScopeId, cycle, 'canceled')
     }
     if (!result.viewPayload || result.viewPayload.requestId !== cycle.loadCycleId || result.viewPayload.revision !== cycle.viewRevision) {
-      const viewPayload = failureLoadingPayload(cycle, result)
-      state = { ...state, viewPayload: safeClone(viewPayload), flowStatus: 'business_failure' }
-      sendPayload(viewPayload)
+      state = { ...state, flowStatus: 'error' }
       notify()
       hideLoading(cycle.loadingCycleId)
       activeLoad = null
@@ -192,7 +190,7 @@ export function createHomeFlowController(options = {}) {
     }
     const status = result.status
     if (status === 'content' || status === 'business_failure' || status === 'error' || status === 'handled') {
-      const viewPayload = status === 'error' ? failureLoadingPayload(cycle, result) : result.viewPayload
+      const viewPayload = result.viewPayload
       if (viewPayload) {
         state = { ...state, viewPayload: safeClone(viewPayload) }
         sendPayload(viewPayload)
@@ -200,7 +198,7 @@ export function createHomeFlowController(options = {}) {
       if (status === 'content' && result.snapshot) {
         state = { ...state, snapshot: safeClone(result.snapshot), snapshotRevision: state.snapshotRevision + 1, flowStatus: 'ready' }
       } else {
-        state = { ...state, flowStatus: status === 'error' || status === 'business_failure' || status === 'handled' ? 'business_failure' : 'error' }
+        state = { ...state, flowStatus: status === 'business_failure' ? 'business_failure' : 'error' }
       }
       notify()
       hideLoading(cycle.loadingCycleId)
@@ -304,9 +302,10 @@ export function createHomeFlowController(options = {}) {
     const payload = state.viewPayload
     const snapshot = state.snapshot
     if (operation.type === 'refresh') {
-      return Boolean(payload)
-        && ['content', 'error', 'loading'].includes(payload.pageStatus)
-        && ['ready', 'business_failure', 'error'].includes(state.flowStatus)
+      return state.flowStatus === 'error'
+        || (Boolean(payload)
+          && ['content', 'error', 'loading'].includes(payload.pageStatus)
+          && ['ready', 'business_failure', 'error'].includes(state.flowStatus))
     }
     if (!payload || payload.pageStatus !== 'content' || !snapshot) return false
     if (operation.type === 'refresh_credit') return state.flowStatus === 'ready'
@@ -385,6 +384,14 @@ export function createHomeFlowController(options = {}) {
     if (!activeOperation || activeOperation.operationId !== operation.requestId || activeOperation.snapshotRevision !== state.snapshotRevision || state.disposed || (permission?.operationId && permission.operationId !== operation.requestId)) return { operationId: operation.requestId, status: 'canceled' }
     if (permission?.status !== 'granted') { activeOperation = null; setStatus('ready', { operationId: null }); return { operationId: operation.requestId, status: permission?.status === 'canceled' ? 'canceled' : 'failed', error: resultError(permission?.errorCode ?? 'PERMISSION_FAILED') } }
     const effect = state.snapshot?.primaryActionEffect
+    if (state.snapshot?.mode === 'cash_loan') {
+      const triggerOnly = dataCollection?.triggerOnly
+      if (typeof triggerOnly === 'function') {
+        try {
+          Promise.resolve(triggerOnly.call(dataCollection, { operationId: operation.requestId })).catch(() => undefined)
+        } catch {}
+      }
+    }
     if (effect === 'show_empty_products_toast' || effect === 'show_overlay_notice') {
       const messageId = effect === 'show_empty_products_toast' ? '10' : '20'
       const text = getMessage(messageId)
@@ -410,15 +417,62 @@ export function createHomeFlowController(options = {}) {
       setStatus('ready', { operationId: null })
       return { operationId: operation.requestId, status: 'completed', effect: intent }
     }
+    if (effect !== 'apply_order') {
+      activeOperation = null
+      setStatus('ready', { operationId: null })
+      return { operationId: operation.requestId, status: 'failed', error: resultError('OPERATION_NOT_AVAILABLE') }
+    }
+    const triggerUpload = dataCollection?.triggerUpload
+    if (typeof triggerUpload !== 'function') {
+      activeOperation = null
+      setStatus('ready', { operationId: null })
+      return { operationId: operation.requestId, status: 'failed', error: resultError('DATA_COLLECTION_UNAVAILABLE') }
+    }
+    const abortController = typeof AbortController === 'function' ? new AbortController() : null
+    activeOperation = { ...activeOperation, abortController }
     setStatus('native_processing')
-    const native = await Promise.race([
-      call('executeNativeDataPlan', { operationId: operation.requestId, homeMode: state.snapshot?.mode }),
+    const upload = await Promise.race([
+      Promise.resolve().then(() => triggerUpload.call(dataCollection, {
+        operationId: operation.requestId,
+        signal: abortController?.signal,
+        onStatus: (status) => {
+          if (!activeOperation || activeOperation.operationId !== operation.requestId || state.disposed) return
+          if (status === 'collecting' || status === 'uploading') {
+            notifyDataCollectionStatus(operation.requestId, status)
+            setStatus('native_processing')
+          }
+        },
+      })).catch(() => ({ status: 'unavailable' })),
       new Promise((resolve) => { if (activeOperation?.operationId === operation.requestId) activeOperation.cancelResolve = resolve }),
     ])
-    if (!activeOperation || activeOperation.operationId !== operation.requestId || activeOperation.snapshotRevision !== state.snapshotRevision || state.disposed || (native?.operationId && native.operationId !== operation.requestId)) return { operationId: operation.requestId, status: 'canceled' }
-    activeOperation = null; setStatus('ready', { operationId: null })
-    if (native?.status === 'trigger_dispatched' || native?.status === 'collected') return { operationId: operation.requestId, status: 'completed', effect: native.status }
-    return { operationId: operation.requestId, status: native?.status === 'canceled' ? 'canceled' : 'failed', error: resultError(native?.errorCode ?? 'NATIVE_FAILED') }
+    if (!activeOperation || activeOperation.operationId !== operation.requestId || activeOperation.snapshotRevision !== state.snapshotRevision || state.disposed || (upload?.operationId && upload.operationId !== operation.requestId)) return { operationId: operation.requestId, status: 'canceled' }
+    const terminalStatus = upload?.status === 'canceled'
+      ? 'cancelled'
+      : DATA_COLLECTION_STATUSES.has(upload?.status) && !['collecting', 'uploading'].includes(upload.status)
+        ? upload.status
+        : 'unavailable'
+    activeOperation = null
+    setStatus('ready', { operationId: null })
+    notifyDataCollectionStatus(operation.requestId, terminalStatus)
+    if (terminalStatus === 'success') return { operationId: operation.requestId, status: 'completed', effect: terminalStatus }
+    if (terminalStatus === 'upload_failed') {
+      const text = getMessage('41')
+      if (typeof text === 'string' && text.trim().length > 0 && state.viewPayload?.pageStatus === 'content') {
+        const payload = safeClone(state.viewPayload)
+        payload.requestId = allocate('view')
+        payload.revision = nextViewRevision()
+        payload.sourceOperationId = operation.requestId
+        payload.toastNotice = { noticeId: allocate('notice'), text }
+        state = { ...state, viewPayload: payload }
+        sendPayload(payload)
+        notify()
+      }
+    }
+    return {
+      operationId: operation.requestId,
+      status: terminalStatus === 'cancelled' ? 'canceled' : 'failed',
+      error: resultError(upload?.errorCode ?? terminalStatus.toUpperCase()),
+    }
   }
 
   async function handleHomeOperation({ flowScopeId, operation } = {}) {
@@ -429,7 +483,7 @@ export function createHomeFlowController(options = {}) {
     handledOperations.add(operation.requestId)
     if (operation.type === 'refresh' || operation.type === 'refresh_credit') {
       cancelOperation()
-      const result = await runLoad({ trigger: operation.type, sourceOperationId: operation.requestId, intermediateStatus: 'refreshing' })
+      const result = await runLoad({ trigger: operation.type, sourceOperationId: operation.requestId, intermediateStatus: 'loading' })
       return { operationId: operation.requestId, status: result.status === 'canceled' ? 'canceled' : result.status === 'ready' || result.status === 'business_failure' || result.status === 'handled' ? 'completed' : 'failed' }
     }
     if (operation.type === 'select_amount' || operation.type === 'select_term' || operation.type === 'toggle_product_selection') { cancelOperation(); emitSelection(operation); return { operationId: operation.requestId, status: 'completed' } }

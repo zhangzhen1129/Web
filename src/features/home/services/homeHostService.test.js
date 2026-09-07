@@ -17,11 +17,6 @@ function createHarness(overrides = {}) {
     initializeApiHostFromCurrentLocation() { calls.push('apiHost'); return { status: 'retained', errorCode: null } },
     setGlobal(update) { Object.assign(this, update); calls.push(`store:${Object.keys(update).join(',')}`); return true },
   }
-  const nativeDataPlanService = {
-    cancelNativeDataPlan(operationId) { calls.push(`cancelPlan:${operationId}`); return true },
-    disposeNativeDataPlanService() { calls.push('disposePlan') },
-    executeNativeDataPlan(plan) { calls.push(`plan:${plan.operationId}:${plan.homeMode}`); return Promise.resolve({ operationId: plan.operationId, status: 'trigger_dispatched', errorCode: null }) },
-  }
   const service = createHomeHostService({
     globalStore: store,
     getNativeAppInfo: request('appInfo'), getNativeCachedToken: request('token'),
@@ -36,7 +31,6 @@ function createHarness(overrides = {}) {
     },
     cancelNativeOneClickPermissionConsumer: (id) => calls.push(`cancelPermission:${id}`),
     showNativeLoading: () => calls.push('showLoading'), hideNativeLoading: () => calls.push('hideLoading'),
-    nativeDataPlanService,
     ...overrides,
   })
   return { calls, pending, service, store }
@@ -47,11 +41,13 @@ async function resolveInitialization(harness) {
     status: 'success', appName: 'App', packageName: 'pkg', packageId: 'id',
     appVersion: '1', appVersionName: '1.0', androidId: 'android',
   })
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  harness.pending.token.consumer({ status: 'completed', hit: true, cacheValue: 'native-token' })
   await Promise.resolve()
   harness.pending.sdk.consumer({ status: 'partial_success', afId: '', fbId: '', gaId: '' })
 }
 
-test('initializes in fixed order, stores the static token, and does not invoke the Token Bridge', async () => {
+test('initializes in fixed order and stores the native cached Token', async () => {
   const harness = createHarness()
   const first = harness.service.initializeHomeHostContext({ initCycleId: 'init-1' })
   const duplicate = harness.service.initializeHomeHostContext({ initCycleId: 'init-1' })
@@ -59,12 +55,11 @@ test('initializes in fixed order, stores the static token, and does not invoke t
   assert.deepEqual(harness.calls, ['apiHost', 'appInfo'])
   await resolveInitialization(harness)
   const result = await first
-  assert.deepEqual(harness.calls.slice(0, 5), ['apiHost', 'appInfo', 'store:appName,packageName,packageId,appVersion,appVersionName,androidId', 'store:token', 'sdk'])
+  assert.deepEqual(harness.calls.slice(0, 6), ['apiHost', 'appInfo', 'store:appName,packageName,packageId,appVersion,appVersionName,androidId', 'token', 'store:token', 'sdk'])
   assert.equal(result.status, 'completed')
   assert.deepEqual(result.steps.token, { status: 'updated', errorCode: null })
   assert.deepEqual(result.steps.sdkIdentifiers, { status: 'retained', errorCode: null })
-  assert.equal(harness.calls.includes('token'), false)
-  assert.equal(harness.store.token.length, 24)
+  assert.equal(harness.store.token, 'native-token')
   assert.equal(JSON.stringify(result).includes(harness.store.token), false)
 })
 
@@ -90,6 +85,24 @@ test('uses the controlled api host initialization result without inferring store
   const result = await resultPromise
   assert.deepEqual(result.steps.apiHost, { status: 'failed', errorCode: 'CACHE_ACCESS_FAILED' })
   assert.equal(result.status, 'partial_success')
+})
+
+test('uses an explicit development token when the native token query is unavailable', async () => {
+  const harness = createHarness({
+    getNativeCachedToken() { throw new Error('native token query must be skipped') },
+    testToken: 'development-token',
+  })
+  const initialization = harness.service.initializeHomeHostContext({ initCycleId: 'development-token-init' })
+  harness.pending.appInfo.consumer({
+    status: 'success', appName: 'App', packageName: 'pkg', packageId: 'id',
+    appVersion: '1', appVersionName: '1.0', androidId: 'android',
+  })
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  harness.pending.sdk.consumer({ status: 'partial_success', afId: '', fbId: '', gaId: '' })
+  const result = await initialization
+  assert.deepEqual(result.steps.token, { status: 'updated', errorCode: null })
+  assert.equal(harness.store.token, 'development-token')
+  assert.equal(harness.calls.includes('token'), false)
 })
 
 test('dispose cancels current consumer, short-circuits later steps, and permits a fresh id', async () => {
@@ -133,21 +146,14 @@ test('loading cycles show once, replace in hide-show order, and ignore late hide
   assert.deepEqual(harness.calls, ['showLoading', 'hideLoading', 'showLoading', 'hideLoading'])
 })
 
-test('permissions use the fixed set, deduplicate, gate plans, and replace old operations', async () => {
+test('permissions use the fixed set, deduplicate, and replace old operations', async () => {
   const harness = createHarness()
   const permission = harness.service.requestHomePermissions({ operationId: 'op-1' })
   assert.equal(permission, harness.service.requestHomePermissions({ operationId: 'op-1' }))
   assert.equal(harness.calls[0], `permissions:${HOME_HOST_PERMISSIONS.join(',')}`)
-  assert.deepEqual(await harness.service.executeNativeDataPlan({ operationId: 'op-1', homeMode: 'cash_loan' }), {
-    operationId: 'op-1', status: 'failed', errorCode: 'INVALID_ARGUMENT',
-  })
   harness.pending.permissions.consumer({ status: 'all_granted' })
   assert.deepEqual(await permission, { operationId: 'op-1', status: 'granted', errorCode: null })
-  const plan = harness.service.executeNativeDataPlan({ operationId: 'op-1', homeMode: 'cash_loan' })
-  assert.equal(plan, harness.service.executeNativeDataPlan({ operationId: 'op-1', homeMode: 'cash_loan' }))
-  assert.equal((await plan).status, 'trigger_dispatched')
-  const changed = await harness.service.executeNativeDataPlan({ operationId: 'op-1', homeMode: 'multi_push' })
-  assert.equal(changed.errorCode, 'INVALID_ARGUMENT')
+  assert.equal('executeNativeDataPlan' in harness.service, false)
 
   const old = harness.service.requestHomePermissions({ operationId: 'op-2' })
   harness.service.requestHomePermissions({ operationId: 'op-3' })
@@ -163,19 +169,4 @@ test('permission failures map exactly and cancellation detaches the consumer', a
   harness.service.cancelHomeHostOperation({ operationId: 'cancel-1' })
   assert.deepEqual(await canceled, { operationId: 'cancel-1', status: 'canceled', errorCode: 'CANCELED' })
   assert.equal(harness.calls.some((call) => call.startsWith('cancelPermission:')), true)
-})
-
-test('replacing a pending data plan settles the old semantic result as replaced', async () => {
-  let resolvePlan
-  const nativeDataPlanService = {
-    cancelNativeDataPlan() { return true },
-    disposeNativeDataPlanService() {},
-    executeNativeDataPlan() { return new Promise((resolve) => { resolvePlan = resolve }) },
-  }
-  const harness = createHarness({ nativeDataPlanService })
-  const oldPlan = harness.service.executeNativeDataPlan({ operationId: 'plan-1', homeMode: 'multi_push' })
-  harness.service.requestHomePermissions({ operationId: 'plan-2' })
-  assert.deepEqual(await oldPlan, { operationId: 'plan-1', status: 'canceled', errorCode: 'REPLACED' })
-  resolvePlan({ operationId: 'plan-1', status: 'collected', errorCode: null })
-  await Promise.resolve()
 })

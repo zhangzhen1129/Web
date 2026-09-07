@@ -243,7 +243,7 @@ test('reports only matching invalid payloads and unexpected statuses through the
   assert.equal(getNativeDataCollectionRegistrySize(), 0)
 })
 
-test('treats undocumented device IN_PROGRESS status as a controlled failure', () => {
+test('delivers device IN_PROGRESS status through the controlled progress consumer', () => {
   const calls = installBridge()
   const progress = []
   const failures = []
@@ -259,8 +259,9 @@ test('treats undocumented device IN_PROGRESS status as a controlled failure', ()
     createReply('pla_fetch_device_info', requestId, 'IN_PROGRESS', 'working'),
   )
 
-  assert.deepEqual(progress, [])
-  assert.deepEqual(failures, [{ capability: 'fetchDeviceInfo', code: 'INVALID_CALLBACK' }])
+  assert.equal(progress.length, 1)
+  assert.equal(progress[0].status, 'IN_PROGRESS')
+  assert.deepEqual(failures, [])
   assert.equal(getNativeDataCollectionRegistrySize(), 0)
   assert.equal(typeof window[request.replyHandler.replace('window.', '')], 'undefined')
 })

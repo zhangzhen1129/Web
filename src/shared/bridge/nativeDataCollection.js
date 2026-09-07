@@ -3,6 +3,7 @@ import {
   deliverBridgeFailure,
   normalizeFailureOptions,
 } from './bridgeFailure.js'
+import { logNativeBridgeCall } from './nativeCallLog.js'
 
 const BRIDGE_OBJECT = 'plahub'
 const CALLBACK_SCOPE = 'perCall'
@@ -45,16 +46,16 @@ const CAPABILITIES = Object.freeze({
     callbackShape: 'deviceBase',
     callbackPrefix: '__dineroProDeviceBaseReply',
     method: 'fetchDeviceBase',
-    progressStatuses: new Set(),
-    terminalStatuses: new Set(['SUCCESS', 'ERR_IN_PROGRESS', 'ERR_TIMEOUT', 'ERR_FETCH_FAILED']),
+    progressStatuses: new Set(['IN_PROGRESS']),
+    terminalStatuses: new Set(['SUCCESS', 'ERR_TIMEOUT', 'ERR_FETCH_FAILED']),
   }),
   deviceInfo: Object.freeze({
     action: 'pla_fetch_device_info',
     callbackShape: 'deviceInfo',
     callbackPrefix: '__dineroProDeviceInfoReply',
     method: 'fetchDeviceInfo',
-    progressStatuses: new Set(),
-    terminalStatuses: new Set(['SUCCESS', 'ERR_IN_PROGRESS', 'ERR_TIMEOUT', 'ERR_FETCH_FAILED']),
+    progressStatuses: new Set(['IN_PROGRESS']),
+    terminalStatuses: new Set(['SUCCESS', 'ERR_TIMEOUT', 'ERR_FETCH_FAILED']),
   }),
   smsTrigger: Object.freeze({
     action: 'sms_fetch_trigger',
@@ -272,6 +273,7 @@ function invokeCapability(capability, extraPayload, consumer = () => {}, options
   }
 
   try {
+    logNativeBridgeCall(capability.method)
     const synchronousResult = JSON.parse(bridge[capability.method](payload))
     const responseShapeValid = isObject(synchronousResult)
       && synchronousResult.action === capability.action

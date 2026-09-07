@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { DEFAULT_API_TIMEOUT_MS, readNetworkSettings, validateNetworkSettings } from './config.js'
+import { readNetworkSettings, validateNetworkSettings } from './config.js'
 
-test('uses the sixty second default when timeout configuration is absent', () => {
+test('requires a controlled timeout configuration', () => {
   const settings = readNetworkSettings({}, () => 'https://api.example.test')
-  assert.equal(settings.timeoutMs, DEFAULT_API_TIMEOUT_MS)
-  assert.equal(validateNetworkSettings(settings).timeoutMs, 60_000)
+  assert.equal(settings.timeoutMs, null)
+  assert.throws(() => validateNetworkSettings(settings), /VITE_API_TIMEOUT_MS/)
 })
 
 test('preserves an explicitly configured timeout', () => {
