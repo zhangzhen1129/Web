@@ -28,6 +28,7 @@ export const MULTI_PUSH_VARIANT = Object.freeze({
 export const HOME_OPERATION_TYPE = Object.freeze({
   REFRESH: 'refresh',
   REFRESH_CREDIT: 'refresh_credit',
+  OPEN_PRODUCT_DIALOG: 'open_product_dialog',
   PRIMARY_ACTION: 'primary_action',
   SELECT_AMOUNT: 'select_amount',
   SELECT_TERM: 'select_term',
@@ -320,6 +321,8 @@ export function validateHomeViewPayload(payload) {
     'errorData',
     'toastNotice',
     'overlayNotice',
+    'productDialogVisible',
+    'submissionOverlay',
   ])
   if (!exactRecord(payload, keys, 'payload', issues)) return issues
   identifier(payload.requestId, 'payload.requestId', issues)
@@ -359,10 +362,24 @@ export function validateHomeViewPayload(payload) {
       for (const key of ['viewData', 'errorData']) {
         if (hasOwn(payload, key)) issue(issues, `payload.${key}`, 'unexpected_field')
       }
+      if (hasOwn(payload, 'productDialogVisible')) booleanValue(payload.productDialogVisible, 'payload.productDialogVisible', issues)
+      if (hasOwn(payload, 'submissionOverlay')) {
+        if (exactRecord(payload.submissionOverlay, new Set(['phase', 'operationId']), 'payload.submissionOverlay', issues)) {
+          const phases = new Set(['collecting', 'uploading', 'pre_applying', 'applying'])
+          if (!phases.has(payload.submissionOverlay.phase)) issue(issues, 'payload.submissionOverlay.phase', 'invalid_enum')
+          identifier(payload.submissionOverlay.operationId, 'payload.submissionOverlay.operationId', issues)
+          if (payload.submissionOverlay.operationId !== payload.sourceOperationId) {
+            issue(issues, 'payload.submissionOverlay.operationId', 'source_operation_mismatch')
+          }
+        }
+      }
     }
   } else {
     if (hasOwn(payload, 'homeMode') && !homeModes.has(payload.homeMode)) issue(issues, 'payload.homeMode', 'invalid_enum')
     for (const key of ['viewMode', 'viewData', 'multiPushViewData']) {
+      if (hasOwn(payload, key)) issue(issues, `payload.${key}`, 'unexpected_field')
+    }
+    for (const key of ['productDialogVisible', 'submissionOverlay']) {
       if (hasOwn(payload, key)) issue(issues, `payload.${key}`, 'unexpected_field')
     }
     if (payload.pageStatus === HOME_PAGE_STATUS.ERROR) {
@@ -386,6 +403,10 @@ function validateOperationData(operation, issues) {
     optionalString(operation.data.amountKey, 'operation.data.amountKey', issues)
     optionalString(operation.data.termKey, 'operation.data.termKey', issues)
     if (!hasOwn(operation.data, 'amountKey') && !hasOwn(operation.data, 'termKey')) issue(issues, 'operation.data', 'empty_data')
+    return
+  }
+  if (operation.type === HOME_OPERATION_TYPE.OPEN_PRODUCT_DIALOG) {
+    if (hasData) issue(issues, 'operation.data', 'unexpected_field')
     return
   }
   const keyedOperations = new Map([

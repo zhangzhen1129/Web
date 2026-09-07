@@ -28,7 +28,7 @@ function cashPayload(requestId, revision, effect = null) {
   }
 }
 
-function createHarness(dataResultFactory, hostOverrides = {}, dataCollectionService = null, getMessage = undefined, onDataCollectionStatus = undefined) {
+function createHarness(dataResultFactory, hostOverrides = {}, dataCollectionService = null, getMessage = undefined, onDataCollectionStatus = undefined, multiPushApplicationService = null) {
   const calls = []
   const views = []
   const intents = []
@@ -53,6 +53,7 @@ function createHarness(dataResultFactory, hostOverrides = {}, dataCollectionServ
     hostService: host,
     dataProvider: data,
     dataCollectionService,
+    multiPushApplicationService,
     ...(getMessage ? { getMessage } : {}),
     ...(onDataCollectionStatus ? { onDataCollectionStatus } : {}),
   })
@@ -206,17 +207,20 @@ test('allows multi push application only after data upload succeeds', async () =
       statuses.push(operationId)
       return Promise.resolve({ operationId, status: 'success' })
     },
-  }, undefined, (status) => notifications.push(status))
+  }, undefined, (status) => notifications.push(status), {
+    preApply: async ({ productIds }) => { assert.deepEqual(productIds, ['product-1']); return { status: 'success', orderIds: ['order-1'] } },
+    apply: async ({ orderIds }) => { assert.deepEqual(orderIds, ['order-1']); return { status: 'success' } },
+  })
   await allowed.controller.startHomeFlow({ flowScopeId: 'scope-multi-apply-allowed' })
   const allowedResult = await allowed.controller.handleHomeOperation({
     flowScopeId: 'scope-multi-apply-allowed',
     operation: { requestId: 'multi-apply-success', type: 'primary_action' },
   })
-  assert.deepEqual(allowedResult, {
-    operationId: 'multi-apply-success',
-    status: 'completed',
-    effect: 'success',
-  })
+  assert.equal(allowedResult.status, 'completed')
+  assert.equal(allowedResult.effect.target, 'multi_push_application_result')
+  assert.deepEqual(Object.keys(allowedResult.effect.params), ['systemTime'])
+  assert.equal(Number.isSafeInteger(allowedResult.effect.params.systemTime), true)
+  assert.deepEqual(allowed.intents.map((item) => item.target), ['multi_push_application_result'])
   assert.deepEqual(statuses, ['multi-apply-success'])
   assert.deepEqual(notifications, [
     { operationId: 'multi-apply-success', status: 'collecting' },
@@ -304,6 +308,64 @@ test('shows the configured upload failure notice without navigating', async () =
   assert.equal(payload.sourceOperationId, 'upload-notice-1')
   assert.notEqual(payload.requestId, harness.views.at(-2).requestId)
   assert.deepEqual(notifications, [{ operationId: 'upload-notice-1', status: 'upload_failed' }])
+})
+
+test('opens the product dialog after permission and submits without a second permission request', async () => {
+  const dataResultFactory = (input) => ({
+    loadCycleId: input.loadCycleId,
+    viewRevision: input.viewRevision,
+    status: 'content',
+    viewPayload: {
+      requestId: input.loadCycleId,
+      revision: input.viewRevision,
+      pageStatus: 'content',
+      homeMode: 'multi_push',
+      multiPushViewData: {
+        primaryAction: { enabled: true, loading: false },
+        products: [{ productId: 'product-1', selectable: true, selected: true }],
+      },
+      tabs: [{ key: 'home', active: true, enabled: true }],
+    },
+    snapshot: {
+      mode: 'multi_push',
+      variant: 'available_only',
+      primaryActionEffect: 'apply_order',
+      products: [{ productId: 'product-1', selected: true }],
+      selectedProductCount: 1,
+      minimumSelectionCount: 1,
+    },
+  })
+  const phases = []
+  const harness = createHarness(dataResultFactory, {}, {
+    triggerUpload: ({ operationId, onStatus }) => {
+      onStatus('collecting')
+      onStatus('uploading')
+      return Promise.resolve({ operationId, status: 'success' })
+    },
+  }, undefined, undefined, {
+    preApply: async () => ({ status: 'success', orderIds: ['order-1'] }),
+    apply: async () => ({ status: 'success' }),
+  })
+  await harness.controller.startHomeFlow({ flowScopeId: 'scope-product-dialog' })
+  const opened = await harness.controller.handleHomeOperation({
+    flowScopeId: 'scope-product-dialog',
+    operation: { requestId: 'dialog-open-1', type: 'open_product_dialog' },
+  })
+  assert.equal(opened.status, 'completed')
+  assert.equal(harness.views.at(-1).productDialogVisible, true)
+
+  const submitted = await harness.controller.handleHomeOperation({
+    flowScopeId: 'scope-product-dialog',
+    operation: { requestId: 'dialog-submit-1', type: 'submit_selected_products', data: { productIds: ['product-1'] } },
+  })
+  assert.equal(submitted.status, 'completed')
+  assert.equal(harness.calls.filter((item) => item.startsWith('permission:')).length, 1)
+  assert.equal(harness.views.at(-1).productDialogVisible, false)
+  assert.deepEqual(Object.keys(harness.intents[0].params), ['systemTime'])
+  for (const payload of harness.views) {
+    if (payload.submissionOverlay?.phase) phases.push(payload.submissionOverlay.phase)
+  }
+  assert.deepEqual([...new Set(phases)], ['collecting', 'uploading', 'pre_applying', 'applying'])
 })
 
 test('routes eligible cash loan primary action without waiting for the background trigger', async () => {

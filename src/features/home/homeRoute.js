@@ -11,6 +11,7 @@ const ROUTE_TARGETS = Object.freeze({
   addBank: Object.freeze({ name: 'addBank', path: '/addBank' }),
   orderDetail: Object.freeze({ name: 'orderDetail', path: '/orderDetail' }),
   loanConfirm: Object.freeze({ name: 'loanConfirm', path: '/loanConfirm' }),
+  multi_push_application_result: Object.freeze({ name: 'loanSuccessMulti', path: '/loanSuccessMulti' }),
 })
 
 const ORDER_DETAIL_STATUSES = new Set([20, 21, 30, 70, 80, 90])
@@ -22,6 +23,7 @@ const CANONICAL_STAGES = new Set([
   'reviewing', 'disbursing', 'repaying', 'rejected',
 ])
 const MAIN_TAB_TARGETS = new Set(['home_tab', 'repayment_tab', 'account_tab'])
+const INTERNAL_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/
 
 function isEmpty(value) {
   return value === undefined || value === null || value === ''
@@ -76,11 +78,23 @@ function validIntent(routeIntent) {
   return routeIntent
     && typeof routeIntent === 'object'
     && typeof routeIntent.intentId === 'string'
-    && routeIntent.intentId.length > 0
+    && INTERNAL_ID_PATTERN.test(routeIntent.intentId)
     && typeof routeIntent.sourceOperationId === 'string'
-    && routeIntent.sourceOperationId.length > 0
+    && INTERNAL_ID_PATTERN.test(routeIntent.sourceOperationId)
     && typeof routeIntent.target === 'string'
     && Object.hasOwn(ROUTE_TARGETS, routeIntent.target)
+}
+
+function validMultiPushResultIntent(routeIntent) {
+  if (!routeIntent || Object.keys(routeIntent).some((key) => !['intentId', 'sourceOperationId', 'target', 'params'].includes(key))) return false
+  const params = routeIntent.params
+  return params
+    && typeof params === 'object'
+    && !Array.isArray(params)
+    && Object.keys(params).length === 1
+    && Object.hasOwn(params, 'systemTime')
+    && Number.isSafeInteger(params.systemTime)
+    && params.systemTime >= 0
 }
 
 export function resolveCashLoanRoute(snapshot, currentSnapshotRevision, routeIntent, permissionResult) {
@@ -123,6 +137,11 @@ export function resolveHomeRouteIntent({ snapshot, currentSnapshotRevision, rout
 
   if (routeIntent.target === 'cash_loan_primary_action') {
     return resolveCashLoanRoute(snapshot, currentSnapshotRevision, routeIntent, permissionResult)
+  }
+
+  if (routeIntent.target === 'multi_push_application_result') {
+    if (!validMultiPushResultIntent(routeIntent)) return result('blocked', null, 'invalid_multi_push_result')
+    return navigation('multi_push_application_result', { systemTime: String(routeIntent.params.systemTime) })
   }
 
   if (routeIntent.target === 'repayment_list' || routeIntent.target === 'order_list') {

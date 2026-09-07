@@ -92,6 +92,17 @@ test('payload validation enforces exact broadcast, product and count-template co
   assert.ok(validateHomeViewPayload(invalidTemplate).some((item) => item.code === 'invalid_count_placeholder'))
 })
 
+test('multi-push submission presentation is model-driven and scoped to its operation', () => {
+  const payload = createUnifiedHomeFixture('multi-available-only')
+  payload.sourceOperationId = 'submit-1'
+  payload.productDialogVisible = true
+  payload.submissionOverlay = { phase: 'pre_applying', operationId: 'submit-1' }
+  assert.deepEqual(validateHomeViewPayload(payload), [])
+
+  payload.submissionOverlay = { phase: 'applying', operationId: 'other-operation' }
+  assert.ok(validateHomeViewPayload(payload).some((item) => item.code === 'source_operation_mismatch'))
+})
+
 test('invalid, duplicate and stale models retain the latest legal state', () => {
   const { session, diagnostics } = createSession()
   const initial = createUnifiedHomeFixture('cash-apply')
@@ -230,7 +241,8 @@ test('credit refresh and tabs only emit enabled semantic intents', () => {
 
 test('product selection updates immediately and protects the final selected product', () => {
   const { session, operations } = createSession()
-  session.updateHomeView(createUnifiedHomeFixture('multi-available-only'))
+  const initial = createUnifiedHomeFixture('multi-available-only')
+  session.updateHomeView(initial)
 
   for (const productId of ['product-1', 'product-2', 'product-3', 'product-4']) {
     assert.ok(session.toggleProductSelection(productId))
@@ -238,9 +250,15 @@ test('product selection updates immediately and protects the final selected prod
   assert.equal(session.getSelectedCountText(), '1 productos')
   assert.equal(session.toggleProductSelection('product-5'), null)
   assert.equal(session.getSelectedCountText(), '1 productos')
+  const openOperationId = session.openProductDialog()
+  assert.ok(openOperationId)
+  const opened = responseFor(initial, openOperationId, 2)
+  opened.productDialogVisible = true
+  opened.multiPushViewData.products = session.getState().multiPushViewData.products
+  assert.equal(session.updateHomeView(opened), true)
   assert.ok(session.submitSelectedProducts())
   assert.deepEqual(operations.at(-1), {
-    requestId: 'operation-5',
+    requestId: 'operation-6',
     type: 'submit_selected_products',
     data: { productIds: ['product-5'] },
   })
@@ -271,7 +289,7 @@ test('active-only empty products retain a disabled summary and cannot open a dia
   session.updateHomeView(createUnifiedHomeFixture('multi-active-only'))
   assert.equal(session.shouldShowProductSummary(), true)
   assert.equal(session.getSelectedCountText(), '0 productos')
-  assert.equal(session.openProductDialog(), false)
+  assert.equal(session.openProductDialog(), null)
   assert.equal(session.getState().dialogOpen, false)
 })
 

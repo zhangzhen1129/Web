@@ -12,7 +12,7 @@ const props = defineProps({
   },
 })
 
-const PROCESSING_STATUSES = new Set(['collecting', 'uploading'])
+const PROCESSING_STATUSES = new Set(['collecting', 'uploading', 'pre_applying', 'applying'])
 const progress = ref(1)
 const message = getProjectMessage('40')
 const isVisible = computed(() => PROCESSING_STATUSES.has(props.status))

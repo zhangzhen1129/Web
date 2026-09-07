@@ -15,6 +15,7 @@ import { HOME_MODE, HOME_OPERATION_TYPE, HOME_PAGE_STATUS, MULTI_PUSH_VARIANT } 
 import { getHomeStepIcon, getHomeTabIcon } from './homeUiResources.js'
 import { createHomeUiSession } from './homeUiSession.js'
 import { homeUiText } from './homeUiText.js'
+import LoadingBar from '../../dataCollection/components/LoadingBar.vue'
 
 defineOptions({ name: 'UnifiedHomeView' })
 
@@ -337,6 +338,7 @@ defineExpose({
         <div class="unified-home__overlay-dialog" role="dialog" aria-modal="true" @click.stop>{{ state.overlayNotice.text }}</div>
       </div>
     </Transition>
+    <LoadingBar :status="state.submissionOverlay?.phase ?? null" />
   </section>
 </template>
 

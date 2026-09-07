@@ -15,6 +15,7 @@ export const ROUTE_PATH = Object.freeze({
   ADD_BANK: '/addBank',
   ORDER_DETAIL: '/orderDetail',
   LOAN_CONFIRM: '/loanConfirm',
+  LOAN_SUCCESS_MULTI: '/loanSuccessMulti',
 })
 
 export const router = createRouter({
@@ -36,6 +37,7 @@ export const router = createRouter({
         { path: 'addBank', name: 'addBank', component: RoutePlaceholder, props: { title: 'Add bank account' } },
         { path: 'orderDetail', name: 'orderDetail', component: RoutePlaceholder, props: { title: 'Order detail' } },
         { path: 'loanConfirm', name: 'loanConfirm', component: RoutePlaceholder, props: { title: 'Loan confirmation' } },
+        { path: 'loanSuccessMulti', name: 'loanSuccessMulti', component: RoutePlaceholder, props: { title: 'Application result' } },
       ],
     },
     { path: '/:pathMatch(.*)*', redirect: ROUTE_PATH.HOME },

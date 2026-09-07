@@ -3,8 +3,8 @@ import { onActivated, onBeforeUnmount, onDeactivated, onMounted, ref } from 'vue
 import { useRouter } from 'vue-router'
 import UnifiedHomeView from '../ui/UnifiedHomeView.vue'
 import { createHomeFlowController, createHomeHostService, createHomeRouteConsumer } from '../index.js'
-import LoadingBar from '../../dataCollection/components/LoadingBar.vue'
 import { createDataCollectionService } from '../../dataCollection/index.js'
+import { createMultiPushApplicationService } from '../services/multiPushApplicationService.js'
 import { createHomeBrowserPort } from '../homeBrowserPort.js'
 import { createHomeDataProvider } from '../providers/homeDataProvider.js'
 import { APP_MODE, setAppMode, setHomeTabs } from '../../shell/appModeStore.js'
@@ -16,12 +16,12 @@ const globalStore = useGlobalStore()
 const router = useRouter()
 const homeView = ref(null)
 const viewProvider = ref(null)
-const dataCollectionStatus = ref(null)
 const flowScopeId = `home-flow-${Date.now().toString(36)}`
 const browserPort = createHomeBrowserPort()
 const homeRouteConsumer = createHomeRouteConsumer({ router })
 const homeHostService = createHomeHostService({ globalStore })
 const dataCollectionService = createDataCollectionService()
+const multiPushApplicationService = createMultiPushApplicationService({ store: globalStore })
 let flowController = null
 let hasBeenActivated = false
 let isDisposed = false
@@ -70,11 +70,8 @@ onMounted(() => {
   flowController = createHomeFlowController({
     hostService: homeHostService,
     dataCollectionService,
+    multiPushApplicationService,
     dataProvider: viewProvider.value,
-    onDataCollectionStatus({ status }) {
-      if (isDisposed) return
-      dataCollectionStatus.value = status
-    },
     updateHomeView,
     emitHomeRouteIntent(routeIntent, context) {
       void homeRouteConsumer.consumeHomeRouteIntent({
@@ -107,7 +104,6 @@ onBeforeUnmount(() => {
   flowController?.disposeHomeFlow({ flowScopeId })
   browserPort.unmount()
   viewProvider.value?.destroy?.()
-  dataCollectionStatus.value = null
   hasBeenActivated = false
   needsBrowserReturnReload = false
 })
@@ -120,5 +116,4 @@ onBeforeUnmount(() => {
     @emit-home-operation="handleHomeOperation"
     @diagnostic="handleHomeDiagnostic"
   />
-  <LoadingBar :status="dataCollectionStatus" />
 </template>

@@ -72,6 +72,20 @@ test('maps tabs and lists while protecting primary list intents', () => {
   assert.equal(resolveHomeRouteIntent({ routeIntent: intent('repayment_list'), permissionResult: { status: 'failed', operationId: 'operation-1' } }).type, 'blocked')
 })
 
+test('maps multi-push completion only with its documented system time parameter', () => {
+  const valid = resolveHomeRouteIntent({
+    routeIntent: intent('multi_push_application_result', { params: { systemTime: 123 } }),
+  })
+  assert.equal(valid.type, 'navigate')
+  assert.equal(valid.route.name, 'loanSuccessMulti')
+  assert.deepEqual(valid.route.query, { systemTime: '123' })
+
+  for (const params of [undefined, {}, { systemTime: -1 }, { systemTime: 1.5 }, { systemTime: Number.MAX_SAFE_INTEGER + 1 }, { systemTime: 1, single: true }]) {
+    const invalid = resolveHomeRouteIntent({ routeIntent: intent('multi_push_application_result', { params }) })
+    assert.equal(invalid.type, 'blocked')
+  }
+})
+
 test('consumer replaces tab navigation and pushes business routes', async () => {
   const calls = []
   const router = {
@@ -86,8 +100,11 @@ test('consumer replaces tab navigation and pushes business routes', async () => 
   assert.equal(tabNavigated.type, 'navigated')
   const navigated = await consumer.consumeHomeRouteIntent({ routeIntent: intent('order_list'), permissionResult: permission })
   assert.equal(navigated.type, 'navigated')
+  const multiResult = await consumer.consumeHomeRouteIntent({ routeIntent: intent('multi_push_application_result', { params: { systemTime: 123 } }) })
+  assert.equal(multiResult.type, 'navigated')
   assert.deepEqual(calls, [
     ['replace', { name: 'mine', query: {} }],
     ['push', { name: 'orderList', query: {} }],
+    ['push', { name: 'loanSuccessMulti', query: { systemTime: '123' } }],
   ])
 })

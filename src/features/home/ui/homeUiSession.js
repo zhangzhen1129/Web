@@ -43,6 +43,7 @@ function createInitialState() {
     overlayNotice: null,
     overlayVisible: false,
     dialogOpen: false,
+    submissionOverlay: null,
     broadcastIndex: 0,
     pendingOperationType: null,
     isVisible: true,
@@ -170,7 +171,7 @@ export function createHomeUiSession(options = {}) {
 
     modelRequestIds.add(payload.requestId)
     payload.multiPushViewData?.products?.forEach((product) => knownProductIds.add(product.productId))
-    if (payload.sourceOperationId && !keepsRefreshOperation) pendingOperation = null
+    if (payload.sourceOperationId && !keepsRefreshOperation && !payload.submissionOverlay) pendingOperation = null
     hasAcceptedModel = true
     const nextHomeMode = payload.homeMode ?? state.homeMode
     const nextViewMode = payload.viewMode ?? state.viewMode
@@ -190,7 +191,8 @@ export function createHomeUiSession(options = {}) {
       toastNotice: payload.toastNotice ? cloneHomeValue(payload.toastNotice) : null,
       overlayNotice: payload.overlayNotice ? cloneHomeValue(payload.overlayNotice) : null,
       overlayVisible: Boolean(payload.overlayNotice),
-      dialogOpen: state.dialogOpen && products.length > 0,
+      dialogOpen: payload.productDialogVisible === true,
+      submissionOverlay: payload.submissionOverlay ? cloneHomeValue(payload.submissionOverlay) : null,
       broadcastIndex: 0,
       pendingOperationType: keepsRefreshOperation ? pendingOperation.type : null,
     }
@@ -306,6 +308,7 @@ export function createHomeUiSession(options = {}) {
   }
 
   function submitSelectedProducts() {
+    if (!state.dialogOpen || state.submissionOverlay) return null
     const productIds = getProducts(state).filter((product) => product.selected).map((product) => product.productId)
     if (productIds.length < 1) return null
     return emitOperation(HOME_OPERATION_TYPE.SUBMIT_SELECTED_PRODUCTS, { productIds })
@@ -318,10 +321,8 @@ export function createHomeUiSession(options = {}) {
   }
 
   function openProductDialog() {
-    if (getProducts(state).length < 1 || state.dialogOpen) return false
-    state = { ...state, dialogOpen: true }
-    notify()
-    return true
+    if (getProducts(state).length < 1 || state.dialogOpen || state.submissionOverlay) return null
+    return emitOperation(HOME_OPERATION_TYPE.OPEN_PRODUCT_DIALOG)
   }
 
   function closeProductDialog() {

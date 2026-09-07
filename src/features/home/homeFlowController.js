@@ -2,10 +2,11 @@ import { getProjectMessage } from '../../shared/config/projectLanguage.js'
 
 const FLOW_STATES = new Set([
   'idle', 'initializing_host', 'loading_data', 'ready', 'business_failure',
-  'refreshing', 'permission_pending', 'native_processing', 'error', 'disposed',
+  'refreshing', 'permission_pending', 'collection_triggering', 'upload_collecting', 'uploading',
+  'pre_applying', 'applying', 'error', 'disposed',
 ])
 const OPERATION_TYPES = new Set([
-  'refresh', 'refresh_credit', 'select_amount', 'select_term',
+  'refresh', 'refresh_credit', 'open_product_dialog', 'select_amount', 'select_term',
   'toggle_product_selection', 'submit_selected_products', 'primary_action', 'select_tab',
 ])
 const ACTIVATE_REASONS = new Set(['return_from_tab', 'return_from_child', 'history_restore'])
@@ -14,7 +15,7 @@ const EFFECTS = new Set([
   'show_empty_products_toast', 'show_overlay_notice', 'navigate_repayment_list',
   'navigate_order_list', 'apply_order',
 ])
-const TARGETS = new Set(['home_tab', 'repayment_tab', 'account_tab', 'repayment_list', 'order_list'])
+const TARGETS = new Set(['home_tab', 'repayment_tab', 'account_tab', 'repayment_list', 'order_list', 'multi_push_application_result'])
 const DATA_COLLECTION_STATUSES = new Set([
   'collecting', 'uploading', 'success', 'collect_failed', 'upload_failed', 'cancelled', 'unavailable',
 ])
@@ -61,6 +62,8 @@ export function createHomeFlowController(options = {}) {
   const host = options.hostService ?? options.host ?? options
   const data = options.dataProvider ?? options.data ?? options
   const dataCollection = options.dataCollectionService ?? null
+  const multiPushApplication = options.multiPushApplicationService ?? null
+  const now = typeof options.now === 'function' ? options.now : () => Date.now()
   const onDataCollectionStatus = asFunction(options.onDataCollectionStatus)
   const updateHomeView = asFunction(options.updateHomeView ?? ui.updateHomeView)
   const emitHomeRouteIntent = asFunction(options.emitHomeRouteIntent ?? options.emitRouteIntent)
@@ -166,6 +169,32 @@ export function createHomeFlowController(options = {}) {
   function notifyDataCollectionStatus(operationId, status) {
     if (!DATA_COLLECTION_STATUSES.has(status)) return
     try { onDataCollectionStatus(Object.freeze({ operationId, status })) } catch {}
+  }
+  function updateSubmissionPayload(operationId, phase = null, productDialogVisible) {
+    const payload = safeClone(state.viewPayload)
+    if (!payload || payload.pageStatus !== 'content' || payload.homeMode !== 'multi_push') return false
+    payload.requestId = allocate('view')
+    payload.revision = nextViewRevision()
+    payload.sourceOperationId = operationId
+    if (phase) payload.submissionOverlay = { phase, operationId }
+    else delete payload.submissionOverlay
+    if (productDialogVisible !== undefined) payload.productDialogVisible = productDialogVisible
+    state = { ...state, viewPayload: payload }
+    sendPayload(payload)
+    notify()
+    return true
+  }
+  function showUploadFailureNotice(operationId) {
+    const text = getMessage('41')
+    if (typeof text !== 'string' || text.trim().length === 0 || state.viewPayload?.pageStatus !== 'content') return
+    const payload = safeClone(state.viewPayload)
+    payload.requestId = allocate('view')
+    payload.revision = nextViewRevision()
+    payload.sourceOperationId = operationId
+    payload.toastNotice = { noticeId: allocate('notice'), text }
+    state = { ...state, viewPayload: payload }
+    sendPayload(payload)
+    notify()
   }
   function acceptDataResult(cycle, result) {
     if (!activeLoad || activeLoad !== cycle || cycle.canceled || state.disposed) return makeResult(state.flowScopeId, cycle, 'canceled')
@@ -276,7 +305,7 @@ export function createHomeFlowController(options = {}) {
     if (!operation || typeof operation !== 'object' || Object.keys(operation).some((key) => !['requestId', 'type', 'viewMode', 'data'].includes(key)) || !validId(operation.requestId) || !OPERATION_TYPES.has(operation.type)) return false
     if (operation.viewMode !== undefined && (typeof operation.viewMode !== 'string' || operation.viewMode.length === 0)) return false
     if (handledOperations.has(operation.requestId)) return 'duplicate'
-    if (operation.type === 'refresh' || operation.type === 'refresh_credit') return !Object.hasOwn(operation, 'data')
+    if (operation.type === 'refresh' || operation.type === 'refresh_credit' || operation.type === 'open_product_dialog') return !Object.hasOwn(operation, 'data')
     const dataValue = operation.data
     if (operation.type === 'select_amount') return !!dataValue && typeof dataValue.amountKey === 'string' && Object.keys(dataValue).length === 1
     if (operation.type === 'select_term') return !!dataValue && typeof dataValue.termKey === 'string' && Object.keys(dataValue).length === 1
@@ -308,6 +337,12 @@ export function createHomeFlowController(options = {}) {
           && ['ready', 'business_failure', 'error'].includes(state.flowStatus))
     }
     if (!payload || payload.pageStatus !== 'content' || !snapshot) return false
+    if (operation.type === 'open_product_dialog') {
+      return payload.homeMode === 'multi_push'
+        && currentProducts().some((product) => product?.selectable)
+        && currentProducts().filter((product) => product?.selectable && product.selected).length >= (snapshot.minimumSelectionCount ?? 1)
+        && state.flowStatus === 'ready'
+    }
     if (operation.type === 'refresh_credit') return state.flowStatus === 'ready'
     if (operation.type === 'select_amount') return snapshot.mode === 'cash_loan' && optionAvailable('amount', operation.data.amountKey)
     if (operation.type === 'select_term') return snapshot.mode === 'cash_loan' && optionAvailable('term', operation.data.termKey)
@@ -322,7 +357,10 @@ export function createHomeFlowController(options = {}) {
     }
     if (operation.type === 'submit_selected_products') {
       const selected = currentProducts().filter((item) => item.selectable && item.selected).map((item) => item.productId ?? item.id)
-      return selected.length >= (snapshot.minimumSelectionCount ?? 1) && JSON.stringify(selected) === JSON.stringify(operation.data.productIds)
+      return payload.homeMode === 'multi_push'
+        && payload.productDialogVisible === true
+        && selected.length >= (snapshot.minimumSelectionCount ?? 1)
+        && JSON.stringify(selected) === JSON.stringify(operation.data.productIds)
     }
     if (operation.type === 'select_tab') {
       const tab = (payload.tabs ?? []).find((item) => item.key === operation.data.tabKey)
@@ -373,6 +411,111 @@ export function createHomeFlowController(options = {}) {
     sendPayload(payload)
     notify()
   }
+  function operationIsCurrent(operation) {
+    return Boolean(activeOperation
+      && activeOperation.operationId === operation.requestId
+      && activeOperation.snapshotRevision === state.snapshotRevision
+      && !state.disposed)
+  }
+  function completeMultiPushFailure(operation, code, keepProductDialogOpen, uploadFailed = false) {
+    activeOperation = null
+    updateSubmissionPayload(operation.requestId, null, keepProductDialogOpen)
+    setStatus('ready', { operationId: null })
+    if (uploadFailed) showUploadFailureNotice(operation.requestId)
+    return {
+      operationId: operation.requestId,
+      status: code === 'CANCELLED' ? 'canceled' : 'failed',
+      error: resultError(code),
+    }
+  }
+  async function runMultiPushSubmission(operation, { keepProductDialogOpen }) {
+    const triggerUpload = dataCollection?.triggerUpload
+    if (typeof triggerUpload !== 'function') {
+      return completeMultiPushFailure(operation, 'DATA_COLLECTION_UNAVAILABLE', keepProductDialogOpen)
+    }
+    const abortController = typeof AbortController === 'function' ? new AbortController() : null
+    activeOperation = { ...activeOperation, abortController }
+    setStatus('collection_triggering')
+    updateSubmissionPayload(operation.requestId, 'collecting', keepProductDialogOpen)
+    setStatus('upload_collecting')
+    const upload = await Promise.race([
+      Promise.resolve().then(() => triggerUpload.call(dataCollection, {
+        operationId: operation.requestId,
+        signal: abortController?.signal,
+        onStatus: (status) => {
+          if (!operationIsCurrent(operation) || !['collecting', 'uploading'].includes(status)) return
+          notifyDataCollectionStatus(operation.requestId, status)
+          updateSubmissionPayload(operation.requestId, status, keepProductDialogOpen)
+          setStatus(status === 'collecting' ? 'upload_collecting' : 'uploading')
+        },
+      })).catch(() => ({ status: 'unavailable' })),
+      new Promise((resolve) => { if (activeOperation?.operationId === operation.requestId) activeOperation.cancelResolve = resolve }),
+    ])
+    if (!operationIsCurrent(operation) || (upload?.operationId && upload.operationId !== operation.requestId)) {
+      return { operationId: operation.requestId, status: 'canceled' }
+    }
+    const uploadStatus = upload?.status === 'canceled' ? 'cancelled' : upload?.status
+    if (uploadStatus !== 'success') {
+      const code = uploadStatus === 'cancelled' ? 'CANCELLED' : upload?.errorCode ?? String(uploadStatus ?? 'unavailable').toUpperCase()
+      notifyDataCollectionStatus(operation.requestId, ['collect_failed', 'upload_failed', 'cancelled', 'unavailable'].includes(uploadStatus) ? uploadStatus : 'unavailable')
+      return completeMultiPushFailure(operation, code, keepProductDialogOpen, uploadStatus === 'upload_failed')
+    }
+    notifyDataCollectionStatus(operation.requestId, 'success')
+    if (!multiPushApplication || typeof multiPushApplication.preApply !== 'function' || typeof multiPushApplication.apply !== 'function') {
+      return completeMultiPushFailure(operation, 'MULTI_PUSH_APPLICATION_UNAVAILABLE', keepProductDialogOpen)
+    }
+    updateSubmissionPayload(operation.requestId, 'pre_applying', keepProductDialogOpen)
+    setStatus('pre_applying')
+    const productIds = currentProducts().filter((item) => item.selectable && item.selected).map((item) => item.productId ?? item.id)
+    const preApplication = await multiPushApplication.preApply({ productIds, signal: abortController?.signal })
+    if (!operationIsCurrent(operation)) return { operationId: operation.requestId, status: 'canceled' }
+    if (preApplication?.status !== 'success') {
+      return completeMultiPushFailure(operation, preApplication?.status === 'canceled' ? 'CANCELLED' : preApplication?.code ?? 'PRE_APPLICATION_FAILED', keepProductDialogOpen)
+    }
+    updateSubmissionPayload(operation.requestId, 'applying', keepProductDialogOpen)
+    setStatus('applying')
+    const application = await multiPushApplication.apply({ orderIds: preApplication.orderIds, signal: abortController?.signal })
+    if (!operationIsCurrent(operation)) return { operationId: operation.requestId, status: 'canceled' }
+    if (application?.status !== 'success') {
+      return completeMultiPushFailure(operation, application?.status === 'canceled' ? 'CANCELLED' : application?.code ?? 'APPLICATION_FAILED', keepProductDialogOpen)
+    }
+    const systemTime = now()
+    if (!Number.isSafeInteger(systemTime) || systemTime < 0) {
+      return completeMultiPushFailure(operation, 'SYSTEM_TIME_INVALID', keepProductDialogOpen)
+    }
+    activeOperation = null
+    updateSubmissionPayload(operation.requestId, null, false)
+    setStatus('ready', { operationId: null })
+    const intent = {
+      intentId: allocate('intent'),
+      sourceOperationId: operation.requestId,
+      target: 'multi_push_application_result',
+      params: { systemTime },
+    }
+    emitHomeRouteIntent(intent, { snapshot: state.snapshot, currentSnapshotRevision: state.snapshotRevision })
+    return { operationId: operation.requestId, status: 'completed', effect: intent }
+  }
+  async function openProductDialog(operation) {
+    const snapshotRevision = state.snapshotRevision
+    state = { ...state, operationId: operation.requestId, flowStatus: 'permission_pending' }
+    activeOperation = { operationId: operation.requestId, snapshotRevision }
+    const permission = await Promise.race([
+      call('requestHomePermissions', { operationId: operation.requestId }),
+      new Promise((resolve) => { if (activeOperation?.operationId === operation.requestId) activeOperation.cancelResolve = resolve }),
+    ])
+    if (!operationIsCurrent(operation) || (permission?.operationId && permission.operationId !== operation.requestId)) {
+      return { operationId: operation.requestId, status: 'canceled' }
+    }
+    if (permission?.status !== 'granted') {
+      activeOperation = null
+      setStatus('ready', { operationId: null })
+      return { operationId: operation.requestId, status: permission?.status === 'canceled' ? 'canceled' : 'failed', error: resultError(permission?.errorCode ?? 'PERMISSION_FAILED') }
+    }
+    activeOperation = null
+    updateSubmissionPayload(operation.requestId, null, true)
+    setStatus('ready', { operationId: null })
+    return { operationId: operation.requestId, status: 'completed' }
+  }
   async function primaryAction(operation) {
     const snapshotRevision = state.snapshotRevision
     state = { ...state, operationId: operation.requestId, flowStatus: 'permission_pending' }
@@ -422,57 +565,7 @@ export function createHomeFlowController(options = {}) {
       setStatus('ready', { operationId: null })
       return { operationId: operation.requestId, status: 'failed', error: resultError('OPERATION_NOT_AVAILABLE') }
     }
-    const triggerUpload = dataCollection?.triggerUpload
-    if (typeof triggerUpload !== 'function') {
-      activeOperation = null
-      setStatus('ready', { operationId: null })
-      return { operationId: operation.requestId, status: 'failed', error: resultError('DATA_COLLECTION_UNAVAILABLE') }
-    }
-    const abortController = typeof AbortController === 'function' ? new AbortController() : null
-    activeOperation = { ...activeOperation, abortController }
-    setStatus('native_processing')
-    const upload = await Promise.race([
-      Promise.resolve().then(() => triggerUpload.call(dataCollection, {
-        operationId: operation.requestId,
-        signal: abortController?.signal,
-        onStatus: (status) => {
-          if (!activeOperation || activeOperation.operationId !== operation.requestId || state.disposed) return
-          if (status === 'collecting' || status === 'uploading') {
-            notifyDataCollectionStatus(operation.requestId, status)
-            setStatus('native_processing')
-          }
-        },
-      })).catch(() => ({ status: 'unavailable' })),
-      new Promise((resolve) => { if (activeOperation?.operationId === operation.requestId) activeOperation.cancelResolve = resolve }),
-    ])
-    if (!activeOperation || activeOperation.operationId !== operation.requestId || activeOperation.snapshotRevision !== state.snapshotRevision || state.disposed || (upload?.operationId && upload.operationId !== operation.requestId)) return { operationId: operation.requestId, status: 'canceled' }
-    const terminalStatus = upload?.status === 'canceled'
-      ? 'cancelled'
-      : DATA_COLLECTION_STATUSES.has(upload?.status) && !['collecting', 'uploading'].includes(upload.status)
-        ? upload.status
-        : 'unavailable'
-    activeOperation = null
-    setStatus('ready', { operationId: null })
-    notifyDataCollectionStatus(operation.requestId, terminalStatus)
-    if (terminalStatus === 'success') return { operationId: operation.requestId, status: 'completed', effect: terminalStatus }
-    if (terminalStatus === 'upload_failed') {
-      const text = getMessage('41')
-      if (typeof text === 'string' && text.trim().length > 0 && state.viewPayload?.pageStatus === 'content') {
-        const payload = safeClone(state.viewPayload)
-        payload.requestId = allocate('view')
-        payload.revision = nextViewRevision()
-        payload.sourceOperationId = operation.requestId
-        payload.toastNotice = { noticeId: allocate('notice'), text }
-        state = { ...state, viewPayload: payload }
-        sendPayload(payload)
-        notify()
-      }
-    }
-    return {
-      operationId: operation.requestId,
-      status: terminalStatus === 'cancelled' ? 'canceled' : 'failed',
-      error: resultError(upload?.errorCode ?? terminalStatus.toUpperCase()),
-    }
+    return runMultiPushSubmission(operation, { keepProductDialogOpen: false })
   }
 
   async function handleHomeOperation({ flowScopeId, operation } = {}) {
@@ -487,7 +580,12 @@ export function createHomeFlowController(options = {}) {
       return { operationId: operation.requestId, status: result.status === 'canceled' ? 'canceled' : result.status === 'ready' || result.status === 'business_failure' || result.status === 'handled' ? 'completed' : 'failed' }
     }
     if (operation.type === 'select_amount' || operation.type === 'select_term' || operation.type === 'toggle_product_selection') { cancelOperation(); emitSelection(operation); return { operationId: operation.requestId, status: 'completed' } }
-    if (operation.type === 'submit_selected_products') return { operationId: operation.requestId, status: 'completed' }
+    if (operation.type === 'open_product_dialog') { cancelOperation(); return openProductDialog(operation) }
+    if (operation.type === 'submit_selected_products') {
+      activeOperation = { operationId: operation.requestId, snapshotRevision: state.snapshotRevision }
+      state = { ...state, operationId: operation.requestId }
+      return runMultiPushSubmission(operation, { keepProductDialogOpen: true })
+    }
     if (operation.type === 'select_tab') {
       const target = `${operation.data.tabKey}_tab`
       if (!TARGETS.has(target)) return { operationId: operation.requestId, status: 'failed', error: resultError('OPERATION_NOT_AVAILABLE') }
