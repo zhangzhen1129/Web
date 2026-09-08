@@ -1,24 +1,22 @@
 <script setup>
 import { onActivated, onBeforeUnmount, onDeactivated, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
 import UnifiedHomeView from '../ui/UnifiedHomeView.vue'
-import { createHomeFlowController, createHomeHostService, createHomeRouteConsumer } from '../index.js'
+import { createHomeFlowController, createHomeHostService } from '../index.js'
 import { createDataCollectionService } from '../../dataCollection/index.js'
 import { createMultiPushApplicationService } from '../services/multiPushApplicationService.js'
 import { createHomeBrowserPort } from '../homeBrowserPort.js'
 import { createHomeDataProvider } from '../providers/homeDataProvider.js'
-import { APP_MODE, setAppMode, setHomeTabs } from '../../shell/appModeStore.js'
+import { APP_MODE, resetHomeTabs, setAppMode, setHomeTabs } from '../../shell/appModeStore.js'
 import { useGlobalStore } from '../../../shared/globalStore/globalStore.js'
+import { dispatchHomeRouteIntent } from '../homeRouteDispatcher.js'
 
 defineOptions({ name: 'HomePage' })
 
 const globalStore = useGlobalStore()
-const router = useRouter()
 const homeView = ref(null)
 const viewProvider = ref(null)
 const flowScopeId = `home-flow-${Date.now().toString(36)}`
 const browserPort = createHomeBrowserPort()
-const homeRouteConsumer = createHomeRouteConsumer({ router })
 const homeHostService = createHomeHostService({ globalStore })
 const dataCollectionService = createDataCollectionService()
 const multiPushApplicationService = createMultiPushApplicationService({ store: globalStore })
@@ -34,6 +32,8 @@ function syncMainTabs(payload) {
   } else if (payload?.homeMode === 'cash_loan' && Array.isArray(payload.tabs)) {
     setAppMode(APP_MODE.CASH_LOAN)
     setHomeTabs(payload.tabs)
+  } else {
+    resetHomeTabs()
   }
 }
 
@@ -74,10 +74,9 @@ onMounted(() => {
     dataProvider: viewProvider.value,
     updateHomeView,
     emitHomeRouteIntent(routeIntent, context) {
-      void homeRouteConsumer.consumeHomeRouteIntent({
+      void dispatchHomeRouteIntent({
         ...context,
         routeIntent,
-        currentRoute: router.currentRoute.value,
       })
     },
   })

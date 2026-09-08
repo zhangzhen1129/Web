@@ -82,6 +82,33 @@ test('refuses a second enable without calling Android or replacing the active co
   assert.notEqual(setPhysicalBackIntercept({ enabled: false }), null)
 })
 
+test('keeps the active configuration when Android does not accept a close request', () => {
+  const calls = installBridge((request) => ({
+    action: 'setPhysicalBackInterceptConfig',
+    requestId: request.requestId,
+    status: request.enabled ? 'success' : 'invalid_param',
+    message: 'saved',
+  }))
+  const failures = []
+  const events = []
+  const requestId = setPhysicalBackIntercept({ enabled: true, onIntercept: (event) => events.push(event) })
+
+  assert.equal(setPhysicalBackIntercept({ enabled: false }, { onFailure: (failure) => failures.push(failure) }), null)
+  assert.equal(getPhysicalBackInterceptRegistrySize(), 1)
+  assert.equal(typeof window.__dineroProPhysicalBackInterceptReply, 'function')
+  assert.deepEqual(failures, [{ capability: 'setPhysicalBackInterceptConfig', code: 'BRIDGE_NOT_ACCEPTED' }])
+  sendIntercept(requestId)
+  assert.equal(events.length, 1)
+  assert.equal(calls.length, 2)
+
+  window.plahub.setPhysicalBackInterceptConfig = (payload) => {
+    const request = JSON.parse(payload)
+    calls.push(request)
+    return JSON.stringify({ action: 'setPhysicalBackInterceptConfig', requestId: request.requestId, status: 'success', message: 'saved' })
+  }
+  assert.notEqual(setPhysicalBackIntercept({ enabled: false }), null)
+})
+
 test('keeps an accepted configuration after invalid, unknown, and consumer-throwing callbacks', () => {
   installBridge()
   const failures = []

@@ -60,6 +60,12 @@ export function setHomeTabs(tabs) {
     : createDefaultHomeTabs()
 }
 
+export function resetHomeTabs() {
+  state.mode = APP_MODE.CASH_LOAN
+  state.homeTabs = createDefaultHomeTabs()
+  state.diagnosticCode = null
+}
+
 export function setMultiPushTabs(tabs) {
   setHomeTabs(tabs)
 }

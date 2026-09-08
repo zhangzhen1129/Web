@@ -3,11 +3,13 @@ import { computed, nextTick, onBeforeUnmount, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import HomeTabs from './features/home/components/HomeTabs.vue'
 import { createHomeRouteConsumer } from './features/home/homeRoute.js'
+import { installHomeRouteDispatcher } from './features/home/homeRouteDispatcher.js'
 import { ROUTE_PATH } from './router/index.js'
 import { appModeState, shouldShowRepaymentTab } from './features/shell/appModeStore.js'
 import { hideNativeTabBar } from './features/shell/nativeTabBar.js'
 
 let safeAreaTimer
+let disposeHomeRouteDispatcher
 
 onMounted(() => {
   if (!import.meta.env.DEV) return
@@ -27,10 +29,12 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   if (safeAreaTimer) window.clearTimeout(safeAreaTimer)
+  disposeHomeRouteDispatcher?.()
 })
 
 const route = useRoute()
 const router = useRouter()
+disposeHomeRouteDispatcher = installHomeRouteDispatcher(router)
 const homeRouteConsumer = createHomeRouteConsumer({ router })
 const tabScrollPositions = new Map()
 let tabIntentSequence = 0

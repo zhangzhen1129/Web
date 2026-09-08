@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { APP_MODE, appModeState, setAppMode, setHomeTabs, shouldShowRepaymentTab } from './appModeStore.js'
+import { APP_MODE, appModeState, resetHomeTabs, setAppMode, setHomeTabs, shouldShowRepaymentTab } from './appModeStore.js'
 
 test('provides safe cash tabs before a home response is available', () => {
   setAppMode(APP_MODE.CASH_LOAN)
@@ -31,4 +31,14 @@ test('multi-push app mode is accepted without changing cash-loan fallback behavi
   assert.equal(shouldShowRepaymentTab(APP_MODE.MULTI_PUSH, [{ key: 'repayment', enabled: true }]), true)
   assert.equal(setAppMode('0'), true)
   assert.equal(shouldShowRepaymentTab(), false)
+})
+
+test('resets an unknown or failed home display to the safe tab collection', () => {
+  setAppMode(APP_MODE.MULTI_PUSH)
+  setHomeTabs([{ key: 'home' }, { key: 'repayment' }, { key: 'account' }])
+
+  resetHomeTabs()
+
+  assert.equal(appModeState.mode, APP_MODE.CASH_LOAN)
+  assert.deepEqual(appModeState.homeTabs.map((tab) => tab.key), ['home', 'account'])
 })

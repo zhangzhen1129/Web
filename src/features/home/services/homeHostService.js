@@ -38,7 +38,7 @@ const APP_INFO_FIELDS = Object.freeze([
 const SDK_FIELDS = Object.freeze(["afId", "fbId", "gaId"]);
 const DEVELOPMENT_TEST_TOKEN =
   typeof import.meta.env === "object" && import.meta.env?.DEV === true
-    ? "6a9ab65fe4b0d92c4ed9b99d"
+    ? "6a9fe524e4b0d92c4ed9cfda"
     : null;
 
 function validId(value) {
