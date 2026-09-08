@@ -51,3 +51,9 @@ export {
   nativeBusinessActionsBridge,
   openGooglePlayNative,
 } from './nativeBusinessActions.js'
+
+export {
+  getPhysicalBackInterceptRegistrySize,
+  nativePhysicalBackInterceptBridge,
+  setPhysicalBackIntercept,
+} from './nativePhysicalBackIntercept.js'
