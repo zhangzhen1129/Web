@@ -75,6 +75,7 @@ function primaryAction(text, options = {}) {
     enabled: options.enabled ?? true,
     loading: options.loading ?? false,
     ...(options.supportingText ? { supportingText: options.supportingText } : {}),
+    ...(options.badgeText ? { badgeText: options.badgeText } : {}),
   }
 }
 
@@ -125,7 +126,7 @@ export const unifiedHomeFixtures = Object.freeze({
     steps: clone(steps),
     broadcast: clone(broadcast),
     productSelection: localSelection(),
-    primaryAction: primaryAction('Solicite ahora'),
+    primaryAction: primaryAction('Solicite ahora', { badgeText: 'Casi: 95%' }),
   }),
   'cash-reviewing': cashPayload('model-cash-reviewing', 1, 'reviewing', {
     broadcast: clone(broadcast),

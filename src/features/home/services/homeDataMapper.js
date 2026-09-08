@@ -1,8 +1,11 @@
 import { getProjectMessage } from '../../../shared/config/projectLanguage.js'
+import { getAuthenticationProgressText } from './homeDisplayText.js'
 
 const SUCCESS_CODE = 2000
 const APP_MODES = new Set([0, 1, 2, 3])
 const ORDER_STATUSES = new Set([10, 20, 21, 30, 40, 70, 80, 90, 100, 101, 110])
+const AUTHENTICATION_PROGRESS_BY_STAGE = Object.freeze({ basic_info_required: 95, additional_info_required: 96, identity_required: 97, remittance_account_required: 98 })
+const APPLICATION_PROGRESS_ORDER_STATUSES = new Set([10, 100, 101, 110])
 const BUTTONS = Object.freeze({ repay: getProjectMessage('30'), processingReviewing: getProjectMessage('31'), processingDisbursing: getProjectMessage('32'), apply: getProjectMessage('33') })
 const BROADCAST_AMOUNTS = Object.freeze([500, 1000, 2000, 3000, 4000, 5000])
 
@@ -59,8 +62,16 @@ function cashDecision(data) {
   return { stage: 'apply', viewMode: 'apply', amountSource: 'api_available' }
 }
 
+function authenticationProgress(decision, orderStatus) {
+  const stageProgress = AUTHENTICATION_PROGRESS_BY_STAGE[decision.stage]
+  if (stageProgress) return stageProgress
+  return decision.stage === 'apply' && APPLICATION_PROGRESS_ORDER_STATUSES.has(orderStatus) ? 99 : null
+}
+
 function mapCash(data, options) {
   const decision = cashDecision(data); const button = plainText(data.button, 'CASH_BUTTON_INVALID'); const tabs = createHomeTabs('cash_loan'); const viewData = { steps: [{ key: 'step-1', text: 'Verificación de información', iconResourceKey: 'step-1' }, { key: 'step-2', text: 'Revisión del préstamo', iconResourceKey: 'step-2' }, { key: 'step-3', text: 'Aprobación de la solicitud', iconResourceKey: 'step-3' }], broadcast: createBroadcast(options.random), primaryAction: { text: button, enabled: !['reviewing', 'disbursing'].includes(decision.stage), loading: decision.stage === 'disbursing' } }
+  const progress = authenticationProgress(decision, data.orderStatus)
+  if (progress) viewData.primaryAction.badgeText = getAuthenticationProgressText(progress)
   if (decision.amountSource === 'local_limit') viewData.productSelection = localSelection(); else viewData.creditSummary = summary({ availableText: data.amount, totalText: data.totalCredit, usedText: data.usedCredit, locked: data.locked })
   if (decision.stateKey) viewData.primaryAction.supportingText = plainText(data.statusDescription, 'CASH_STATUS_DESCRIPTION_INVALID')
   const payload = { requestId: options.requestId, revision: options.revision, ...(options.sourceOperationId ? { sourceOperationId: options.sourceOperationId } : {}), pageStatus: 'content', homeMode: 'cash_loan', viewMode: decision.viewMode, viewData, tabs }

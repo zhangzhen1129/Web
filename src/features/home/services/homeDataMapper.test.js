@@ -11,6 +11,36 @@ function multi(overrides = {}) { const data = { used: '10', total: '100', remain
 
 test('maps a UI-contract-valid cash local-limit model', () => { const mapped = mapAppModeResponse(app({ status: 10, orderId: 'o-1' }), { requestId: 'cycle-1', revision: 1 }); assert.equal(mapped.payload.viewData.productSelection.selectedAmountKey, '5000'); assert.equal(mapped.payload.tabs.length, 2); assert.deepEqual(validateHomeViewPayload(mapped.payload), []) })
 test('maps unavailable mode to the local-limit branch without service credit values', () => { const mapped = mapAppModeResponse(app({ mode: 2, amount: undefined, total: undefined, used: undefined, locked: undefined }), { requestId: 'cycle-unavailable', revision: 2 }); assert.equal(mapped.snapshot.stage, 'application_unavailable'); assert.equal(mapped.snapshot.amountSource, 'local_limit'); assert.equal(mapped.payload.viewData.productSelection.selectedAmountKey, '5000'); assert.equal(mapped.payload.viewData.creditSummary, undefined) })
+test('maps authentication progress from incomplete cash-loan profiles and application statuses', () => {
+  const profileStages = [
+    [{ basic: 0 }, 'Casi: 95%'],
+    [{ basic: 1, add: 0 }, 'Casi: 96%'],
+    [{ basic: 1, add: 1, identity: 0 }, 'Casi: 97%'],
+    [{ basic: 1, add: 1, identity: 1, remittance: 0 }, 'Casi: 98%'],
+  ]
+  for (const [index, [overrides, badgeText]] of profileStages.entries()) {
+    const mapped = mapAppModeResponse(app(overrides), { requestId: `profile-${index + 1}`, revision: 1 })
+    assert.equal(mapped.payload.viewData.primaryAction.badgeText, badgeText)
+    assert.deepEqual(validateHomeViewPayload(mapped.payload), [])
+  }
+  for (const status of [10, 100, 101, 110]) {
+    const mapped = mapAppModeResponse(app({ status, orderId: `order-${status}` }), { requestId: `application-${status}`, revision: 1 })
+    assert.equal(mapped.payload.viewData.primaryAction.badgeText, 'Casi: 99%')
+    assert.deepEqual(validateHomeViewPayload(mapped.payload), [])
+  }
+})
+test('omits authentication progress outside documented cash-loan states', () => {
+  const cases = [
+    { mode: 2 },
+    {},
+    { status: 20, orderId: 'reviewing-order' },
+    { status: 40, orderId: 'rejected-order' },
+  ]
+  for (const overrides of cases) {
+    const mapped = mapAppModeResponse(app(overrides), { requestId: `without-progress-${overrides.mode ?? overrides.status ?? 'ready'}`, revision: 1 })
+    assert.equal(mapped.payload.viewData.primaryAction.badgeText, undefined)
+  }
+})
 test('maps loading and error fallbacks with safe top-level tabs', () => {
   const loading = createLoadingPayload({ requestId: 'cycle-loading', revision: 3 })
   const error = createErrorPayload({ requestId: 'cycle-error', revision: 4 })

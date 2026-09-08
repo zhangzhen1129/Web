@@ -172,11 +172,12 @@ function validateSelection(value, path, issues) {
 }
 
 function validatePrimaryAction(value, path, issues) {
-  if (!exactRecord(value, new Set(['text', 'enabled', 'loading', 'supportingText']), path, issues)) return
+  if (!exactRecord(value, new Set(['text', 'enabled', 'loading', 'supportingText', 'badgeText']), path, issues)) return
   requiredString(value.text, `${path}.text`, issues)
   booleanValue(value.enabled, `${path}.enabled`, issues)
   booleanValue(value.loading, `${path}.loading`, issues)
   optionalString(value.supportingText, `${path}.supportingText`, issues)
+  optionalString(value.badgeText, `${path}.badgeText`, issues)
 }
 
 function validateCashViewData(value, path, issues) {

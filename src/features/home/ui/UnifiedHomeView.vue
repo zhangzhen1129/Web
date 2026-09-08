@@ -256,6 +256,7 @@ defineExpose({
             </button>
 
             <div v-if="primaryAction" class="unified-home__primary-wrap">
+              <span v-if="primaryAction.badgeText" class="unified-home__primary-badge">{{ primaryAction.badgeText }}</span>
               <p v-if="primaryAction.supportingText" class="unified-home__primary-hint">{{ primaryAction.supportingText }}</p>
               <button
                 class="unified-home__primary"

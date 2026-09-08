@@ -1,7 +1,7 @@
 import { createNetworkError, NETWORK_ERROR_CATEGORY } from './errors.js'
 import { useGlobalStore } from '../globalStore/globalStore.js'
 
-const TIMEOUT_KEY = 'VITE_API_TIMEOUT_MS'
+const NETWORK_TIMEOUT_MS = 180_000
 
 function readApiHostFromGlobalStore() {
   try {
@@ -11,13 +11,10 @@ function readApiHostFromGlobalStore() {
   }
 }
 
-export function readNetworkSettings(environment = import.meta.env, readApiHost = readApiHostFromGlobalStore) {
-  const configuredTimeout = environment?.[TIMEOUT_KEY]
+export function readNetworkSettings(readApiHost = readApiHostFromGlobalStore) {
   return {
     baseUrl: readApiHost(),
-    timeoutMs: configuredTimeout === undefined || configuredTimeout === null || configuredTimeout === ''
-      ? null
-      : Number(configuredTimeout),
+    timeoutMs: NETWORK_TIMEOUT_MS,
   }
 }
 
@@ -52,7 +49,7 @@ export function validateNetworkSettings(settings, requestedTimeout) {
   if (!Number.isInteger(timeoutMs) || timeoutMs <= 0) {
     throw createNetworkError({
       category: NETWORK_ERROR_CATEGORY.CONFIGURATION,
-      message: `${TIMEOUT_KEY} must be a positive integer supplied by controlled configuration.`,
+      message: 'Request timeout must be a positive integer supplied by the network configuration.',
     })
   }
 

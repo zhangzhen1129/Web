@@ -191,6 +191,11 @@ async function main() {
       assert.equal(metrics.rootCount, 1)
       assert.equal(metrics.amountSourceCount, 1)
       assert.ok(Number.parseFloat(metrics.primaryButtonFontSize) <= 14, `${scenario} primary action font is too large`)
+      if (scenario === 'cash-apply') {
+        assert.equal(await evaluate(`document.querySelector('.unified-home__primary-badge')?.textContent`), 'Casi: 95%')
+      } else if (scenario === 'cash-reviewing' || scenario === 'cash-rejected') {
+        assert.equal(await evaluate(`Boolean(document.querySelector('.unified-home__primary-badge'))`), false)
+      }
       await screenshot(`${scenario}-375x812`)
       results.push({ scenario, viewport: '375x812', metrics })
     }

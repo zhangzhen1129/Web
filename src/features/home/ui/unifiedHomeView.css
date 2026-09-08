@@ -441,6 +441,7 @@ img.unified-home__credit-state {
   opacity: 1;
 }
 
+.unified-home__primary-badge,
 .unified-home__primary-hint {
   position: absolute;
   right: 0;

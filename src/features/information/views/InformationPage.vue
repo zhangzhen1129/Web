@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { showToast } from 'vant'
+import { Popup, showToast } from 'vant'
+import 'vant/es/popup/style'
 import { useRouter } from 'vue-router'
 import { useGlobalStore } from '../../../shared/globalStore/globalStore.js'
 import { hideNativeLoading, showNativeLoading } from '../../../shared/bridge/nativeLoading.js'
@@ -37,7 +38,12 @@ const controller = createInformationController({
 
 const unsubscribe = controller.subscribe((nextState) => { state.value = nextState })
 const activeField = computed(() => INFORMATION_FIELDS.find((field) => field.key === state.value?.activeField) ?? null)
+const preparedField = computed(() => activeField.value ?? INFORMATION_FIELDS[0])
 const canSubmit = computed(() => isCompleteInformationForm(state.value?.values) && !state.value?.submitting)
+
+function handleOptionsPopupVisibility(visible) {
+  if (!visible) controller.closeOptions()
+}
 
 onMounted(() => controller.initialize())
 onBeforeUnmount(() => {
@@ -84,26 +90,30 @@ onBeforeUnmount(() => {
       <button class="information-page__submit" type="button" :disabled="!canSubmit" @click="controller.submit()">Enviar</button>
     </footer>
 
-    <Transition name="information-sheet">
-      <div v-if="activeField" class="information-modal" role="presentation" @click.self="controller.closeOptions()">
-        <section class="information-modal__sheet" role="dialog" aria-modal="true" :aria-labelledby="`information-options-title-${activeField.key}`">
+    <Popup
+      :show="Boolean(activeField)"
+      position="bottom"
+      :lazy-render="false"
+      class="information-modal__popup"
+      @update:show="handleOptionsPopupVisibility"
+    >
+        <section class="information-modal__sheet" role="dialog" aria-modal="true" :aria-labelledby="`information-options-title-${preparedField.key}`">
           <button class="information-modal__close" type="button" aria-label="Close" @click="controller.closeOptions()"><img :src="closeAsset" alt="" /></button>
-          <h2 :id="`information-options-title-${activeField.key}`">{{ activeField.label }}</h2>
-          <div class="information-modal__options" role="radiogroup" :aria-label="activeField.label">
+          <h2 :id="`information-options-title-${preparedField.key}`">{{ preparedField.label }}</h2>
+          <div class="information-modal__options" role="radiogroup" :aria-label="preparedField.label">
             <button
-              v-for="option in activeField.options"
+              v-for="option in preparedField.options"
               :key="option.key"
               class="information-modal__option"
-              :class="{ 'information-modal__option--selected': state?.values[activeField.key] === option.key }"
+              :class="{ 'information-modal__option--selected': state?.values[preparedField.key] === option.key }"
               type="button"
               role="radio"
-              :aria-checked="state?.values[activeField.key] === option.key"
-              @click="controller.select(activeField.key, option.key)"
+              :aria-checked="state?.values[preparedField.key] === option.key"
+              @click="controller.select(preparedField.key, option.key)"
             >{{ option.label }}</button>
           </div>
         </section>
-      </div>
-    </Transition>
+    </Popup>
 
     <Transition name="information-dialog">
       <div v-if="state?.leaveConfirmationOpen" class="information-modal information-modal--centered" role="presentation">
