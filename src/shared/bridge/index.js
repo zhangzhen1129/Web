@@ -57,3 +57,10 @@ export {
   nativePhysicalBackInterceptBridge,
   setPhysicalBackIntercept,
 } from './nativePhysicalBackIntercept.js'
+
+export {
+  cancelNativeContactConsumer,
+  getNativeContactRegistrySize,
+  nativeContactBridge,
+  selectContactNative,
+} from './nativeContact.js'

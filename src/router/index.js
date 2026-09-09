@@ -1,10 +1,11 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
-import HomePage from '../features/home/views/HomePage.vue'
-import RepaymentPage from '../features/shell/views/RepaymentPage.vue'
 import MainTabShell from '../features/shell/MainTabShell.vue'
-import RoutePlaceholder from './RoutePlaceholder.vue'
-import MultiPushResultPlaceholder from './MultiPushResultPlaceholder.vue'
-import InformationPage from '../features/information/views/InformationPage.vue'
+import HomePage from '../features/home/views/HomePage.vue'
+
+const RepaymentPage = () => import('../features/shell/views/RepaymentPage.vue')
+const RoutePlaceholder = () => import('./RoutePlaceholder.vue')
+const MultiPushResultPlaceholder = () => import('./MultiPushResultPlaceholder.vue')
+const InformationPage = () => import('../features/information/views/InformationPage.vue')
 
 export const ROUTE_PATH = Object.freeze({
   HOME: '/home',
