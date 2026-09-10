@@ -64,3 +64,10 @@ export {
   nativeContactBridge,
   selectContactNative,
 } from './nativeContact.js'
+
+export {
+  cancelNativeIdCardCameraConsumer,
+  getNativeIdCardCameraRegistrySize,
+  nativeIdCardCameraBridge,
+  openIdCardCameraNative,
+} from './nativeIdCardCamera.js'
