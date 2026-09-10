@@ -6,6 +6,7 @@ const RepaymentPage = () => import('../features/shell/views/RepaymentPage.vue')
 const RoutePlaceholder = () => import('./RoutePlaceholder.vue')
 const MultiPushResultPlaceholder = () => import('./MultiPushResultPlaceholder.vue')
 const InformationPage = () => import('../features/information/views/InformationPage.vue')
+const ContactsPage = () => import('../features/contacts/views/ContactsPage.vue')
 
 export const ROUTE_PATH = Object.freeze({
   HOME: '/home',
@@ -35,7 +36,7 @@ export const router = createRouter({
         { path: ROUTE_PATH.MINE, name: 'mine', component: RoutePlaceholder, props: { title: 'Mi cuenta' }, meta: { showTab: true, tabKey: 'account' } },
         { path: 'orderList', name: 'orderList', component: RoutePlaceholder, props: { title: 'Order list' } },
         { path: 'information', name: 'information', component: InformationPage },
-        { path: 'contacts', name: 'contacts', component: RoutePlaceholder, props: { title: 'Contacts' } },
+        { path: 'contacts', name: 'contacts', component: ContactsPage },
         { path: 'identity', name: 'identity', component: RoutePlaceholder, props: { title: 'Identity' } },
         { path: 'addBank', name: 'addBank', component: RoutePlaceholder, props: { title: 'Add bank account' } },
         { path: 'orderDetail', name: 'orderDetail', component: RoutePlaceholder, props: { title: 'Order detail' } },

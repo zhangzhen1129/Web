@@ -1,0 +1,531 @@
+.contacts-page {
+  position: relative;
+  width: 100%;
+  min-height: 100%;
+  padding-bottom: 4.61538rem;
+  overflow: visible;
+  background: #f8f9fc;
+  color: #374151;
+}
+
+.contacts-page--name-focused {
+  padding-bottom: calc(100vh + env(safe-area-inset-bottom));
+}
+
+.contacts-page__header {
+  position: relative;
+  flex: 0 0 auto;
+  min-height: 6.10256rem;
+  padding-top: var(--app-safe-area-top);
+  background: #155dfc;
+  color: #fff;
+}
+
+.contacts-page__nav {
+  position: relative;
+  display: flex;
+  height: 1.64103rem;
+  align-items: center;
+  justify-content: center;
+  padding: .25641rem .41026rem;
+}
+
+.contacts-page__nav h1 {
+  margin: 0;
+  font-size: .46154rem;
+  font-weight: 900;
+  line-height: .61538rem;
+}
+
+.contacts-page__back {
+  position: absolute;
+  left: .41026rem;
+  display: grid;
+  width: 1.12821rem;
+  height: 1.12821rem;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: .30769rem;
+  background: #fff;
+  box-shadow: 0 .05128rem .10256rem rgb(0 0 0 / 8%);
+}
+
+.contacts-page__back img {
+  width: .51282rem;
+  height: .51282rem;
+}
+
+.contacts-progress {
+  position: relative;
+  width: 100%;
+  height: 3.48718rem;
+  margin-top: -.20513rem;
+  overflow: hidden;
+}
+
+.contacts-progress__base {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.contacts-progress__active-step {
+  position: absolute;
+  top: .61538rem;
+  left: 2.92308rem;
+  width: 1.64103rem;
+  height: 1.64103rem;
+}
+
+.contacts-progress__coin {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.contacts-progress__mark {
+  position: absolute;
+  top: .53846rem;
+  left: .48718rem;
+  width: .66667rem;
+  height: .5641rem;
+}
+
+.contacts-progress__active-step span {
+  position: absolute;
+  top: .61538rem;
+  left: .28205rem;
+  color: #dc8f00;
+  font-size: .41026rem;
+  font-weight: 900;
+  line-height: .41026rem;
+  white-space: nowrap;
+}
+
+.contacts-progress__label {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 1.02564rem;
+  padding-left: 2.84615rem;
+  background: #155dfc;
+  color: #fff;
+  font-size: .30769rem;
+  font-weight: 900;
+  line-height: .41026rem;
+  text-align: left;
+}
+
+.contacts-page__content {
+  padding: .41026rem .41026rem 0;
+}
+
+.contact-group {
+  padding-bottom: .41026rem;
+}
+
+.contact-group + .contact-group {
+  padding-top: .41026rem;
+  border-top: .05128rem solid #e3e3e3;
+}
+
+.contact-group h2 {
+  display: flex;
+  min-height: .61538rem;
+  align-items: center;
+  gap: .20513rem;
+  margin: 0 0 .41026rem;
+  color: #155dfc;
+  font-size: .41026rem;
+  font-weight: 700;
+  line-height: .51282rem;
+}
+
+.contact-group--2 h2 {
+  color: #ff6b2c;
+}
+
+.contact-group__icon {
+  display: grid;
+  width: .61538rem;
+  height: .61538rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: .20513rem;
+  background: #155dfc;
+}
+
+.contact-group--2 .contact-group__icon {
+  background: #ff6b2c;
+}
+
+.contact-group__icon img {
+  width: .41026rem;
+  height: .41026rem;
+}
+
+.contact-field {
+  margin-bottom: .41026rem;
+}
+
+.contact-field:last-child {
+  margin-bottom: 0;
+}
+
+.contact-field label {
+  display: block;
+  margin-bottom: .20513rem;
+  color: #374151;
+  font-size: .35897rem;
+  font-weight: 500;
+  line-height: .51282rem;
+}
+
+.contact-field__control,
+.contact-field__phone {
+  width: 100%;
+  min-height: 1.4359rem;
+  border: .02564rem solid #e5e7eb;
+  border-radius: .41026rem;
+  background: #fff;
+  color: #333;
+  font-size: .41026rem;
+  line-height: .61538rem;
+}
+
+.contact-field__control {
+  padding: .41026rem;
+}
+
+.contact-field__select {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  text-align: left;
+}
+
+.contact-field__select img {
+  width: .12821rem;
+  height: .25641rem;
+}
+
+.contact-field__placeholder,
+.contact-field__control::placeholder,
+.contact-field__phone input::placeholder {
+  color: #999;
+  opacity: 1;
+}
+
+.contact-field__phone {
+  position: relative;
+  overflow: hidden;
+}
+
+.contact-field__phone input {
+  width: 100%;
+  min-height: 1.38462rem;
+  padding: .41026rem 1.33333rem .41026rem .41026rem;
+  border: 0;
+  background: #fff;
+  color: #333;
+  font: inherit;
+  opacity: 1;
+  -webkit-text-fill-color: #333;
+}
+
+.contact-field__phone input:placeholder-shown {
+  -webkit-text-fill-color: #999;
+}
+
+.contact-field__phone-action {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: .41026rem;
+  border: 0;
+  background: transparent;
+}
+
+.contact-field__phone-action img {
+  width: .41026rem;
+  height: .41026rem;
+}
+
+.contacts-page__footer {
+  position: fixed;
+  z-index: 4;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  padding: .41026rem .41026rem calc(.41026rem + env(safe-area-inset-bottom));
+  background: #f8f9fc;
+}
+
+.contacts-page__submit {
+  display: block;
+  width: 100%;
+  min-height: 1.4359rem;
+  border: 0;
+  border-radius: .41026rem;
+  background: #155dfc;
+  color: #fff;
+  font-size: .41026rem;
+  font-weight: 900;
+  line-height: .61538rem;
+}
+
+.contacts-page__submit:disabled {
+  background: #d8d8d8;
+  color: #979797;
+}
+
+.contacts-page__back:focus-visible,
+.contact-field__control:focus-visible,
+.contact-field__phone-action:focus-visible,
+.contacts-page__submit:focus-visible,
+.contacts-dialog__close:focus-visible,
+.contacts-relationship-sheet__option:focus-visible,
+.contacts-prompt button:focus-visible,
+.contacts-leave-dialog button:focus-visible {
+  outline: .07692rem solid #111827;
+  outline-offset: .05128rem;
+}
+
+.contacts-relationship-popup {
+  width: 100%;
+  overflow: visible;
+  background: transparent;
+}
+
+.contacts-popup-overlay {
+  background: rgb(0 0 0 / 70%);
+}
+
+.contacts-relationship-sheet {
+  position: relative;
+  width: 100%;
+  max-height: calc(100dvh - var(--app-safe-area-top));
+  padding: .61538rem .41026rem calc(.61538rem + env(safe-area-inset-bottom));
+  overflow-y: auto;
+  border-radius: .61538rem .61538rem 0 0;
+  background: #fff;
+  outline: none;
+  overscroll-behavior: contain;
+}
+
+.contacts-relationship-sheet__title {
+  width: 8.20513rem;
+  margin: 0 auto .41026rem;
+  color: #333;
+  font-size: .61538rem;
+  font-weight: 900;
+  line-height: .82051rem;
+  text-align: center;
+}
+
+.contacts-dialog__close {
+  position: absolute;
+  top: .61538rem;
+  right: .41026rem;
+  width: .61538rem;
+  height: .61538rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.contacts-dialog__close img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.contacts-relationship-sheet__options {
+  display: grid;
+  gap: .61538rem;
+}
+
+.contacts-relationship-sheet__option {
+  width: 100%;
+  min-height: 1.02564rem;
+  padding: .20513rem .25641rem;
+  border: .02564rem solid #999;
+  border-radius: .51282rem;
+  background: #fff;
+  color: #999;
+  font-size: .41026rem;
+  line-height: .61538rem;
+}
+
+.contacts-relationship-sheet__option--selected {
+  border-color: #155dfc;
+  color: #155dfc;
+  font-weight: 700;
+}
+
+.contacts-modal {
+  position: fixed;
+  z-index: 20;
+  inset: 0;
+  display: flex;
+  background: rgb(0 0 0 / 70%);
+}
+
+.contacts-modal--centered {
+  align-items: center;
+  justify-content: center;
+  padding: .61538rem;
+}
+
+.contacts-prompt,
+.contacts-leave-dialog {
+  width: 8.76923rem;
+  max-width: 100%;
+  padding: .61538rem .41026rem;
+  border-radius: .61538rem;
+  background: #fff;
+  outline: none;
+  text-align: center;
+}
+
+.contacts-prompt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.02564rem;
+}
+
+.contacts-prompt__icon {
+  display: grid;
+  width: 1.4359rem;
+  height: 1.4359rem;
+  place-items: center;
+  border-radius: .41026rem;
+  background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
+}
+
+.contacts-prompt__icon img {
+  width: .82051rem;
+  height: .82051rem;
+}
+
+.contacts-prompt p,
+.contacts-leave-dialog p {
+  margin: 0;
+  color: #6b7280;
+  font-size: .41026rem;
+  line-height: .51282rem;
+}
+
+.contacts-prompt button,
+.contacts-leave-dialog button {
+  display: block;
+  width: 100%;
+  min-height: 1.23077rem;
+  border: 0;
+  border-radius: .41026rem;
+  background: #155dfc;
+  color: #fff;
+  font-size: .41026rem;
+  font-weight: 600;
+}
+
+.contacts-leave-dialog > img {
+  display: block;
+  width: 1.4359rem;
+  height: 1.4359rem;
+  margin: 0 auto .41026rem;
+}
+
+.contacts-leave-dialog p {
+  margin-bottom: .61538rem;
+}
+
+.contacts-leave-dialog .contacts-leave-dialog__leave {
+  min-height: .61538rem;
+  margin-top: .41026rem;
+  background: transparent;
+  color: #999;
+  font-weight: 400;
+}
+
+.contacts-success-dialog {
+  width: 8.76923rem;
+  max-width: 100%;
+  padding: .61538rem .41026rem;
+  border-radius: .61538rem;
+  background: #000;
+  color: #fff;
+  text-align: center;
+}
+
+.contacts-success-dialog strong,
+.contacts-success-dialog span {
+  display: block;
+  font-size: .41026rem;
+  line-height: .61538rem;
+}
+
+.contacts-success-dialog strong {
+  font-weight: 900;
+}
+
+.contacts-dialog-enter-active,
+.contacts-dialog-leave-active {
+  transition: opacity 180ms ease;
+}
+
+.contacts-dialog-enter-from,
+.contacts-dialog-leave-to {
+  opacity: 0;
+}
+
+.contacts-dialog-enter-active .contacts-prompt,
+.contacts-dialog-enter-active .contacts-leave-dialog,
+.contacts-dialog-enter-active .contacts-success-dialog {
+  animation: contacts-dialog-enter 200ms cubic-bezier(.2, .8, .2, 1);
+}
+
+.contacts-dialog-leave-active .contacts-prompt,
+.contacts-dialog-leave-active .contacts-leave-dialog,
+.contacts-dialog-leave-active .contacts-success-dialog {
+  animation: contacts-dialog-leave 150ms ease-in;
+}
+
+@keyframes contacts-dialog-enter {
+  from { transform: scale(.92); }
+  to { transform: scale(1); }
+}
+
+@keyframes contacts-dialog-leave {
+  from { transform: scale(1); }
+  to { transform: scale(.96); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .contacts-popup-overlay.van-fade-enter-active,
+  .contacts-popup-overlay.van-fade-leave-active,
+  .contacts-relationship-popup.van-popup-slide-bottom-enter-active,
+  .contacts-relationship-popup.van-popup-slide-bottom-leave-active {
+    transition-duration: 1ms !important;
+  }
+
+  .contacts-dialog-enter-active,
+  .contacts-dialog-leave-active {
+    transition-duration: 1ms;
+  }
+
+  .contacts-dialog-enter-active .contacts-prompt,
+  .contacts-dialog-enter-active .contacts-leave-dialog,
+  .contacts-dialog-enter-active .contacts-success-dialog,
+  .contacts-dialog-leave-active .contacts-prompt,
+  .contacts-dialog-leave-active .contacts-leave-dialog,
+  .contacts-dialog-leave-active .contacts-success-dialog {
+    animation-duration: 1ms;
+  }
+}
