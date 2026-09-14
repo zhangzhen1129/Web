@@ -5,6 +5,7 @@ export const BRIDGE_FAILURE_CODES = Object.freeze({
   callFailed: 'BRIDGE_CALL_FAILED',
   invalidCallback: 'INVALID_CALLBACK',
   configActive: 'CONFIG_ACTIVE',
+  requestActive: 'REQUEST_ACTIVE',
 })
 
 export function normalizeFailureOptions(options) {

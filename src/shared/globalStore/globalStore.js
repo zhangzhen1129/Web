@@ -9,6 +9,12 @@ import {
 
 export const GLOBAL_TOKEN_CACHE_KEY = 'global:token'
 export const GLOBAL_TOKEN_CACHE_VERSION = 1
+export const GLOBAL_USER_CACHE_KEYS = Object.freeze({
+  userId: 'global:user-id',
+  mobile: 'global:mobile',
+})
+export const GLOBAL_USER_CACHE_VERSION = 1
+export const GLOBAL_USER_FIELDS = Object.freeze(Object.keys(GLOBAL_USER_CACHE_KEYS))
 export const GLOBAL_API_HOST_CACHE_KEY = 'global:api-host'
 export const GLOBAL_API_HOST_CACHE_VERSION = 1
 export const GLOBAL_APP_INFO_CACHE_KEYS = Object.freeze({
@@ -40,7 +46,7 @@ const initialState = () => ({
   ...Object.fromEntries(GLOBAL_FIELDS.map((field) => [field, null])),
   isMultiPush: false,
 })
-const AUTHORIZED_FIELDS = new Set(['token', 'apiHost', ...GLOBAL_APP_INFO_FIELDS, ...GLOBAL_THIRD_PARTY_SDK_FIELDS, 'isMultiPush'])
+const AUTHORIZED_FIELDS = new Set(['token', ...GLOBAL_USER_FIELDS, 'apiHost', ...GLOBAL_APP_INFO_FIELDS, ...GLOBAL_THIRD_PARTY_SDK_FIELDS, 'isMultiPush'])
 const UNRESOLVED_FIELDS = new Set(GLOBAL_FIELDS.filter((field) => !AUTHORIZED_FIELDS.has(field)))
 const apiHostHydrationResults = new WeakMap()
 
@@ -72,6 +78,39 @@ function readCachedToken() {
   if (typeof token === 'string' && token.length > 0) return token
   if (token !== null) removePersistentValue(GLOBAL_TOKEN_CACHE_KEY)
   return null
+}
+
+function readCachedUserFields() {
+  return Object.fromEntries(GLOBAL_USER_FIELDS.map((field) => {
+    const cachedValue = getPersistentValue(GLOBAL_USER_CACHE_KEYS[field], null, { version: GLOBAL_USER_CACHE_VERSION })
+    if (typeof cachedValue === 'string' && cachedValue.length > 0) return [field, cachedValue]
+    if (cachedValue !== null) removePersistentValue(GLOBAL_USER_CACHE_KEYS[field])
+    return [field, null]
+  }))
+}
+
+function persistEntriesAtomically(entries) {
+  const snapshots = entries.map((entry) => ({
+    entry,
+    result: getPersistentResult(entry.key, { version: entry.version }),
+  }))
+  if (snapshots.some(({ result }) => result.status === 'failed')) return false
+
+  const attempted = []
+  for (const snapshot of snapshots) {
+    attempted.push(snapshot)
+    if (setPersistentValue(snapshot.entry.key, snapshot.entry.value, { version: snapshot.entry.version })) continue
+
+    attempted.reverse().forEach(({ entry, result }) => {
+      if (result.status === 'found') {
+        setPersistentValue(entry.key, result.value, { version: entry.version })
+      } else {
+        removePersistentValue(entry.key)
+      }
+    })
+    return false
+  }
+  return true
 }
 
 function hydrateCachedApiHost(store) {
@@ -127,6 +166,7 @@ export const useGlobalStore = defineStore('globalStore', {
       if (fields.some((field) => !GLOBAL_FIELDS.includes(field))) return false
       if (fields.some((field) => UNRESOLVED_FIELDS.has(field) && partial[field] !== null)) return false
       if (Object.hasOwn(partial, 'token') && (typeof partial.token !== 'string' || partial.token.length === 0)) return false
+      if (GLOBAL_USER_FIELDS.some((field) => Object.hasOwn(partial, field) && (typeof partial[field] !== 'string' || partial[field].length === 0))) return false
       if (Object.hasOwn(partial, 'isMultiPush') && typeof partial.isMultiPush !== 'boolean') return false
       if (GLOBAL_APP_INFO_FIELDS.some((field) => Object.hasOwn(partial, field) && (typeof partial[field] !== 'string' || partial[field].length === 0))) return false
       if (GLOBAL_THIRD_PARTY_SDK_FIELDS.some((field) => Object.hasOwn(partial, field) && (typeof partial[field] !== 'string' || partial[field].length === 0))) return false
@@ -139,6 +179,9 @@ export const useGlobalStore = defineStore('globalStore', {
 
       const entries = []
       if (Object.hasOwn(partial, 'token')) entries.push({ field: 'token', key: GLOBAL_TOKEN_CACHE_KEY, version: GLOBAL_TOKEN_CACHE_VERSION, value: partial.token })
+      GLOBAL_USER_FIELDS.forEach((field) => {
+        if (Object.hasOwn(partial, field)) entries.push({ field, key: GLOBAL_USER_CACHE_KEYS[field], version: GLOBAL_USER_CACHE_VERSION, value: partial[field] })
+      })
       if (apiHost) entries.push({ field: 'apiHost', key: GLOBAL_API_HOST_CACHE_KEY, version: GLOBAL_API_HOST_CACHE_VERSION, value: apiHost })
       if (Object.hasOwn(partial, 'isMultiPush')) entries.push({ field: 'isMultiPush', key: GLOBAL_MULTI_PUSH_CACHE_KEY, version: GLOBAL_MULTI_PUSH_CACHE_VERSION, value: partial.isMultiPush })
       GLOBAL_APP_INFO_FIELDS.forEach((field) => {
@@ -148,15 +191,14 @@ export const useGlobalStore = defineStore('globalStore', {
         if (Object.hasOwn(partial, field)) entries.push({ field, key: GLOBAL_THIRD_PARTY_SDK_CACHE_KEYS[field], version: GLOBAL_THIRD_PARTY_SDK_CACHE_VERSION, value: partial[field] })
       })
 
-      for (const entry of entries) {
-        setPersistentValue(entry.key, entry.value, { version: entry.version })
-      }
+      if (!persistEntriesAtomically(entries)) return false
 
       fields.forEach((field) => { this[field] = nextValues[field] })
       return true
     },
     hydrateGlobal() {
       this.token = readCachedToken()
+      Object.assign(this, readCachedUserFields())
       hydrateCachedApiHost(this)
       Object.assign(this, readCachedAppInfo())
       Object.assign(this, readCachedThirdPartySdkIdentifiers())
@@ -192,6 +234,9 @@ export const useGlobalStore = defineStore('globalStore', {
     clearGlobal() {
       const applicationCacheRemoved = clearApplicationCache()
       const tokenRemoved = removePersistentValue(GLOBAL_TOKEN_CACHE_KEY)
+      const userFieldsRemoved = GLOBAL_USER_FIELDS
+        .map((field) => removePersistentValue(GLOBAL_USER_CACHE_KEYS[field]))
+        .every(Boolean)
       const apiHostRemoved = removePersistentValue(GLOBAL_API_HOST_CACHE_KEY)
       const appInfoRemoved = GLOBAL_APP_INFO_FIELDS
         .map((field) => removePersistentValue(GLOBAL_APP_INFO_CACHE_KEYS[field]))
@@ -202,7 +247,7 @@ export const useGlobalStore = defineStore('globalStore', {
       const multiPushRemoved = removePersistentValue(GLOBAL_MULTI_PUSH_CACHE_KEY)
       this.$patch(initialState())
       apiHostHydrationResults.delete(this)
-      return applicationCacheRemoved && tokenRemoved && apiHostRemoved && appInfoRemoved && thirdPartySdkRemoved && multiPushRemoved
+      return applicationCacheRemoved && tokenRemoved && userFieldsRemoved && apiHostRemoved && appInfoRemoved && thirdPartySdkRemoved && multiPushRemoved
     },
   },
 })

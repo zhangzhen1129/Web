@@ -9,7 +9,11 @@ const BRIDGE_OBJECT = 'plahub'
 const METHOD = 'handlePersistentCache'
 const CALLBACK_NAME = '__dineroProPersistentCacheReply'
 const CALLBACK_SCOPE = 'shared'
-const CACHE_KEY = 'Token'
+const CACHE_KEYS = Object.freeze({
+  token: 'Token',
+  userId: 'UserId',
+  mobile: 'LoginPhoneNumber',
+})
 
 let sequence = 0
 const registry = new Map()
@@ -55,14 +59,14 @@ function notifyImmediateFailure(onFailure, code) {
   deliverBridgeFailure(onFailure, code, METHOD, reportDiagnostic)
 }
 
-function isValidReply(reply) {
+function isValidReply(reply, cacheKey) {
   return reply !== null
     && typeof reply === 'object'
     && !Array.isArray(reply)
     && reply.action === 'persistent_cache_handle'
     && typeof reply.requestId === 'string'
     && reply.operation === 'get'
-    && reply.cacheKey === CACHE_KEY
+    && reply.cacheKey === cacheKey
     && (reply.status === 'completed' || reply.status === 'error')
     && typeof reply.message === 'string'
     && typeof reply.cacheValue === 'string'
@@ -82,14 +86,14 @@ function handleReply(reply) {
     ? [...registry.values()].find((entry) => entry.requestId === requestId)
     : null
 
-  if (!isValidReply(reply)) {
-    if (record) notifyFailure(record, BRIDGE_FAILURE_CODES.invalidCallback)
-    reportDiagnostic('BRIDGE_CALLBACK_INVALID_PAYLOAD')
+  if (!record) {
+    reportDiagnostic('BRIDGE_CALLBACK_UNKNOWN_REQUEST')
     return
   }
 
-  if (!record) {
-    reportDiagnostic('BRIDGE_CALLBACK_UNKNOWN_REQUEST')
+  if (!isValidReply(reply, record.cacheKey)) {
+    notifyFailure(record, BRIDGE_FAILURE_CODES.invalidCallback)
+    reportDiagnostic('BRIDGE_CALLBACK_INVALID_PAYLOAD')
     return
   }
 
@@ -124,10 +128,7 @@ function ensureSharedCallback() {
   }
 }
 
-/** Query the Android persistent cache entry named Token.
- * The callback remains application-scoped so a route change cannot cancel it.
- */
-export function getNativeCachedToken(consumer = () => {}, options) {
+function getNativeCachedValue(cacheKey, consumer, options) {
   const failureOptions = normalizeFailureOptions(options)
   if (!failureOptions.valid) {
     reportDiagnostic('BRIDGE_INVALID_OPTIONS')
@@ -158,6 +159,7 @@ export function getNativeCachedToken(consumer = () => {}, options) {
     callbackName: `window.${CALLBACK_NAME}`,
     callbackScope: CALLBACK_SCOPE,
     requestId,
+    cacheKey,
     status: 'pending',
     completed: false,
     consumerCanceled: false,
@@ -172,7 +174,7 @@ export function getNativeCachedToken(consumer = () => {}, options) {
       requestId,
       replyHandler: `window.${CALLBACK_NAME}`,
       operation: 'get',
-      cacheKey: CACHE_KEY,
+      cacheKey,
     })
   } catch {
     notifyFailure(record, BRIDGE_FAILURE_CODES.callFailed)
@@ -206,9 +208,11 @@ export function getNativeCachedToken(consumer = () => {}, options) {
   return requestId
 }
 
-export function cancelNativeCachedTokenConsumer(requestId) {
+function cancelNativeCachedConsumer(requestId, cacheKey) {
   if (typeof requestId !== 'string' || requestId.length === 0) return false
-  const record = [...registry.values()].find((entry) => entry.requestId === requestId)
+  const record = [...registry.values()].find((entry) => (
+    entry.requestId === requestId && entry.cacheKey === cacheKey
+  ))
   if (!record || record.completed) return false
   record.consumerCanceled = true
   record.consumer = () => {}
@@ -216,11 +220,42 @@ export function cancelNativeCachedTokenConsumer(requestId) {
   return true
 }
 
+/** Query the Android persistent cache entry named Token. */
+export function getNativeCachedToken(consumer = () => {}, options) {
+  return getNativeCachedValue(CACHE_KEYS.token, consumer, options)
+}
+
+/** Query the Android persistent cache entry named UserId. */
+export function getNativeCachedUserId(consumer = () => {}, options) {
+  return getNativeCachedValue(CACHE_KEYS.userId, consumer, options)
+}
+
+/** Query the Android persistent cache entry named LoginPhoneNumber. */
+export function getNativeCachedMobile(consumer = () => {}, options) {
+  return getNativeCachedValue(CACHE_KEYS.mobile, consumer, options)
+}
+
+export function cancelNativeCachedTokenConsumer(requestId) {
+  return cancelNativeCachedConsumer(requestId, CACHE_KEYS.token)
+}
+
+export function cancelNativeCachedUserIdConsumer(requestId) {
+  return cancelNativeCachedConsumer(requestId, CACHE_KEYS.userId)
+}
+
+export function cancelNativeCachedMobileConsumer(requestId) {
+  return cancelNativeCachedConsumer(requestId, CACHE_KEYS.mobile)
+}
+
 export function getNativePersistentCacheRegistrySize() {
   return registry.size
 }
 
 export const nativePersistentCacheBridge = Object.freeze({
+  cancelNativeCachedMobileConsumer,
   cancelNativeCachedTokenConsumer,
+  cancelNativeCachedUserIdConsumer,
+  getNativeCachedMobile,
   getNativeCachedToken,
+  getNativeCachedUserId,
 })

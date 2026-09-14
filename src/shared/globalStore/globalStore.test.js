@@ -10,6 +10,8 @@ import {
   GLOBAL_MULTI_PUSH_CACHE_VERSION,
   GLOBAL_TOKEN_CACHE_KEY,
   GLOBAL_TOKEN_CACHE_VERSION,
+  GLOBAL_USER_CACHE_KEYS,
+  GLOBAL_USER_CACHE_VERSION,
   GLOBAL_THIRD_PARTY_SDK_CACHE_KEYS,
   GLOBAL_THIRD_PARTY_SDK_CACHE_VERSION,
   useGlobalStore,
@@ -33,6 +35,7 @@ test.afterEach(() => { delete globalThis.window })
 test('updates and hydrates authorized global fields through the cache adapter', () => {
   const store = useGlobalStore()
   assert.equal(store.setGlobal({ token: 'redacted-token' }), true)
+  assert.equal(store.setGlobal({ userId: 'redacted-user-id', mobile: 'redacted-mobile' }), true)
   assert.equal(store.setGlobal({ apiHost: 'https://api.example.test/' }), true)
   const appInfo = {
     appName: 'PlataRap',
@@ -50,6 +53,8 @@ test('updates and hydrates authorized global fields through the cache adapter', 
   }
   assert.equal(store.setGlobal(sdkIdentifiers), true)
   assert.equal(store.token, 'redacted-token')
+  assert.equal(store.userId, 'redacted-user-id')
+  assert.equal(store.mobile, 'redacted-mobile')
   assert.equal(store.apiHost, 'https://api.example.test')
   assert.equal(store.setGlobal({ isMultiPush: true }), true)
   assert.equal(store.isMultiPush, true)
@@ -57,6 +62,8 @@ test('updates and hydrates authorized global fields through the cache adapter', 
   assert.deepEqual(Object.fromEntries(Object.keys(appInfo).map((field) => [field, store[field]])), appInfo)
   assert.deepEqual(Object.fromEntries(Object.keys(sdkIdentifiers).map((field) => [field, store[field]])), sdkIdentifiers)
   assert.deepEqual(JSON.parse(window.localStorage.getItem('DineroPro:global:token')), { version: GLOBAL_TOKEN_CACHE_VERSION, value: 'redacted-token' })
+  assert.deepEqual(JSON.parse(window.localStorage.getItem('DineroPro:global:user-id')), { version: GLOBAL_USER_CACHE_VERSION, value: 'redacted-user-id' })
+  assert.deepEqual(JSON.parse(window.localStorage.getItem('DineroPro:global:mobile')), { version: GLOBAL_USER_CACHE_VERSION, value: 'redacted-mobile' })
   assert.deepEqual(JSON.parse(window.localStorage.getItem('DineroPro:global:api-host')), { version: GLOBAL_API_HOST_CACHE_VERSION, value: 'https://api.example.test' })
   for (const [field, key] of Object.entries(GLOBAL_APP_INFO_CACHE_KEYS)) {
     assert.deepEqual(JSON.parse(window.localStorage.getItem(`DineroPro:${key}`)), { version: GLOBAL_APP_INFO_CACHE_VERSION, value: appInfo[field] })
@@ -69,16 +76,20 @@ test('updates and hydrates authorized global fields through the cache adapter', 
   assert.deepEqual(store.initializeApiHostFromCurrentLocation(), { status: 'retained', errorCode: null })
   assert.equal(store.isMultiPush, true)
   assert.equal(store.apiHost, 'https://api.example.test')
+  assert.equal(store.userId, 'redacted-user-id')
+  assert.equal(store.mobile, 'redacted-mobile')
   assert.deepEqual(Object.fromEntries(Object.keys(appInfo).map((field) => [field, store[field]])), appInfo)
   assert.deepEqual(Object.fromEntries(Object.keys(sdkIdentifiers).map((field) => [field, store[field]])), sdkIdentifiers)
   assert.equal(GLOBAL_TOKEN_CACHE_KEY, 'global:token')
   assert.equal(GLOBAL_API_HOST_CACHE_KEY, 'global:api-host')
+  assert.deepEqual(GLOBAL_USER_CACHE_KEYS, { userId: 'global:user-id', mobile: 'global:mobile' })
 })
 
 test('rejects unknown, unresolved, and invalid authorized fields', () => {
   const store = useGlobalStore()
   assert.equal(store.setGlobal({ unknown: true }), false)
-  assert.equal(store.setGlobal({ userId: 'unconfirmed-user' }), false)
+  assert.equal(store.setGlobal({ userId: '' }), false)
+  assert.equal(store.setGlobal({ mobile: 123 }), false)
   assert.equal(store.setGlobal({ afId: '' }), false)
   assert.equal(store.setGlobal({ fbId: 123 }), false)
   assert.equal(store.setGlobal({ appVersionName: '' }), false)
@@ -144,7 +155,7 @@ test('initializes apiHost from current URL with controlled semantic results', ()
   assert.equal(store.apiHost, 'https://launch.example.test')
 })
 
-test('retains memory updates when the cache is unavailable', () => {
+test('reports cache persistence failures and retains the last usable value', () => {
   const store = useGlobalStore()
   assert.equal(store.setGlobal({ apiHost: 'https://cached.example.test' }), true)
 
@@ -159,13 +170,13 @@ test('retains memory updates when the cache is unavailable', () => {
   window.localStorage.setItem = () => { throw new Error('quota exceeded') }
   window.location.search = '?apiHost=https%3A%2F%2Flaunch.example.test'
   assert.deepEqual(store.initializeApiHostFromCurrentLocation(), {
-    status: 'updated',
-    errorCode: null,
+    status: 'failed',
+    errorCode: 'STORE_UPDATE_FAILED',
   })
-  assert.equal(store.apiHost, 'https://launch.example.test')
+  assert.equal(store.apiHost, 'https://cached.example.test')
 })
 
-test('updates memory even when a multi-field cache write fails', () => {
+test('rolls back a failed multi-field cache write and preserves usable values', () => {
   const store = useGlobalStore()
   assert.equal(store.setGlobal({ token: 'old-token', apiHost: 'https://old.example.test' }), true)
   const originalSetItem = window.localStorage.setItem.bind(window.localStorage)
@@ -174,16 +185,34 @@ test('updates memory even when a multi-field cache write fails', () => {
     originalSetItem(key, value)
   }
 
-  assert.equal(store.setGlobal({ token: 'new-token', apiHost: 'https://new.example.test' }), true)
-  assert.equal(store.token, 'new-token')
-  assert.equal(store.apiHost, 'https://new.example.test')
+  assert.equal(store.setGlobal({ token: 'new-token', apiHost: 'https://new.example.test' }), false)
+  assert.equal(store.token, 'old-token')
+  assert.equal(store.apiHost, 'https://old.example.test')
   assert.deepEqual(JSON.parse(window.localStorage.getItem('DineroPro:global:token')), {
     version: GLOBAL_TOKEN_CACHE_VERSION,
-    value: 'new-token',
+    value: 'old-token',
   })
   assert.deepEqual(JSON.parse(window.localStorage.getItem('DineroPro:global:api-host')), {
     version: GLOBAL_API_HOST_CACHE_VERSION,
     value: 'https://old.example.test',
+  })
+})
+
+test('preserves cached user fields when persistence fails', () => {
+  const store = useGlobalStore()
+  assert.equal(store.setGlobal({ userId: 'old-user-id', mobile: 'old-mobile' }), true)
+  const originalSetItem = window.localStorage.setItem.bind(window.localStorage)
+  window.localStorage.setItem = (key, value) => {
+    if (key === 'DineroPro:global:user-id') throw new Error('quota exceeded')
+    originalSetItem(key, value)
+  }
+
+  assert.equal(store.setGlobal({ userId: 'new-user-id' }), false)
+  assert.equal(store.userId, 'old-user-id')
+  assert.equal(store.mobile, 'old-mobile')
+  assert.deepEqual(JSON.parse(window.localStorage.getItem('DineroPro:global:user-id')), {
+    version: GLOBAL_USER_CACHE_VERSION,
+    value: 'old-user-id',
   })
 })
 
@@ -224,6 +253,8 @@ test('clearGlobal removes every authorized cache entry and resets every field', 
   const store = useGlobalStore()
   assert.equal(store.setGlobal({
     token: 'redacted-token',
+    userId: 'redacted-user-id',
+    mobile: 'redacted-mobile',
     apiHost: 'https://api.example.test',
     appName: 'PlataRap',
     packageName: 'PlataRap',
@@ -240,9 +271,13 @@ test('clearGlobal removes every authorized cache entry and resets every field', 
   window.localStorage.setItem('other-app:session', 'keep')
   assert.equal(store.clearGlobal(), true)
   assert.equal(store.token, null)
+  assert.equal(store.userId, null)
+  assert.equal(store.mobile, null)
   assert.equal(store.apiHost, null)
   assert.equal(store.isMultiPush, false)
   assert.equal(window.localStorage.getItem('DineroPro:global:token'), null)
+  assert.equal(window.localStorage.getItem('DineroPro:global:user-id'), null)
+  assert.equal(window.localStorage.getItem('DineroPro:global:mobile'), null)
   assert.equal(window.localStorage.getItem('DineroPro:global:api-host'), null)
   assert.equal(window.localStorage.getItem('DineroPro:global:is-multi-push'), null)
   assert.deepEqual(store.initializeApiHostFromCurrentLocation(), { status: 'not_found', errorCode: null })

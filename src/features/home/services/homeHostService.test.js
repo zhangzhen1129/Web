@@ -13,15 +13,19 @@ function createHarness(overrides = {}) {
     return requestId
   }
   const store = {
-    apiHost: 'https://cached.example.test', token: 'cached-token', afId: 'cached-af',
+    apiHost: 'https://cached.example.test', userId: 'cached-user', mobile: 'cached-mobile', token: 'cached-token', afId: 'cached-af',
     initializeApiHostFromCurrentLocation() { calls.push('apiHost'); return { status: 'retained', errorCode: null } },
     setGlobal(update) { Object.assign(this, update); calls.push(`store:${Object.keys(update).join(',')}`); return true },
   }
   const service = createHomeHostService({
     globalStore: store,
-    getNativeAppInfo: request('appInfo'), getNativeCachedToken: request('token'),
+    getNativeAppInfo: request('appInfo'),
+    getNativeCachedUserId: request('userId'), getNativeCachedMobile: request('mobile'),
+    getNativeCachedToken: request('token'),
     getThirdPartySdkIdentifiers: request('sdk'),
     cancelNativeAppInfoConsumer: (id) => calls.push(`cancelApp:${id}`),
+    cancelNativeCachedUserIdConsumer: (id) => calls.push(`cancelUserId:${id}`),
+    cancelNativeCachedMobileConsumer: (id) => calls.push(`cancelMobile:${id}`),
     cancelNativeCachedTokenConsumer: (id) => calls.push(`cancelToken:${id}`),
     cancelThirdPartySdkIdentifiersConsumer: (id) => calls.push(`cancelSdk:${id}`),
     requestNativeOneClickPermissions(permissions, consumer, options) {
@@ -36,18 +40,31 @@ function createHarness(overrides = {}) {
   return { calls, pending, service, store }
 }
 
+async function waitForPending(harness, name) {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    if (harness.pending[name]) return harness.pending[name]
+    await new Promise((resolve) => setTimeout(resolve, 0))
+  }
+  throw new Error(`Missing pending request: ${name}`)
+}
+
 async function resolveInitialization(harness) {
-  harness.pending.appInfo.consumer({
+  const appInfo = await waitForPending(harness, 'appInfo')
+  appInfo.consumer({
     status: 'success', appName: 'App', packageName: 'pkg', packageId: 'id',
     appVersion: '1', appVersionName: '1.0', androidId: 'android',
   })
-  await new Promise((resolve) => setTimeout(resolve, 0))
-  harness.pending.token.consumer({ status: 'completed', hit: true, cacheValue: 'native-token' })
-  await Promise.resolve()
-  harness.pending.sdk.consumer({ status: 'partial_success', afId: '', fbId: '', gaId: '' })
+  const userId = await waitForPending(harness, 'userId')
+  userId.consumer({ status: 'completed', hit: true, cacheValue: 'native-user' })
+  const mobile = await waitForPending(harness, 'mobile')
+  mobile.consumer({ status: 'completed', hit: true, cacheValue: 'native-mobile' })
+  const token = await waitForPending(harness, 'token')
+  token.consumer({ status: 'completed', hit: true, cacheValue: 'native-token' })
+  const sdk = await waitForPending(harness, 'sdk')
+  sdk.consumer({ status: 'partial_success', afId: '', fbId: '', gaId: '' })
 }
 
-test('initializes in fixed order and stores the native cached Token', async () => {
+test('initializes in fixed order and stores native cached user fields and Token', async () => {
   const harness = createHarness()
   const first = harness.service.initializeHomeHostContext({ initCycleId: 'init-1' })
   const duplicate = harness.service.initializeHomeHostContext({ initCycleId: 'init-1' })
@@ -55,12 +72,30 @@ test('initializes in fixed order and stores the native cached Token', async () =
   assert.deepEqual(harness.calls, ['apiHost', 'appInfo'])
   await resolveInitialization(harness)
   const result = await first
-  assert.deepEqual(harness.calls.slice(0, 6), ['apiHost', 'appInfo', 'store:appName,packageName,packageId,appVersion,appVersionName,androidId', 'token', 'store:token', 'sdk'])
+  assert.deepEqual(harness.calls.slice(0, 10), [
+    'apiHost',
+    'appInfo',
+    'store:appName,packageName,packageId,appVersion,appVersionName,androidId',
+    'userId',
+    'store:userId',
+    'mobile',
+    'store:mobile',
+    'token',
+    'store:token',
+    'sdk',
+  ])
   assert.equal(result.status, 'completed')
   assert.deepEqual(result.steps.token, { status: 'updated', errorCode: null })
+  assert.deepEqual(result.steps.userId, { status: 'updated', errorCode: null })
+  assert.deepEqual(result.steps.mobile, { status: 'updated', errorCode: null })
   assert.deepEqual(result.steps.sdkIdentifiers, { status: 'retained', errorCode: null })
   assert.equal(harness.store.token, 'native-token')
-  assert.equal(JSON.stringify(result).includes(harness.store.token), false)
+  assert.equal(harness.store.userId, 'native-user')
+  assert.equal(harness.store.mobile, 'native-mobile')
+  const serializedResult = JSON.stringify(result)
+  assert.equal(serializedResult.includes(harness.store.token), false)
+  assert.equal(serializedResult.includes(harness.store.userId), false)
+  assert.equal(serializedResult.includes(harness.store.mobile), false)
 })
 
 test('rejects malformed and concurrent init ids without additional Bridge calls', async () => {
@@ -87,24 +122,6 @@ test('uses the controlled api host initialization result without inferring store
   assert.equal(result.status, 'partial_success')
 })
 
-test('uses an explicit development token when the native token query is unavailable', async () => {
-  const harness = createHarness({
-    getNativeCachedToken() { throw new Error('native token query must be skipped') },
-    testToken: 'development-token',
-  })
-  const initialization = harness.service.initializeHomeHostContext({ initCycleId: 'development-token-init' })
-  harness.pending.appInfo.consumer({
-    status: 'success', appName: 'App', packageName: 'pkg', packageId: 'id',
-    appVersion: '1', appVersionName: '1.0', androidId: 'android',
-  })
-  await new Promise((resolve) => setTimeout(resolve, 0))
-  harness.pending.sdk.consumer({ status: 'partial_success', afId: '', fbId: '', gaId: '' })
-  const result = await initialization
-  assert.deepEqual(result.steps.token, { status: 'updated', errorCode: null })
-  assert.equal(harness.store.token, 'development-token')
-  assert.equal(harness.calls.includes('token'), false)
-})
-
 test('dispose cancels current consumer, short-circuits later steps, and permits a fresh id', async () => {
   const harness = createHarness()
   const first = harness.service.initializeHomeHostContext({ initCycleId: 'init-1' })
@@ -112,11 +129,94 @@ test('dispose cancels current consumer, short-circuits later steps, and permits 
   const canceled = await first
   assert.equal(canceled.status, 'canceled')
   assert.equal(canceled.steps.appInfo.status, 'canceled')
+  assert.equal(canceled.steps.userId.status, 'canceled')
+  assert.equal(canceled.steps.mobile.status, 'canceled')
   assert.equal(canceled.steps.token.status, 'canceled')
   assert.equal(canceled.steps.sdkIdentifiers.status, 'canceled')
   assert.equal(harness.calls.includes('token'), false)
   harness.service.initializeHomeHostContext({ initCycleId: 'init-2' })
   assert.equal(harness.calls.filter((call) => call === 'appInfo').length, 2)
+})
+
+test('continues after a userId failure and reports independent user field states', async () => {
+  const harness = createHarness()
+  const initialization = harness.service.initializeHomeHostContext({ initCycleId: 'user-failure' })
+  const appInfo = await waitForPending(harness, 'appInfo')
+  appInfo.consumer({
+    status: 'success', appName: 'App', packageName: 'pkg', packageId: 'id',
+    appVersion: '1', appVersionName: '1.0', androidId: 'android',
+  })
+  const userId = await waitForPending(harness, 'userId')
+  userId.options.onFailure({ code: 'BRIDGE_UNAVAILABLE' })
+  const mobile = await waitForPending(harness, 'mobile')
+  mobile.consumer({ status: 'completed', hit: false, cacheValue: '' })
+  const token = await waitForPending(harness, 'token')
+  token.consumer({ status: 'completed', hit: false, cacheValue: '' })
+  const sdk = await waitForPending(harness, 'sdk')
+  sdk.consumer({ status: 'partial_success', afId: '', fbId: '', gaId: '' })
+
+  const result = await initialization
+  assert.deepEqual(result.steps.userId, { status: 'failed', errorCode: 'BRIDGE_UNAVAILABLE' })
+  assert.deepEqual(result.steps.mobile, { status: 'retained', errorCode: null })
+  assert.equal(result.status, 'partial_success')
+  assert.equal(harness.calls.includes('mobile'), true)
+  assert.equal(harness.calls.includes('token'), true)
+})
+
+test('reports userId persistence failure and continues with mobile', async () => {
+  const harness = createHarness({
+    globalStore: {
+      apiHost: 'https://cached.example.test',
+      userId: 'cached-user',
+      mobile: 'cached-mobile',
+      token: 'cached-token',
+      afId: 'cached-af',
+      initializeApiHostFromCurrentLocation() { return { status: 'retained', errorCode: null } },
+      setGlobal(update) {
+        Object.assign(this, update)
+        return !Object.hasOwn(update, 'userId')
+      },
+    },
+  })
+  const initialization = harness.service.initializeHomeHostContext({ initCycleId: 'persist-failure' })
+  const appInfo = await waitForPending(harness, 'appInfo')
+  appInfo.consumer({
+    status: 'success', appName: 'App', packageName: 'pkg', packageId: 'id',
+    appVersion: '1', appVersionName: '1.0', androidId: 'android',
+  })
+  const userId = await waitForPending(harness, 'userId')
+  userId.consumer({ status: 'completed', hit: true, cacheValue: 'native-user' })
+  const mobile = await waitForPending(harness, 'mobile')
+  mobile.consumer({ status: 'completed', hit: true, cacheValue: 'native-mobile' })
+  const token = await waitForPending(harness, 'token')
+  token.consumer({ status: 'completed', hit: false, cacheValue: '' })
+  const sdk = await waitForPending(harness, 'sdk')
+  sdk.consumer({ status: 'partial_success', afId: '', fbId: '', gaId: '' })
+
+  const result = await initialization
+  assert.deepEqual(result.steps.userId, { status: 'failed', errorCode: 'STORE_UPDATE_FAILED' })
+  assert.deepEqual(result.steps.mobile, { status: 'updated', errorCode: null })
+  assert.equal(result.status, 'partial_success')
+})
+
+test('dispose detaches the active userId consumer and ignores its late callback', async () => {
+  const harness = createHarness()
+  const initialization = harness.service.initializeHomeHostContext({ initCycleId: 'dispose-user' })
+  const appInfo = await waitForPending(harness, 'appInfo')
+  appInfo.consumer({
+    status: 'success', appName: 'App', packageName: 'pkg', packageId: 'id',
+    appVersion: '1', appVersionName: '1.0', androidId: 'android',
+  })
+  const userId = await waitForPending(harness, 'userId')
+  harness.service.disposeHomeHostInit({ initCycleId: 'dispose-user' })
+  userId.consumer({ status: 'completed', hit: true, cacheValue: 'late-user' })
+
+  const result = await initialization
+  assert.equal(result.status, 'canceled')
+  assert.equal(result.steps.userId.status, 'canceled')
+  assert.equal(harness.store.userId, 'cached-user')
+  assert.equal(harness.calls.filter((call) => call === `cancelUserId:${userId.requestId}`).length, 1)
+  assert.equal(harness.calls.includes('mobile'), false)
 })
 
 test('dispose releases operation and loading histories for the next scope', async () => {

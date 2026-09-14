@@ -1,10 +1,14 @@
 import {
   cancelNativeAppInfoConsumer,
+  cancelNativeCachedMobileConsumer,
   cancelNativeCachedTokenConsumer,
+  cancelNativeCachedUserIdConsumer,
   cancelNativeOneClickPermissionConsumer,
   cancelThirdPartySdkIdentifiersConsumer,
   getNativeAppInfo,
+  getNativeCachedMobile,
   getNativeCachedToken,
+  getNativeCachedUserId,
   getThirdPartySdkIdentifiers,
   hideNativeLoading,
   requestNativeOneClickPermissions,
@@ -36,10 +40,6 @@ const APP_INFO_FIELDS = Object.freeze([
   "androidId",
 ]);
 const SDK_FIELDS = Object.freeze(["afId", "fbId", "gaId"]);
-const DEVELOPMENT_TEST_TOKEN =
-  typeof import.meta.env === "object" && import.meta.env?.DEV === true
-    ? "6aa247cfe4b0d92c4ed9df11"
-    : null;
 
 function validId(value) {
   return typeof value === "string" && ID_PATTERN.test(value);
@@ -65,6 +65,8 @@ function invalidInitResult() {
     steps: Object.freeze({
       apiHost: failed,
       appInfo: failed,
+      userId: failed,
+      mobile: failed,
       token: failed,
       sdkIdentifiers: failed,
     }),
@@ -73,7 +75,6 @@ function invalidInitResult() {
 
 export function createHomeHostService(options = {}) {
   const store = options.globalStore;
-  const developmentTestToken = options.testToken ?? DEVELOPMENT_TEST_TOKEN;
   const bridge = {
     getNativeAppInfo: options.getNativeAppInfo ?? getNativeAppInfo,
     cancelNativeAppInfoConsumer:
@@ -81,6 +82,12 @@ export function createHomeHostService(options = {}) {
     getNativeCachedToken: options.getNativeCachedToken ?? getNativeCachedToken,
     cancelNativeCachedTokenConsumer:
       options.cancelNativeCachedTokenConsumer ?? cancelNativeCachedTokenConsumer,
+    getNativeCachedUserId: options.getNativeCachedUserId ?? getNativeCachedUserId,
+    cancelNativeCachedUserIdConsumer:
+      options.cancelNativeCachedUserIdConsumer ?? cancelNativeCachedUserIdConsumer,
+    getNativeCachedMobile: options.getNativeCachedMobile ?? getNativeCachedMobile,
+    cancelNativeCachedMobileConsumer:
+      options.cancelNativeCachedMobileConsumer ?? cancelNativeCachedMobileConsumer,
     getThirdPartySdkIdentifiers:
       options.getThirdPartySdkIdentifiers ?? getThirdPartySdkIdentifiers,
     cancelThirdPartySdkIdentifiersConsumer:
@@ -115,13 +122,24 @@ export function createHomeHostService(options = {}) {
         if (requestId) context.requests.delete(requestId);
         resolve(result);
       };
-      const cancelPending = () =>
+      const cancelPending = () => {
+        if (requestId) {
+          try {
+            cancel(requestId);
+          } catch {}
+        }
         finish(step("canceled", ERROR_CODES.canceled));
+      };
       context.pending.add(cancelPending);
       try {
-        requestId = invoke((reply) => finish(consume(reply)), {
-          onFailure: (failure) =>
-            finish(step("failed", mapBridgeFailure(failure?.code))),
+        requestId = invoke((reply) => {
+          if (settled || context.disposed) return;
+          finish(consume(reply));
+        }, {
+          onFailure: (failure) => {
+            if (settled || context.disposed) return;
+            finish(step("failed", mapBridgeFailure(failure?.code)));
+          },
         });
         if (typeof requestId !== "string" || requestId.length === 0)
           finish(step("failed", ERROR_CODES.bridgeCallFailed));
@@ -183,39 +201,62 @@ export function createHomeHostService(options = {}) {
         }
       },
     );
-    if (typeof developmentTestToken === "string" && developmentTestToken.length > 0) {
-      try {
-        steps.token = store?.setGlobal?.({ token: developmentTestToken })
-          ? step("updated")
-          : step("failed", ERROR_CODES.storeUpdateFailed);
-      } catch {
-        steps.token = step("failed", ERROR_CODES.storeUpdateFailed);
-      }
-    } else {
-      steps.token = await queryStep(
-        context,
-        bridge.getNativeCachedToken,
-        bridge.cancelNativeCachedTokenConsumer,
-        (reply) => {
-          if (reply?.status !== "completed")
-            return step("failed", ERROR_CODES.nativeFailed);
-          if (reply.hit !== true) {
-            return step(typeof store?.token === "string" && store.token.length > 0
-              ? "retained"
-              : "not_found");
-          }
-          if (typeof reply.cacheValue !== "string" || reply.cacheValue.length === 0)
-            return step("failed", ERROR_CODES.invalidCallback);
-          try {
-            return store?.setGlobal?.({ token: reply.cacheValue })
-              ? step("updated")
-              : step("failed", ERROR_CODES.storeUpdateFailed);
-          } catch {
-            return step("failed", ERROR_CODES.storeUpdateFailed);
-          }
-        },
-      );
-    }
+    const queryCachedUserField = async (field, invoke, cancel) => queryStep(
+      context,
+      invoke,
+      cancel,
+      (reply) => {
+        if (reply?.status !== "completed")
+          return step("failed", ERROR_CODES.nativeFailed);
+        if (reply.hit !== true) {
+          return step(typeof store?.[field] === "string" && store[field].length > 0
+            ? "retained"
+            : "not_found");
+        }
+        if (typeof reply.cacheValue !== "string" || reply.cacheValue.length === 0)
+          return step("failed", ERROR_CODES.invalidCallback);
+        try {
+          return store?.setGlobal?.({ [field]: reply.cacheValue })
+            ? step("updated")
+            : step("failed", ERROR_CODES.storeUpdateFailed);
+        } catch {
+          return step("failed", ERROR_CODES.storeUpdateFailed);
+        }
+      },
+    );
+    steps.userId = await queryCachedUserField(
+      "userId",
+      bridge.getNativeCachedUserId,
+      bridge.cancelNativeCachedUserIdConsumer,
+    );
+    steps.mobile = await queryCachedUserField(
+      "mobile",
+      bridge.getNativeCachedMobile,
+      bridge.cancelNativeCachedMobileConsumer,
+    );
+    steps.token = await queryStep(
+      context,
+      bridge.getNativeCachedToken,
+      bridge.cancelNativeCachedTokenConsumer,
+      (reply) => {
+        if (reply?.status !== "completed")
+          return step("failed", ERROR_CODES.nativeFailed);
+        if (reply.hit !== true) {
+          return step(typeof store?.token === "string" && store.token.length > 0
+            ? "retained"
+            : "not_found");
+        }
+        if (typeof reply.cacheValue !== "string" || reply.cacheValue.length === 0)
+          return step("failed", ERROR_CODES.invalidCallback);
+        try {
+          return store?.setGlobal?.({ token: reply.cacheValue })
+            ? step("updated")
+            : step("failed", ERROR_CODES.storeUpdateFailed);
+        } catch {
+          return step("failed", ERROR_CODES.storeUpdateFailed);
+        }
+      },
+    );
     steps.sdkIdentifiers = await queryStep(
       context,
       bridge.getThirdPartySdkIdentifiers,
@@ -244,7 +285,7 @@ export function createHomeHostService(options = {}) {
         }
       },
     );
-    for (const key of ["apiHost", "appInfo", "token", "sdkIdentifiers"])
+    for (const key of ["apiHost", "appInfo", "userId", "mobile", "token", "sdkIdentifiers"])
       if (!steps[key]) steps[key] = step("canceled", ERROR_CODES.canceled);
     const normal = new Set(["updated", "retained", "not_found"]);
     const values = Object.values(steps);

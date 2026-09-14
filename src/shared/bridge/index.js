@@ -5,8 +5,12 @@ export {
 } from './nativeLoading.js'
 
 export {
+  cancelNativeCachedMobileConsumer,
   cancelNativeCachedTokenConsumer,
+  cancelNativeCachedUserIdConsumer,
+  getNativeCachedMobile,
   getNativeCachedToken,
+  getNativeCachedUserId,
   getNativePersistentCacheRegistrySize,
   nativePersistentCacheBridge,
 } from './nativePersistentCache.js'
@@ -71,3 +75,17 @@ export {
   nativeIdCardCameraBridge,
   openIdCardCameraNative,
 } from './nativeIdCardCamera.js'
+
+export {
+  cancelNativeFaceCameraConsumer,
+  getNativeFaceCameraRegistrySize,
+  nativeFaceCameraBridge,
+  openFaceCameraNative,
+} from './nativeFaceCamera.js'
+
+export {
+  cancelNativeAdvanceLiveConsumer,
+  getNativeAdvanceLiveRegistrySize,
+  nativeAdvanceLiveBridge,
+  openAdvanceLivePageNat,
+} from './nativeAdvanceLive.js'
