@@ -217,7 +217,11 @@ export function createIdentityController({
     let previewUrl = ''
     try {
       previewUrl = await createImagePreview({ imageBase64, mimeType })
-    } catch {}
+      if (typeof previewUrl !== 'string' || !previewUrl.startsWith('blob:')) throw new Error('Unable to create image preview.')
+    } catch {
+      if (isCurrent(id)) failTo(state.hasDocument ? IDENTITY_PHASE.DOCUMENT_READY : IDENTITY_PHASE.DOCUMENT_EMPTY, { type: 'invalid_response' })
+      return
+    }
     if (!isCurrent(id)) {
       revokeImagePreview(previewUrl)
       return
@@ -349,6 +353,19 @@ export function createIdentityController({
     if (context && isCurrent(context.id)) emit({ phase: IDENTITY_PHASE.DOCUMENT_READY, busy: false })
   }
 
+  function resumeFromExternalFlow() {
+    const context = activeAdvanceContext
+    if (!context || !isCurrent(context.id)) return false
+    activeAdvanceContext = null
+    advancePort.detach()
+    if (requestController) requestController.abort()
+    requestController = null
+    try { bridge.hideLoading() } catch {}
+    operationId += 1
+    emit({ phase: IDENTITY_PHASE.DOCUMENT_READY, busy: false, operationId })
+    return true
+  }
+
   async function saveLiving(id, identityNo, payload) {
     if (!isCurrent(id)) return
     emit({ phase: IDENTITY_PHASE.IDENTITY_SAVING, progressOpen: true, progress: 1 })
@@ -432,6 +449,7 @@ export function createIdentityController({
     closeFirstPrompt() { if (!disposed) emit({ firstPromptOpen: false }) },
     confirmFirstPrompt: openDocumentCamera,
     openDocumentCamera,
+    resumeFromExternalFlow,
     updateDni(value) { if (!disposed && !state.busy) emit({ dni: typeof value === 'string' ? value : '' }) },
     submit,
     requestLeave,
@@ -443,6 +461,7 @@ export function createIdentityController({
       disposed = true
       invalidate()
       stopConsumers()
+      revokeImagePreview(state.imagePreviewUrl)
       clearProgress()
       try { bridge.hideLoading() } catch {}
       closeBackIntercept()

@@ -199,6 +199,54 @@ test('Advance type 2 starts a fresh channel and session chain without reusing th
   controller.dispose()
 })
 
+test('restores the document context when Advance returns without a result and allows a new capture', async () => {
+  const bridge = bridgeFixture()
+  const services = {
+    saveIdentity: async ({ mark }) => mark === 1 ? { type: 'success', status: '1', idNumber: 'DNI-1' } : { type: 'success', status: '1', idNumber: '' },
+    getOcrChannel: async () => ({ type: 'success', channel: 'Advance' }),
+    createAdvanceSession: async () => ({ type: 'success', requestHandle: 'signature-1', url: 'https://trusted.example/live-1' }),
+  }
+  const controller = createController({ bridges: bridge, services, createAdvancePort: createAdvancePortFactory(bridge) })
+  await makeReady(controller, bridge)
+  const previewUrl = controller.getState().imagePreviewUrl
+  await controller.submit()
+  assert.equal(controller.getState().phase, IDENTITY_PHASE.LIVENESS_RUNNING)
+  assert.equal(controller.getState().busy, true)
+  assert.equal(controller.resumeFromExternalFlow(), true)
+  assert.equal(controller.getState().phase, IDENTITY_PHASE.DOCUMENT_READY)
+  assert.equal(controller.getState().busy, false)
+  assert.equal(controller.getState().dni, 'DNI-1')
+  assert.equal(controller.getState().imagePreviewUrl, previewUrl)
+  assert.equal(bridge.advanceConsumer, null)
+  controller.openDocumentArea()
+  assert.equal(controller.getState().phase, IDENTITY_PHASE.DOCUMENT_CAPTURING)
+  controller.dispose()
+})
+
+test('keeps the previous document preview when a replacement preview cannot be created', async () => {
+  const bridge = bridgeFixture()
+  let previewCalls = 0
+  const services = { saveIdentity: async ({ mark }) => ({ type: 'success', status: '1', idNumber: mark === 1 ? 'DNI-1' : '' }) }
+  const controller = createController({
+    bridges: bridge,
+    services,
+    createImagePreview: async () => {
+      previewCalls += 1
+      if (previewCalls === 2) throw new Error('preview failed')
+      return 'blob:identity-first-preview'
+    },
+  })
+  await makeReady(controller, bridge, 'DNI-1')
+  assert.equal(controller.getState().imagePreviewUrl, 'blob:identity-first-preview')
+  controller.openDocumentArea()
+  bridge.idConsumer({ status: 'success', imageBase64: 'replacement-image' })
+  await flush(8)
+  assert.equal(controller.getState().phase, IDENTITY_PHASE.DOCUMENT_READY)
+  assert.equal(controller.getState().dni, 'DNI-1')
+  assert.equal(controller.getState().imagePreviewUrl, 'blob:identity-first-preview')
+  controller.dispose()
+})
+
 test('leave confirmation suspends presentation and confirmation aborts current work and detaches consumers', async () => {
   const bridge = bridgeFixture()
   const pending = deferred()

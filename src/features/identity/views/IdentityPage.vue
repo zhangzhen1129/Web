@@ -34,6 +34,7 @@ const controller = createIdentityController({
 
 const unsubscribe = controller.subscribe((nextState) => { state.value = nextState })
 const isReady = computed(() => state.value?.phase === IDENTITY_PHASE.DOCUMENT_READY)
+const hasDni = computed(() => state.value?.hasDocument === true && Boolean(state.value?.dni?.trim()))
 const isBusy = computed(() => Boolean(state.value?.busy))
 const showFirstPrompt = computed(() => Boolean(state.value?.firstPromptOpen && !state.value?.leaveConfirmationOpen))
 const showLeavePrompt = computed(() => Boolean(state.value?.leaveConfirmationOpen))
@@ -62,8 +63,38 @@ function onBack() {
   controller.requestLeave()
 }
 
-onMounted(() => controller.initialize())
-onBeforeUnmount(() => { unsubscribe(); controller.dispose() })
+let windowWasBlurred = false
+
+function resumeExternalFlow() {
+  if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return
+  controller.resumeFromExternalFlow()
+}
+
+function onWindowBlur() {
+  windowWasBlurred = true
+}
+
+function onWindowFocus() {
+  if (!windowWasBlurred) return
+  windowWasBlurred = false
+  resumeExternalFlow()
+}
+
+onMounted(() => {
+  controller.initialize()
+  window.addEventListener('pageshow', resumeExternalFlow)
+  window.addEventListener('blur', onWindowBlur)
+  window.addEventListener('focus', onWindowFocus)
+  document.addEventListener('visibilitychange', resumeExternalFlow)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('pageshow', resumeExternalFlow)
+  window.removeEventListener('blur', onWindowBlur)
+  window.removeEventListener('focus', onWindowFocus)
+  document.removeEventListener('visibilitychange', resumeExternalFlow)
+  unsubscribe()
+  controller.dispose()
+})
 </script>
 
 <template>
@@ -94,10 +125,10 @@ onBeforeUnmount(() => { unsubscribe(); controller.dispose() })
         <span class="identity-card-label">Frente de DNI / DNIe</span>
       </button>
 
-      <section v-if="isReady" class="identity-dni-field" aria-label="DNI field">
+      <section v-if="hasDni" class="identity-dni-field" aria-label="DNI field">
         <div class="identity-field-heading"><label for="identity-dni">DNI</label><span>Corrija si la identificación es incorrecta.</span></div>
         <div class="identity-input-shell">
-          <input id="identity-dni" :value="state.dni" type="text" autocomplete="off" @input="onDniInput" />
+          <input id="identity-dni" :value="state.dni" :disabled="isBusy" type="text" autocomplete="off" @input="onDniInput" />
           <span class="identity-edit-icon" aria-hidden="true"><img :src="editAsset" alt="" /></span>
         </div>
       </section>

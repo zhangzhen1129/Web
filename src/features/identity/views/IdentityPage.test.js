@@ -24,6 +24,11 @@ test('maps the identity states to accessible dynamic UI controls', () => {
   assert.match(page, /class="identity-camera"/)
   assert.doesNotMatch(page, /v-if="!state\?\.imageBase64"/)
   assert.match(page, /left: progressPosition/)
+  assert.match(page, /resumeFromExternalFlow/)
+  assert.match(page, /pageshow/)
+  assert.match(page, /visibilitychange/)
+  assert.match(page, /blur/)
+  assert.match(page, /focus/)
 })
 
 test('does not embed sensitive payloads, raw bridge calls, or authored SVG markup', () => {
