@@ -164,7 +164,7 @@ function registerCallback() {
   }
 }
 
-/** Open the documented Advance live page and deliver its terminal result. */
+/** Open the documented Advance live page and return an opaque H5 consumer handle. */
 export function openAdvanceLivePageNat(url, consumer = () => {}, options) {
   const failureOptions = normalizeFailureOptions(options)
   if (!failureOptions.valid || !isTrustedAdvanceUrl(url) || typeof consumer !== 'function') {
@@ -192,11 +192,13 @@ export function openAdvanceLivePageNat(url, consumer = () => {}, options) {
   }
 
   const requestId = createId('advance-live-request')
+  const consumerHandle = createId('advance-live-consumer')
   const record = {
     registryKey: createId('advance-live'),
     callbackName: `window.${CALLBACK_NAME}`,
     callbackScope: CALLBACK_SCOPE,
     requestId,
+    consumerHandle,
     completed: false,
     consumerCanceled: false,
     consumer,
@@ -230,16 +232,17 @@ export function openAdvanceLivePageNat(url, consumer = () => {}, options) {
     return null
   }
 
-  return requestId
+  return consumerHandle
 }
 
-export function cancelNativeAdvanceLiveConsumer(requestId) {
+/** Detach the current business consumer without cancelling the native Advance task. */
+export function cancelNativeAdvanceLiveConsumer(consumerHandle) {
   const record = activeRecord
   if (
-    typeof requestId !== 'string'
-    || requestId.length === 0
+    typeof consumerHandle !== 'string'
+    || consumerHandle.length === 0
     || !record
-    || record.requestId !== requestId
+    || record.consumerHandle !== consumerHandle
     || record.completed
     || record.consumerCanceled
   ) return false

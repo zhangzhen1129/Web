@@ -41,7 +41,7 @@ test('sends only requestId and URL, then delivers type 1 from the shared string 
   const calls = installBridge()
   const results = []
   const failures = []
-  const requestId = openAdvanceLivePageNat(
+  const consumerHandle = openAdvanceLivePageNat(
     VALID_URL,
     (result) => results.push(result),
     { onFailure: (failure) => failures.push(failure) },
@@ -49,7 +49,8 @@ test('sends only requestId and URL, then delivers type 1 from the shared string 
 
   assert.equal(calls.length, 1)
   assert.deepEqual(Object.keys(calls[0]).sort(), ['requestId', 'url'])
-  assert.equal(calls[0].requestId, requestId)
+  assert.notEqual(calls[0].requestId, consumerHandle)
+  assert.match(consumerHandle, /^h5-advance-live-consumer-/)
   assert.equal(calls[0].url, VALID_URL)
   assert.equal(typeof window.advanceCallBack, 'function')
   assert.equal(getNativeAdvanceLiveRegistrySize(), 1)
@@ -65,11 +66,11 @@ test('sends only requestId and URL, then delivers type 1 from the shared string 
 test('delivers type 2 as the terminal retry result and permits a new call', () => {
   const calls = installBridge()
   const results = []
-  const firstRequestId = openAdvanceLivePageNat(VALID_URL, (result) => results.push(result))
+  const firstConsumerHandle = openAdvanceLivePageNat(VALID_URL, (result) => results.push(result))
   window.advanceCallBack('{"type":2}')
-  const secondRequestId = openAdvanceLivePageNat(VALID_URL, (result) => results.push(result))
+  const secondConsumerHandle = openAdvanceLivePageNat(VALID_URL, (result) => results.push(result))
 
-  assert.notEqual(firstRequestId, secondRequestId)
+  assert.notEqual(firstConsumerHandle, secondConsumerHandle)
   assert.equal(calls.length, 2)
   window.advanceCallBack('{"type":1}')
   assert.deepEqual(results, [{ type: 2 }, { type: 1 }])
@@ -79,14 +80,14 @@ test('rejects a concurrent call without replacing the active consumer or calling
   const calls = installBridge()
   const results = []
   const failures = []
-  const requestId = openAdvanceLivePageNat(VALID_URL, (result) => results.push(result))
+  const consumerHandle = openAdvanceLivePageNat(VALID_URL, (result) => results.push(result))
   const duplicate = openAdvanceLivePageNat(
     VALID_URL,
     () => assert.fail('concurrent consumer must not run'),
     { onFailure: (failure) => failures.push(failure) },
   )
 
-  assert.ok(requestId)
+  assert.ok(consumerHandle)
   assert.equal(duplicate, null)
   assert.equal(calls.length, 1)
   assert.deepEqual(failures, [{ code: 'REQUEST_ACTIVE', capability: 'openAdvanceLivePage' }])
@@ -255,14 +256,16 @@ test('consumer detachment keeps the shared callback until the terminal result', 
   const calls = installBridge()
   const results = []
   const failures = []
-  const requestId = openAdvanceLivePageNat(
+  const consumerHandle = openAdvanceLivePageNat(
     VALID_URL,
     (result) => results.push(result),
     { onFailure: (failure) => failures.push(failure) },
   )
 
-  assert.equal(cancelNativeAdvanceLiveConsumer(requestId), true)
-  assert.equal(cancelNativeAdvanceLiveConsumer(requestId), false)
+  assert.notEqual(calls[0].requestId, consumerHandle)
+  assert.equal(cancelNativeAdvanceLiveConsumer(calls[0].requestId), false)
+  assert.equal(cancelNativeAdvanceLiveConsumer(consumerHandle), true)
+  assert.equal(cancelNativeAdvanceLiveConsumer(consumerHandle), false)
   assert.equal(cancelNativeAdvanceLiveConsumer('other'), false)
   assert.equal(calls.length, 1)
   assert.equal(getNativeAdvanceLiveRegistrySize(), 1)
@@ -273,6 +276,21 @@ test('consumer detachment keeps the shared callback until the terminal result', 
   assert.deepEqual(failures, [])
   assert.equal(getNativeAdvanceLiveRegistrySize(), 0)
   assert.equal(typeof window.advanceCallBack, 'undefined')
+})
+
+test('allows a new call after a detached call reaches its terminal state', () => {
+  installBridge()
+  const firstHandle = openAdvanceLivePageNat(VALID_URL, () => assert.fail('detached consumer must not run'))
+
+  assert.equal(cancelNativeAdvanceLiveConsumer(firstHandle), true)
+  window.advanceCallBack('{"type":2}')
+
+  const secondResults = []
+  const secondHandle = openAdvanceLivePageNat(VALID_URL, (result) => secondResults.push(result))
+
+  assert.notEqual(firstHandle, secondHandle)
+  window.advanceCallBack('{"type":1}')
+  assert.deepEqual(secondResults, [{ type: 1 }])
 })
 
 test('isolates consumer exceptions after terminal cleanup', () => {

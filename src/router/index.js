@@ -37,7 +37,7 @@ export const router = createRouter({
         { path: 'orderList', name: 'orderList', component: RoutePlaceholder, props: { title: 'Order list' } },
         { path: 'information', name: 'information', component: InformationPage },
         { path: 'contacts', name: 'contacts', component: ContactsPage },
-        { path: 'identity', name: 'identity', component: RoutePlaceholder, props: { title: 'Identity' } },
+        { path: 'identity', name: 'identity', component: () => import('../features/identity/views/IdentityPage.vue') },
         { path: 'addBank', name: 'addBank', component: RoutePlaceholder, props: { title: 'Add bank account' } },
         { path: 'orderDetail', name: 'orderDetail', component: RoutePlaceholder, props: { title: 'Order detail' } },
         { path: 'loanConfirm', name: 'loanConfirm', component: RoutePlaceholder, props: { title: 'Loan confirmation' } },
