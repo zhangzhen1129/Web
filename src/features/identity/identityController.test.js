@@ -247,6 +247,49 @@ test('keeps the previous document preview when a replacement preview cannot be c
   controller.dispose()
 })
 
+test('finishes OCR progress after server success without waiting for preview conversion', async () => {
+  const bridge = bridgeFixture()
+  const ocr = deferred()
+  const preview = deferred()
+  const controller = createController({
+    bridges: bridge,
+    services: { saveIdentity: () => ocr.promise },
+    createImagePreview: () => preview.promise,
+  })
+  controller.openDocumentArea()
+  controller.confirmFirstPrompt()
+  bridge.idConsumer({ status: 'success', imageBase64: 'replacement-image' })
+  ocr.resolve({ type: 'success', status: '1', idNumber: 'DNI-2' })
+  await flush(8)
+  assert.equal(controller.getState().progressOpen, false)
+  assert.equal(controller.getState().busy, true)
+  assert.equal(controller.getState().imagePreviewUrl, '')
+  preview.resolve('blob:identity-replacement-preview')
+  await flush(8)
+  assert.equal(controller.getState().phase, IDENTITY_PHASE.DOCUMENT_READY)
+  assert.equal(controller.getState().busy, false)
+  assert.equal(controller.getState().dni, 'DNI-2')
+  assert.equal(controller.getState().imagePreviewUrl, 'blob:identity-replacement-preview')
+  controller.dispose()
+})
+
+test('does not leave OCR progress open when preview conversion rejects', async () => {
+  const bridge = bridgeFixture()
+  const controller = createController({
+    bridges: bridge,
+    services: { saveIdentity: async () => ({ type: 'success', status: '1', idNumber: 'DNI-2' }) },
+    createImagePreview: async () => { throw new Error('preview failed') },
+  })
+  controller.openDocumentArea()
+  controller.confirmFirstPrompt()
+  bridge.idConsumer({ status: 'success', imageBase64: 'replacement-image' })
+  await flush(8)
+  assert.equal(controller.getState().progressOpen, false)
+  assert.equal(controller.getState().busy, false)
+  assert.equal(controller.getState().phase, IDENTITY_PHASE.DOCUMENT_EMPTY)
+  controller.dispose()
+})
+
 test('leave confirmation suspends presentation and confirmation aborts current work and detaches consumers', async () => {
   const bridge = bridgeFixture()
   const pending = deferred()

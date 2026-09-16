@@ -179,7 +179,7 @@ export function createIdentityController({
     progressTimer = schedule(tick, 100)
   }
 
-  function finishProgress(next) {
+  function finishProgress(next = () => {}) {
     if (disposed) return
     if (progressTimer !== null) cancelSchedule(progressTimer)
     progressTimer = null
@@ -214,6 +214,7 @@ export function createIdentityController({
       return
     }
     const nextDni = result.idNumber.trim()
+    finishProgress()
     let previewUrl = ''
     try {
       previewUrl = await createImagePreview({ imageBase64, mimeType })

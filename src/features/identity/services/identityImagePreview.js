@@ -24,6 +24,10 @@ export function createIdentityImagePreview({ imageBase64, mimeType = 'image/jpeg
         worker.terminate()
         reject(new Error('Unable to create image preview.'))
       }
+      worker.onmessageerror = () => {
+        worker.terminate()
+        reject(new Error('Unable to create image preview.'))
+      }
       worker.postMessage({ id, imageBase64 })
     } catch (error) {
       worker?.terminate()
