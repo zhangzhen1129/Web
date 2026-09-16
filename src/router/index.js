@@ -7,6 +7,7 @@ const RoutePlaceholder = () => import('./RoutePlaceholder.vue')
 const MultiPushResultPlaceholder = () => import('./MultiPushResultPlaceholder.vue')
 const InformationPage = () => import('../features/information/views/InformationPage.vue')
 const ContactsPage = () => import('../features/contacts/views/ContactsPage.vue')
+const BankPage = () => import('../features/bank/views/BankPage.vue')
 
 export const ROUTE_PATH = Object.freeze({
   HOME: '/home',
@@ -38,7 +39,7 @@ export const router = createRouter({
         { path: 'information', name: 'information', component: InformationPage },
         { path: 'contacts', name: 'contacts', component: ContactsPage },
         { path: 'identity', name: 'identity', component: () => import('../features/identity/views/IdentityPage.vue') },
-        { path: 'addBank', name: 'addBank', component: RoutePlaceholder, props: { title: 'Add bank account' } },
+        { path: 'addBank', name: 'addBank', component: BankPage },
         { path: 'orderDetail', name: 'orderDetail', component: RoutePlaceholder, props: { title: 'Order detail' } },
         { path: 'loanConfirm', name: 'loanConfirm', component: RoutePlaceholder, props: { title: 'Loan confirmation' } },
         {
