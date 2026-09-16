@@ -15,6 +15,7 @@ import coinInactiveAsset from '../../../assets/bank/coin-inactive.png'
 import coinLabelActiveAsset from '../../../assets/bank/coin-label-active.svg'
 import coinLabelInactiveAsset from '../../../assets/bank/coin-label-inactive.svg'
 import returnBellAsset from '../../../assets/bank/return-bell.svg'
+import { createContactKeyboardVisibility } from '../../contacts/contactKeyboardVisibility.js'
 import { ACCOUNT_TYPE, BANK_OPTIONS, BANK_OPTION_BY_CODE } from '../bankData.js'
 import {
   getAccountNumberLabel,
@@ -30,10 +31,15 @@ const route = useRoute()
 const router = useRouter()
 const globalStore = useGlobalStore()
 const state = ref(null)
+const contentElement = ref(null)
 const activeDialogElement = ref(null)
 const bankTriggerElement = ref(null)
 const backButtonElement = ref(null)
+const accountInputFocused = ref(false)
 let lastTriggerElement = null
+const accountInputVisibility = createContactKeyboardVisibility({
+  getScrollElement: () => contentElement.value,
+})
 
 const controller = createBankController({
   services: createBankServices({ getGlobalState: () => globalStore }),
@@ -41,6 +47,9 @@ const controller = createBankController({
   hideNativeLoading,
   setPhysicalBackIntercept,
   onBusinessFailure(message) {
+    if (message) showToast({ message, forbidClick: true })
+  },
+  onAccountFormatError(message) {
     if (message) showToast({ message, forbidClick: true })
   },
   onNavigateLoanConfirm({ orderId }) {
@@ -71,7 +80,6 @@ const canSubmit = computed(() => Boolean(state.value?.entryValid)
   && isSubmitEnabled({
     bank: selectedBank.value,
     accountNumber: state.value?.accountNumber ?? '',
-    recipientName: state.value?.recipientName ?? '',
   }))
 const progressSteps = Object.freeze([
   Object.freeze({ value: '1,000', active: true }),
@@ -107,6 +115,19 @@ function reloadPage() {
   window.location.reload()
 }
 
+async function handleAccountFocus(event) {
+  const target = event.currentTarget
+  accountInputFocused.value = true
+  await nextTick()
+  if (document.activeElement !== target) return
+  accountInputVisibility.focus(target)
+}
+
+function handleAccountBlur(event) {
+  accountInputVisibility.blur(event.currentTarget)
+  accountInputFocused.value = false
+}
+
 watch(() => state.value?.dialog, async (nextDialog, previousDialog) => {
   if (nextDialog) {
     await nextTick()
@@ -122,6 +143,7 @@ watch(() => state.value?.dialog, async (nextDialog, previousDialog) => {
 
 onMounted(() => controller.initialize(route.query))
 onBeforeUnmount(() => {
+  accountInputVisibility.dispose()
   unsubscribe()
   controller.dispose()
   lastTriggerElement = null
@@ -134,7 +156,12 @@ onBeforeUnmount(() => {
     <button type="button" @click="reloadPage">Recargar</button>
   </main>
 
-  <main v-else class="bank-page" :aria-busy="state?.submitting ? 'true' : 'false'">
+  <main
+    v-else
+    class="bank-page"
+    :class="{ 'bank-page--input-focused': accountInputFocused }"
+    :aria-busy="state?.submitting ? 'true' : 'false'"
+  >
     <header class="bank-header">
       <nav class="bank-header__nav" aria-label="Navegación bancaria">
         <button ref="backButtonElement" class="bank-header__back" type="button" aria-label="Volver" @click="openLeaveConfirmation">
@@ -157,7 +184,7 @@ onBeforeUnmount(() => {
       </div>
     </header>
 
-    <section class="bank-content" aria-label="Formulario bancario">
+    <section ref="contentElement" class="bank-content" aria-label="Formulario bancario">
       <div class="bank-field">
         <label for="bank-payment-trigger">Forma de pago</label>
         <button
@@ -205,11 +232,10 @@ onBeforeUnmount(() => {
           :placeholder="accountNumberPlaceholder"
           :maxlength="maxAccountDigits"
           :disabled="state?.submitting || state?.navigationLocked"
-          :aria-invalid="state?.accountError ? 'true' : 'false'"
-          :aria-describedby="state?.accountError ? 'bank-account-error' : undefined"
+          @focus="handleAccountFocus"
+          @blur="handleAccountBlur"
           @input="controller.updateAccountNumber($event.target.value)"
         />
-        <p v-if="state?.accountError" id="bank-account-error" class="bank-field__error" role="alert">{{ state.accountError }}</p>
       </div>
 
       <div class="bank-tips">

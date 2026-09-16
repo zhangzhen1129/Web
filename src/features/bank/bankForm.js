@@ -1,4 +1,9 @@
-import { ACCOUNT_TYPE, BANK_OPTION_BY_CODE, BANK_OPTION_BY_NAME } from './bankData.js'
+import {
+  ACCOUNT_NUMBER_ERROR_TEXT,
+  ACCOUNT_TYPE,
+  BANK_OPTION_BY_CODE,
+  BANK_OPTION_BY_NAME,
+} from './bankData.js'
 
 export const DEFAULT_ACCOUNT_TYPE = ACCOUNT_TYPE.SAVINGS
 export const BANK_PICKER_PLACEHOLDER = 'Por favor, elija'
@@ -43,25 +48,24 @@ function formatDigitList(digits) {
 }
 
 export function getAccountNumberPlaceholder(bank, accountType = DEFAULT_ACCOUNT_TYPE) {
+  if (!bank) return ACCOUNT_NUMBER_PLACEHOLDER
+  if (typeof bank.placeholder === 'string' && bank.placeholder.length > 0) return bank.placeholder
   const digits = getAllowedDigits(bank, accountType)
   if (!digits) return ACCOUNT_NUMBER_PLACEHOLDER
-  return `Ingrese ${formatDigitList(digits)} dígitos`
+  return `${formatDigitList(digits)} dígitos`
 }
 
-export function getAccountNumberError(bank, accountType = DEFAULT_ACCOUNT_TYPE) {
-  const digits = getAllowedDigits(bank, accountType)
-  if (!digits) return 'Ingrese un número de cuenta válido.'
-  return `Ingrese ${formatDigitList(digits)} dígitos.`
+export function getAccountNumberError() {
+  return ACCOUNT_NUMBER_ERROR_TEXT
 }
 
 export function getAccountNumberLabel(bank) {
   return bank?.recommended ? 'Número de cuenta' : 'Número de cuenta CCI'
 }
 
-export function isSubmitEnabled({ bank, accountNumber, recipientName }) {
+export function isSubmitEnabled({ bank, accountNumber }) {
   return Boolean(bank)
     && accountNumber.length > 0
-    && recipientName.trim().length > 0
 }
 
 export function canReusePrefilledAccount({ prefillSnapshot, bank, accountNumber }) {

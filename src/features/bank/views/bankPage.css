@@ -8,6 +8,10 @@
   color: #374151;
 }
 
+.bank-page--input-focused .bank-content {
+  padding-bottom: calc(100vh + env(safe-area-inset-bottom));
+}
+
 .bank-page--invalid {
   display: grid;
   place-content: center;
@@ -236,13 +240,6 @@
 .bank-field__input::placeholder {
   color: #999;
   opacity: 1;
-}
-
-.bank-field__error {
-  margin: .10256rem 0 0;
-  color: #ff4a43;
-  font-size: .30769rem;
-  line-height: .41026rem;
 }
 
 .bank-account-types {

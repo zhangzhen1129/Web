@@ -32,6 +32,7 @@ function createHarness(overrides = {}) {
       abort() { this.signal.aborted = true; abortCount += 1 },
     }),
     onBusinessFailure: (message) => calls.push(`business:${message}`),
+    onAccountFormatError: (message) => calls.push(`format:${message}`),
     onNavigateLoanConfirm: ({ orderId }) => calls.push(`navigate:loanConfirm:${orderId}`),
     onNavigateBack: () => calls.push('navigate:back'),
     ...overrides,
@@ -91,7 +92,7 @@ test('resets account type and account number when a bank is confirmed or changed
   assert.equal(harness.controller.getState().accountNumber, '')
 })
 
-test('validates account length only after visible submit conditions are met', async () => {
+test('validates account length only after bank and account are present, then reports one toast', async () => {
   const harness = createHarness()
   harness.controller.initialize({ orderId: 'order-1', from: 'order' })
   await flush()
@@ -100,10 +101,58 @@ test('validates account length only after visible submit conditions are met', as
   harness.controller.confirmBankSelection()
   harness.controller.updateAccountNumber('123')
   assert.equal(harness.controller.requestConfirmation(), false)
-  assert.equal(harness.controller.getState().accountError, 'Ingrese 13 dígitos.')
+  assert.equal(harness.controller.getState().accountError, undefined)
+  assert.equal(harness.calls.includes('format:Número de cuenta del recibo con formato incorrecto'), true)
   harness.controller.updateAccountNumber('1234567890123')
   assert.equal(harness.controller.requestConfirmation(), true)
   assert.equal(harness.controller.getState().dialog, BANK_DIALOG.CONFIRM)
+})
+
+test('enables submit and submits with an empty recipient name when the name request yields nothing', async () => {
+  const harness = createHarness({
+    services: {
+      async getUserInfo() { return { type: 'success', recipientName: '' } },
+      async getLoanAccounts() { return { type: 'success', list: [] } },
+      async addLoanAccount(payload) {
+        harness.calls.push(`addName:${JSON.stringify(payload.name)}`)
+        return { type: 'success', id: 'new-account' }
+      },
+      async bindLoanAccount() { return { type: 'success' } },
+    },
+  })
+  harness.controller.initialize({ orderId: 'order-1', from: 'order' })
+  await flush()
+  harness.controller.openBankPicker()
+  harness.controller.selectBankDraft('2')
+  harness.controller.confirmBankSelection()
+  harness.controller.updateAccountNumber('1234567890123')
+  assert.equal(harness.controller.canSubmit(), true)
+  assert.equal(harness.controller.requestConfirmation(), true)
+  harness.controller.confirmSubmission()
+  await flush()
+  assert.equal(harness.calls.includes('addName:""'), true)
+  assert.equal(harness.calls.includes('navigate:loanConfirm:order-1'), true)
+})
+
+test('prefills the marked loan card without applying the digit rule', async () => {
+  const harness = createHarness({
+    services: {
+      async getUserInfo() { return { type: 'success', recipientName: 'Ana' } },
+      async getLoanAccounts() {
+        return {
+          type: 'success',
+          list: [{ id: 'account-1', bank: 'Scotiabank', type: 1, accountNumber: '123', markLoanCard: 1 }],
+        }
+      },
+      async addLoanAccount() { throw new Error('not used') },
+      async bindLoanAccount() { throw new Error('not used') },
+    },
+  })
+  harness.controller.initialize({ orderId: 'order-1', from: 'order' })
+  await flush()
+  const state = harness.controller.getState()
+  assert.equal(state.bankCode, '4')
+  assert.equal(state.accountNumber, '123')
 })
 
 test('skips add and binds the prefilled account when bank and account match', async () => {

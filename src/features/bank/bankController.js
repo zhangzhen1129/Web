@@ -29,7 +29,6 @@ function createState() {
     accountType: DEFAULT_ACCOUNT_TYPE,
     accountNumber: '',
     recipientName: '',
-    accountError: '',
     dialog: null,
     draftBankCode: '',
     submitting: false,
@@ -67,6 +66,7 @@ export function createBankController({
   setPhysicalBackIntercept,
   createAbortController = () => new AbortController(),
   onBusinessFailure = () => {},
+  onAccountFormatError = () => {},
   onNavigateLoanConfirm = () => {},
   onNavigateBack = () => {},
 } = {}) {
@@ -160,7 +160,7 @@ export function createBankController({
     const bank = typeof markedAccount.bank === 'string' ? BANK_OPTION_BY_NAME[markedAccount.bank] : null
     const accountType = markedAccount.type
     const accountNumber = typeof markedAccount.accountNumber === 'string' ? markedAccount.accountNumber : ''
-    if (!id || !bank || !isAccountType(accountType) || !accountNumber || !isAccountNumberValid(bank, accountType, accountNumber)) return
+    if (!id || !bank || !isAccountType(accountType) || !accountNumber) return
 
     prefillSnapshot = Object.freeze({
       id,
@@ -171,7 +171,6 @@ export function createBankController({
       bankCode: bank.code,
       accountType,
       accountNumber,
-      accountError: '',
     })
   }
 
@@ -247,7 +246,6 @@ export function createBankController({
         bankCode: '',
         accountType: DEFAULT_ACCOUNT_TYPE,
         accountNumber: '',
-        accountError: '',
       })
       return true
     }
@@ -258,14 +256,13 @@ export function createBankController({
       bankCode: bank.code,
       accountType: DEFAULT_ACCOUNT_TYPE,
       accountNumber: '',
-      accountError: '',
     })
     return true
   }
 
   function setAccountType(accountType) {
     if (disposed || state.submitting || !isAccountType(accountType) || state.accountType === accountType) return false
-    emit({ accountType, accountNumber: '', accountError: '' })
+    emit({ accountType, accountNumber: '' })
     return true
   }
 
@@ -274,7 +271,7 @@ export function createBankController({
     const bank = BANK_OPTION_BY_CODE[state.bankCode] ?? null
     const normalized = normalizeAccountNumber(value)
     const maxDigits = getMaxAccountDigits(bank, state.accountType)
-    emit({ accountNumber: normalized.slice(0, maxDigits), accountError: '' })
+    emit({ accountNumber: normalized.slice(0, maxDigits) })
     return true
   }
 
@@ -284,14 +281,13 @@ export function createBankController({
     if (!isSubmitEnabled({
       bank,
       accountNumber: state.accountNumber,
-      recipientName: state.recipientName,
     })) return false
     if (!isAccountType(state.accountType)) return false
     if (!isAccountNumberValid(bank, state.accountType, state.accountNumber)) {
-      emit({ accountError: getAccountNumberError(bank, state.accountType) })
+      onAccountFormatError(getAccountNumberError())
       return false
     }
-    emit({ dialog: BANK_DIALOG.CONFIRM, accountError: '' })
+    emit({ dialog: BANK_DIALOG.CONFIRM })
     return true
   }
 
@@ -326,7 +322,7 @@ export function createBankController({
     const id = submissionId + 1
     submissionId = id
     submissionController = createAbortController()
-    emit({ submitting: true, dialog: null, accountError: '' })
+    emit({ submitting: true, dialog: null })
     showLoading(`submit-${id}`)
 
     let result
@@ -458,7 +454,6 @@ export function createBankController({
         && isSubmitEnabled({
           bank,
           accountNumber: state.accountNumber,
-          recipientName: state.recipientName,
         })
     },
     dispose() {

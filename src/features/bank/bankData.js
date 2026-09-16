@@ -3,6 +3,8 @@ export const ACCOUNT_TYPE = Object.freeze({
   SAVINGS: 1,
 })
 
+export const ACCOUNT_NUMBER_ERROR_TEXT = 'Número de cuenta del recibo con formato incorrecto'
+
 const SAME_SAVINGS_AND_CHECKING_DIGITS = Object.freeze({
   [ACCOUNT_TYPE.CHECKING]: Object.freeze([18, 20]),
   [ACCOUNT_TYPE.SAVINGS]: Object.freeze([18, 20]),
@@ -29,10 +31,10 @@ const BCP_DIGITS = Object.freeze({
 })
 
 export const BANK_OPTIONS = Object.freeze([
-  Object.freeze({ code: '1', name: 'BBVA', recommended: true, arrivalText: 'Llegada en 1 hora', digitRule: SAME_SAVINGS_AND_CHECKING_DIGITS }),
-  Object.freeze({ code: '2', name: 'Interbank', recommended: true, arrivalText: 'Llegada en 1 hora', digitRule: THIRTEEN_DIGITS }),
+  Object.freeze({ code: '1', name: 'BBVA', recommended: true, arrivalText: 'Llegada en 1 hora', digitRule: SAME_SAVINGS_AND_CHECKING_DIGITS, placeholder: '18 o 20 dígitos' }),
+  Object.freeze({ code: '2', name: 'Interbank', recommended: true, arrivalText: 'Llegada en 1 hora', digitRule: THIRTEEN_DIGITS, placeholder: '13 dígitos' }),
   Object.freeze({ code: '3', name: 'BCP', recommended: true, arrivalText: 'Llegada en 1 hora', digitRule: BCP_DIGITS }),
-  Object.freeze({ code: '4', name: 'Scotiabank', recommended: true, arrivalText: 'Llegada en 1 hora', digitRule: TEN_DIGITS }),
+  Object.freeze({ code: '4', name: 'Scotiabank', recommended: true, arrivalText: 'Llegada en 1 hora', digitRule: TEN_DIGITS, placeholder: '10 dígitos' }),
   Object.freeze({ code: '13', name: 'Banco de la Nacion', recommended: false, arrivalText: '', digitRule: TWENTY_DIGITS }),
   Object.freeze({ code: '6', name: 'BanBif', recommended: false, arrivalText: '', digitRule: TWENTY_DIGITS }),
   Object.freeze({ code: '7', name: 'Banco Santander', recommended: false, arrivalText: '', digitRule: TWENTY_DIGITS }),
