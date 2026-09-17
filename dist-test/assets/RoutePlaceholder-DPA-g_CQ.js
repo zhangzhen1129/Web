@@ -1,0 +1,1 @@
+import{O as e,c as t,d as n,ft as r}from"./runtime-core.esm-bundler-Co9tXruv.js";var i={class:`route-placeholder`,"aria-live":`polite`},a={__name:`RoutePlaceholder`,props:{title:{type:String,required:!0}},setup(a){return(o,s)=>(e(),n(`main`,i,[t(`h1`,null,r(a.title),1)]))}};export{a as default};

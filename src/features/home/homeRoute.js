@@ -19,7 +19,7 @@ const LOAN_CONFIRM_STATUSES = new Set([10, 100, 101, 110])
 const KNOWN_ORDER_STATUSES = new Set([...ORDER_DETAIL_STATUSES, ...LOAN_CONFIRM_STATUSES, 40])
 const CANONICAL_STAGES = new Set([
   'application_unavailable', 'basic_info_required', 'additional_info_required',
-  'identity_required', 'remittance_account_required', 'ready_to_apply',
+  'identity_required', 'remittance_account_required', 'ready_to_apply', 'apply',
   'reviewing', 'disbursing', 'repaying', 'rejected',
 ])
 const MAIN_TAB_TARGETS = new Set(['home_tab', 'repayment_tab', 'account_tab'])

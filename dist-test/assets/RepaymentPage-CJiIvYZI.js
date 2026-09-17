@@ -1,1 +1,0 @@
-import{d as e,g as t,v as n,w as r}from"./index-B3MWOrqI.js";var i={name:`RepaymentPage`},a={class:`shell-tab-page`,"aria-labelledby":`repayment-title`};function o(e,i,o,s,c,l){return r(),n(`main`,a,[...i[0]||=[t(`h1`,{id:`repayment-title`},`Reembolso`,-1)]])}var s=e(i,[[`render`,o]]);export{s as default};

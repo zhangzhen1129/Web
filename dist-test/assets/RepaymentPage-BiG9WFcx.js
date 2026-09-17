@@ -1,0 +1,1 @@
+import{O as e,c as t,d as n}from"./runtime-core.esm-bundler-Co9tXruv.js";import{_ as r}from"./index-BlZ9SjLN.js";var i={name:`RepaymentPage`},a={class:`shell-tab-page`,"aria-labelledby":`repayment-title`};function o(r,i,o,s,c,l){return e(),n(`main`,a,[...i[0]||=[t(`h1`,{id:`repayment-title`},`Reembolso`,-1)]])}var s=r(i,[[`render`,o]]);export{s as default};

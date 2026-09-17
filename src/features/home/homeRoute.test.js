@@ -60,6 +60,8 @@ test('normalizes the canonical data-adapter snapshot without reading display tex
   assert.equal(resolveCashLoanRoute({ ...base, stage: 'additional_info_required' }, 3, routeIntent, permission).route.name, 'contacts')
   assert.equal(resolveCashLoanRoute({ ...base, stage: 'identity_required' }, 3, routeIntent, permission).route.name, 'identity')
   assert.equal(resolveCashLoanRoute({ ...base, stage: 'remittance_account_required' }, 3, routeIntent, permission).route.name, 'addBank')
+  assert.equal(resolveCashLoanRoute({ ...base, stage: 'apply', orderStatus: 10 }, 3, routeIntent, permission).route.name, 'loanConfirm')
+  assert.equal(resolveCashLoanRoute({ ...base, stage: 'apply', orderStatus: 100 }, 3, routeIntent, permission).route.name, 'loanConfirm')
   assert.equal(resolveCashLoanRoute({ ...base, stage: 'reviewing' }, 3, routeIntent, permission).route.name, 'orderDetail')
 })
 

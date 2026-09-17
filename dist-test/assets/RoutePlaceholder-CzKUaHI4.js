@@ -1,1 +1,0 @@
-import{g as e,j as t,v as n,w as r}from"./index-B3MWOrqI.js";var i={class:`route-placeholder`,"aria-live":`polite`},a={__name:`RoutePlaceholder`,props:{title:{type:String,required:!0}},setup(a){return(o,s)=>(r(),n(`main`,i,[e(`h1`,null,t(a.title),1)]))}};export{a as default};
