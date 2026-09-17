@@ -1,0 +1,223 @@
+.loan-confirm-page {
+  position: relative;
+  width: 100%;
+  height: 100dvh;
+  min-height: 100vh;
+  overflow: hidden;
+  background: #f8f9fc;
+  color: #374151;
+  font-family: Roboto, Arial, sans-serif;
+}
+
+.loan-confirm-header {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: calc(4.71795rem + var(--app-safe-area-top));
+  padding-top: var(--app-safe-area-top);
+  background: #155dfc;
+}
+
+.loan-confirm-header__nav {
+  position: relative;
+  display: flex;
+  height: 1.64103rem;
+  align-items: center;
+  justify-content: center;
+  padding: .25641rem .41026rem;
+}
+
+.loan-confirm-header__nav h1 {
+  margin: 0;
+  color: #fff;
+  font-size: .46154rem;
+  font-weight: 700;
+  line-height: .61538rem;
+}
+
+.loan-confirm-header__back {
+  position: absolute;
+  top: .25641rem;
+  left: .41026rem;
+  display: grid;
+  width: 1.12821rem;
+  height: 1.12821rem;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: .30769rem;
+  background: #fff;
+  box-shadow: 0 .05128rem .10256rem rgb(0 0 0 / 8%);
+}
+
+.loan-confirm-header__back img {
+  width: .51282rem;
+  height: .51282rem;
+}
+
+.loan-confirm-header__back:disabled {
+  opacity: .65;
+}
+
+.loan-confirm-amount {
+  display: flex;
+  width: calc(100% - .82051rem);
+  min-height: 2.25641rem;
+  flex-direction: column;
+  align-items: center;
+  margin: .41026rem;
+  padding: .41026rem;
+  border-radius: .41026rem;
+  background: #fff;
+}
+
+.loan-confirm-amount__label {
+  margin: 0;
+  color: #333;
+  font-size: .30769rem;
+  font-weight: 700;
+  line-height: .51282rem;
+}
+
+.loan-confirm-amount__value {
+  display: flex;
+  width: 100%;
+  align-items: baseline;
+  justify-content: center;
+  gap: .12821rem;
+  margin: 0;
+  color: #333;
+  line-height: .92308rem;
+}
+
+.loan-confirm-amount__value span {
+  flex: 0 0 auto;
+  font-size: .35897rem;
+  line-height: .51282rem;
+}
+
+.loan-confirm-amount__value strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: .71795rem;
+  font-weight: 700;
+  line-height: .92308rem;
+  text-align: center;
+}
+
+.loan-confirm-content {
+  position: absolute;
+  top: calc(4.71795rem + var(--app-safe-area-top));
+  right: 0;
+  bottom: 0;
+  left: 0;
+  padding: .41026rem .41026rem 2.46154rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.loan-confirm-card {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  justify-content: space-between;
+  margin-bottom: .41026rem;
+  padding: .41026rem;
+  border: .02564rem solid #e5e7eb;
+  border-radius: .41026rem;
+  background: #fff;
+}
+
+.loan-confirm-card--two {
+  height: 2.46154rem;
+}
+
+.loan-confirm-card--bank {
+  min-height: 2.92308rem;
+}
+
+.loan-confirm-row {
+  display: flex;
+  min-width: 0;
+  min-height: .61538rem;
+  align-items: center;
+}
+
+.loan-confirm-row + .loan-confirm-row {
+  margin-top: .41026rem;
+}
+
+.loan-confirm-row__icon {
+  display: block;
+  width: .61538rem;
+  height: .61538rem;
+  flex: 0 0 auto;
+}
+
+.loan-confirm-row__label {
+  min-width: 0;
+  margin-left: .20513rem;
+  color: #374151;
+  font-size: .35897rem;
+  font-weight: 400;
+  line-height: .51282rem;
+}
+
+.loan-confirm-row__value {
+  min-width: 0;
+  max-width: 4.10256rem;
+  margin-left: auto;
+  overflow-wrap: anywhere;
+  color: #374151;
+  font-size: .35897rem;
+  font-weight: 400;
+  line-height: .51282rem;
+  text-align: right;
+}
+
+.loan-confirm-row__currency {
+  margin-right: .10256rem;
+}
+
+.loan-confirm-row--account .loan-confirm-row__label {
+  max-width: 2.87179rem;
+  line-height: .51282rem;
+}
+
+.loan-confirm-row--account .loan-confirm-row__value {
+  max-width: 3.33333rem;
+}
+
+.loan-confirm-footer {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  padding: 0 .41026rem calc(.61538rem + env(safe-area-inset-bottom));
+  background: #f8f9fc;
+}
+
+.loan-confirm-footer__submit {
+  display: block;
+  width: 100%;
+  height: 1.4359rem;
+  border: 0;
+  border-radius: .41026rem;
+  background: #155dfc;
+  color: #fff;
+  font-size: .41026rem;
+  font-weight: 900;
+  line-height: .61538rem;
+}
+
+.loan-confirm-footer__submit:disabled {
+  opacity: .65;
+}
+
+.loan-confirm-header__back:focus-visible,
+.loan-confirm-footer__submit:focus-visible {
+  outline: .07692rem solid #111827;
+  outline-offset: .05128rem;
+}

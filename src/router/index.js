@@ -8,6 +8,7 @@ const MultiPushResultPlaceholder = () => import('./MultiPushResultPlaceholder.vu
 const InformationPage = () => import('../features/information/views/InformationPage.vue')
 const ContactsPage = () => import('../features/contacts/views/ContactsPage.vue')
 const BankPage = () => import('../features/bank/views/BankPage.vue')
+const LoanConfirmPage = () => import('../features/loanConfirm/views/LoanConfirmPage.vue')
 
 export const ROUTE_PATH = Object.freeze({
   HOME: '/home',
@@ -20,6 +21,8 @@ export const ROUTE_PATH = Object.freeze({
   ADD_BANK: '/addBank',
   ORDER_DETAIL: '/orderDetail',
   LOAN_CONFIRM: '/loanConfirm',
+  LOAN_FAIL: '/loanFail',
+  LOAN_SUCCESS: '/loanSuccess',
   LOAN_SUCCESS_MULTI: '/loanSuccessMulti',
 })
 
@@ -41,7 +44,34 @@ export const router = createRouter({
         { path: 'identity', name: 'identity', component: () => import('../features/identity/views/IdentityPage.vue') },
         { path: 'addBank', name: 'addBank', component: BankPage },
         { path: 'orderDetail', name: 'orderDetail', component: RoutePlaceholder, props: { title: 'Order detail' } },
-        { path: 'loanConfirm', name: 'loanConfirm', component: RoutePlaceholder, props: { title: 'Loan confirmation' } },
+        { path: 'loanConfirm', name: 'loanConfirm', component: LoanConfirmPage },
+        {
+          path: 'loanFail',
+          name: 'loanFail',
+          component: RoutePlaceholder,
+          props: { title: 'Loan failure' },
+          beforeEnter: (to) => {
+            const orderId = to.query.orderId
+            const isValidOrderId = Object.keys(to.query).length === 1
+              && typeof orderId === 'string'
+              && orderId.trim().length > 0
+            return isValidOrderId ? true : { name: 'home' }
+          },
+        },
+        {
+          path: 'loanSuccess',
+          name: 'loanSuccess',
+          component: RoutePlaceholder,
+          props: { title: 'Loan success' },
+          beforeEnter: (to) => {
+            const systemTime = to.query.systemTime
+            const isValidSystemTime = Object.keys(to.query).length === 1
+              && typeof systemTime === 'string'
+              && /^(0|[1-9]\d*)$/.test(systemTime)
+              && Number.isSafeInteger(Number(systemTime))
+            return isValidSystemTime ? true : { name: 'home' }
+          },
+        },
         {
           path: 'loanSuccessMulti',
           name: 'loanSuccessMulti',
