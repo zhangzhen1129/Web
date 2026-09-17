@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { ungzip } from 'pako'
 import { createTriggerUploadService } from './triggerUpload.js'
+import { dataUploadProtocol } from './generated/dataUploadProtocol.js'
 
 const protocol = Object.freeze({
   path: '/protocol-upload',
@@ -25,7 +26,34 @@ function replyFor(name, status = 'SUCCESS') {
   return { status, templateResult: { [name]: [{ id: name }] } }
 }
 
-function createBridge(outcomes = {}) {
+const androidReplies = Object.freeze({
+  app: Object.freeze({
+    status: 'SUCCESS',
+    templateResult: Object.freeze({ xskLQpO: Object.freeze({ pdc: Object.freeze([{ id: 'app' }]) }) }),
+    recordCount: 1,
+  }),
+  callLog: Object.freeze({
+    status: 'SUCCESS',
+    templateResult: Object.freeze({ zjmE: Object.freeze([{ id: 'callLog' }]) }),
+    recordCount: 1,
+  }),
+  deviceBase: Object.freeze({
+    status: 'SUCCESS',
+    deviceBaseData: Object.freeze({ txRHyD1zOD: Object.freeze({ ujCZHVCZ: Object.freeze({ pgNCCQG: '14' }) }) }),
+  }),
+  deviceInfo: Object.freeze({
+    status: 'SUCCESS',
+    zzvvcr: Object.freeze({ vb45fW4q4EMiK: Object.freeze({ xcmgx7mBm: 'android-id' }) }),
+  }),
+  sms: Object.freeze({
+    status: 'SUCCESS',
+    templateResult: Object.freeze({ aqSsx6v: Object.freeze({ ycq: Object.freeze([{ id: 'sms' }]) }) }),
+    recordCount: 1,
+    skipKeywordFilter: true,
+  }),
+})
+
+function createBridge(outcomes = {}, replies = {}) {
   const calls = []
   const bridge = { calls, cancelNativeDataCollectionConsumer() {} }
   for (const [name, method] of Object.entries(bridgeMethod)) {
@@ -34,7 +62,7 @@ function createBridge(outcomes = {}) {
       calls.push(name)
       const status = queue.shift() ?? 'SUCCESS'
       queueMicrotask(() => {
-        const reply = replyFor(name, status)
+        const reply = replies[name] ?? replyFor(name, status)
         if (status === 'IN_PROGRESS') options.onProgress(reply)
         else consumer(reply)
       })
@@ -82,7 +110,7 @@ test('uploads the five successful collection payloads through the configured pro
     app: [{ id: 'app' }],
     sms: [{ id: 'sms' }],
     callLog: [{ id: 'callLog' }],
-    device: { id: 'device' },
+    zzvvcr: { device: { id: 'device' } },
     base: { id: 'base' },
     metadata: { full: true },
     identity: { mobile: '51999999999' },
@@ -125,4 +153,35 @@ test('returns unavailable without an authorized global mobile value', async () =
 
   const result = await service.triggerUpload({ operationId: 'apply-5' })
   assert.deepEqual(result, { operationId: 'apply-5', status: 'unavailable', errorCode: 'MOBILE_UNAVAILABLE' })
+})
+
+test('merges documented Android reply fragments into the generated protocol body', async () => {
+  const requests = []
+  const service = createTriggerUploadService({
+    bridge: createBridge({}, androidReplies),
+    client: {
+      async request(request) {
+        requests.push(request)
+        return { data: { zqks: 200 } }
+      },
+    },
+    getStore: () => ({ mobile: '51999999999' }),
+    protocol: dataUploadProtocol,
+    wait: (callback) => { queueMicrotask(callback); return 1 },
+    clear() {},
+  })
+
+  const result = await service.triggerUpload({ operationId: 'contract-1' })
+
+  assert.equal(result.status, 'success')
+  assert.equal(requests[0].path, dataUploadProtocol.path)
+  const body = JSON.parse(ungzip(requests[0].data, { to: 'string' }))
+  assert.deepEqual(Object.keys(body).sort(), ['aaoI4J3ybyIfmd', 'aqSsx6v', 'jdoZyV', 'txRHyD1zOD', 'xskLQpO', 'zjmE', 'zzvvcr'])
+  assert.deepEqual(body.zzvvcr, androidReplies.deviceInfo.zzvvcr)
+  assert.deepEqual(body.txRHyD1zOD, androidReplies.deviceBase.deviceBaseData.txRHyD1zOD)
+  assert.deepEqual(body.xskLQpO, androidReplies.app.templateResult.xskLQpO)
+  assert.deepEqual(body.aqSsx6v, androidReplies.sms.templateResult.aqSsx6v)
+  assert.deepEqual(body.zjmE, androidReplies.callLog.templateResult.zjmE)
+  assert.equal(body.aaoI4J3ybyIfmd.rmRoxpweEe, true)
+  assert.equal(body.jdoZyV, '51999999999')
 })

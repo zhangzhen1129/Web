@@ -49,7 +49,7 @@ const collectionDefinitions = Object.freeze([
   Object.freeze({
     name: 'deviceInfo',
     invoke: (bridge, consumer, options) => bridge.queryNativeDeviceFetchResult(consumer, options),
-    payload: (reply) => reply?.zzvvcr,
+    payload: (reply) => (asObject(reply?.zzvvcr) ? { zzvvcr: reply.zzvvcr } : null),
   }),
   Object.freeze({
     name: 'deviceBase',
