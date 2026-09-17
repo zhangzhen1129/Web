@@ -11,6 +11,11 @@ const PROJECT_MESSAGES = Object.freeze({
     es: 'Por favor, inténtelo de nuevo después de 0:00!',
     sw: 'Tafadhali jaribu tena baada ya saa 0:00!',
   }),
+  '21': Object.freeze({
+    en: 'We regret to inform you that your application has been rejected. You may resubmit it tomorrow.',
+    es: 'Lamentamos informarle que su solicitud ha sido rechazada. Puede volver a enviarla mañana.',
+    sw: 'Tunasikitika kukufahamisha kuwa ombi lako limekataliwa. Unaweza kutuma ombi tena kesho.',
+  }),
   '30': Object.freeze({
     en: 'Go to repay',
     es: 'Ir a reembolsar',

@@ -399,6 +399,38 @@ test('routes eligible cash loan primary action without waiting for the backgroun
   resolveTrigger({ status: 'accepted' })
 })
 
+test('shows the unavailable-mode overlay with its configured message id', async () => {
+  const triggerStarted = []
+  const harness = createHarness((input) => ({
+    loadCycleId: input.loadCycleId,
+    viewRevision: input.viewRevision,
+    status: 'content',
+    viewPayload: cashPayload(input.loadCycleId, input.viewRevision),
+    snapshot: {
+      mode: 'cash_loan',
+      stage: 'application_unavailable',
+      primaryActionEffect: 'show_overlay_notice',
+      primaryActionMessageId: '21',
+    },
+  }), {}, {
+    triggerOnly: ({ operationId }) => {
+      triggerStarted.push(operationId)
+      return Promise.resolve({ status: 'accepted' })
+    },
+  }, (id) => id === '21' ? 'Unavailable mode notice' : '')
+
+  await harness.controller.startHomeFlow({ flowScopeId: 'scope-unavailable-notice' })
+  const result = await harness.controller.handleHomeOperation({
+    flowScopeId: 'scope-unavailable-notice',
+    operation: { requestId: 'unavailable-primary-1', type: 'primary_action' },
+  })
+
+  assert.equal(result.status, 'completed')
+  assert.equal(result.effect, 'show_overlay_notice')
+  assert.equal(harness.views.at(-1).overlayNotice.text, 'Unavailable mode notice')
+  assert.deepEqual(triggerStarted, ['unavailable-primary-1'])
+})
+
 test('selection updates are local and duplicate operation ids are ignored', async () => {
   const harness = createHarness((input) => ({
     loadCycleId: input.loadCycleId,

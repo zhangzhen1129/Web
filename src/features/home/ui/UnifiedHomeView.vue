@@ -109,8 +109,7 @@ function isProductToggleDisabled(product) {
 }
 
 function handleVisibilityChange() {
-  if (document.hidden) session.hide()
-  else session.show()
+  session.setDocumentVisibility(!document.hidden)
 }
 
 function handleOverlayKeydown(event) {

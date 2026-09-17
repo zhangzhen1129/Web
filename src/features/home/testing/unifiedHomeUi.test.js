@@ -324,6 +324,24 @@ test('notices are model-driven and local dismissal emits no operation', () => {
   assert.deepEqual(operations, [])
 })
 
+test('document visibility preserves a pending operation until its response arrives', () => {
+  const { session, operations } = createSession()
+  const initial = createUnifiedHomeFixture('cash-apply')
+  session.updateHomeView(initial)
+  const operationId = session.primaryAction()
+  assert.equal(operationId, 'operation-1')
+
+  assert.equal(session.setDocumentVisibility(false), true)
+  const overlayResponse = responseFor(createUnifiedHomeFixture('overlay'), operationId, 2, 'overlay-after-hidden')
+  assert.equal(session.updateHomeView(overlayResponse), true)
+  assert.equal(session.getState().overlayNotice.text, 'Tu solicitud sigue en proceso.')
+  assert.equal(session.getState().overlayVisible, true)
+
+  assert.equal(session.setDocumentVisibility(true), true)
+  assert.equal(session.getState().overlayVisible, true)
+  assert.deepEqual(operations.map((operation) => operation.type), ['primary_action'])
+})
+
 test('a missing or failing operation receiver is diagnosed without breaking the session', () => {
   const diagnostics = []
   const session = createHomeUiSession({

@@ -536,7 +536,9 @@ export function createHomeFlowController(options = {}) {
       }
     }
     if (effect === 'show_empty_products_toast' || effect === 'show_overlay_notice') {
-      const messageId = effect === 'show_empty_products_toast' ? '10' : '20'
+      const messageId = effect === 'show_empty_products_toast'
+        ? '10'
+        : state.snapshot?.primaryActionMessageId ?? '20'
       const text = getMessage(messageId)
       if (typeof text !== 'string' || text.trim().length === 0) { activeOperation = null; setStatus('ready', { operationId: null }); return { operationId: operation.requestId, status: 'failed', error: resultError('MESSAGE_UNAVAILABLE') } }
       const payload = safeClone(state.viewPayload); const noticeId = allocate('notice')

@@ -48,7 +48,7 @@ function summary({ availableText, totalText, usedText, locked, prefix = 'CASH' }
 
 function cashDecision(data) {
   const mode = integerValue(data.maskModel, 'CASH_MODE_INVALID'); if (!APP_MODES.has(mode) || mode === 1) throw new HomeDataMappingError('CASH_MODE_INVALID')
-  if (mode === 2) return { stage: 'application_unavailable', viewMode: 'apply', amountSource: 'local_limit' }
+  if (mode === 2) return { stage: 'application_unavailable', viewMode: 'apply', amountSource: 'local_limit', primaryActionEffect: 'show_overlay_notice', primaryActionMessageId: '21' }
   for (const [field, stage] of [['basicInfoAuth', 'basic_info_required'], ['addInfoAuth', 'additional_info_required'], ['identityAuth', 'identity_required'], ['remittanceAccountAuth', 'remittance_account_required']]) if (integerValue(data[field], `CASH_${field.toUpperCase()}_INVALID`) === 0) return { stage, viewMode: 'apply', amountSource: 'local_limit' }
   const status = data.orderStatus
   if (status === undefined || status === null || status === '') return { stage: 'ready_to_apply', viewMode: 'apply', amountSource: 'local_limit' }

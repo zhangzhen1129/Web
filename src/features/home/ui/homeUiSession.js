@@ -353,6 +353,25 @@ export function createHomeUiSession(options = {}) {
     notify()
   }
 
+  function setDocumentVisibility(isVisible) {
+    if (state.isDestroyed || typeof isVisible !== 'boolean' || state.isVisible === isVisible) return false
+    if (isVisible) {
+      state = { ...state, isVisible: true }
+      startBroadcast()
+      notify()
+      return true
+    }
+    stopBroadcast()
+    state = {
+      ...state,
+      isVisible: false,
+      dialogOpen: false,
+      overlayVisible: false,
+    }
+    notify()
+    return true
+  }
+
   function show() {
     if (state.isDestroyed || state.isVisible) return
     state = { ...state, isVisible: true }
@@ -414,6 +433,7 @@ export function createHomeUiSession(options = {}) {
     getSelectedCountText,
     shouldShowProductSummary,
     hide,
+    setDocumentVisibility,
     show,
     destroy,
   })
