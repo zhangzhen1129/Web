@@ -9,6 +9,7 @@ const InformationPage = () => import('../features/information/views/InformationP
 const ContactsPage = () => import('../features/contacts/views/ContactsPage.vue')
 const BankPage = () => import('../features/bank/views/BankPage.vue')
 const LoanConfirmPage = () => import('../features/loanConfirm/views/LoanConfirmPage.vue')
+const LoanSuccessPage = () => import('../features/loanSuccess/views/LoanSuccessPage.vue')
 
 export const ROUTE_PATH = Object.freeze({
   HOME: '/home',
@@ -61,8 +62,7 @@ export const router = createRouter({
         {
           path: 'loanSuccess',
           name: 'loanSuccess',
-          component: RoutePlaceholder,
-          props: { title: 'Loan success' },
+          component: LoanSuccessPage,
           beforeEnter: (to) => {
             const systemTime = to.query.systemTime
             const isValidSystemTime = Object.keys(to.query).length === 1
