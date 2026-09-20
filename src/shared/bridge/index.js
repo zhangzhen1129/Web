@@ -89,3 +89,9 @@ export {
   nativeAdvanceLiveBridge,
   openAdvanceLivePageNat,
 } from './nativeAdvanceLive.js'
+
+export {
+  nativePrivacyAgreementBridge,
+  openPrivacyAgreementExternalNat,
+  openPrivacyAgreementInAppNat,
+} from './nativePrivacyAgreement.js'

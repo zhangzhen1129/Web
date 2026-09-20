@@ -457,6 +457,8 @@
 }
 
 .loan-success-modal__cancel {
+  display: block;
+  width: 100%;
   margin-top: .41026rem;
   padding: 0;
   border: 0;
@@ -464,6 +466,7 @@
   color: #999;
   font-size: .41026rem;
   line-height: .61538rem;
+  text-align: center;
 }
 
 .loan-success-review {
@@ -480,8 +483,7 @@
   flex-direction: column;
   align-items: center;
   padding-top: .51282rem;
-  background-position: center;
-  background-size: cover;
+  background: linear-gradient(90deg, #155dfc 0%, #4f39f6 50%, #9810fa 100%);
 }
 
 .loan-success-review__star {

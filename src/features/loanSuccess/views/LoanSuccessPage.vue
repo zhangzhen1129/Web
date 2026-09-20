@@ -14,8 +14,6 @@ import backAsset from '../assets/back.svg'
 import checkboxCheckedAsset from '../assets/checkbox-checked.svg'
 import checkboxUncheckedAsset from '../assets/checkbox-unchecked.svg'
 import interceptIconAsset from '../assets/intercept-icon.svg'
-import reviewHeaderGradientAsset from '../assets/review-header-gradient.svg'
-import reviewHeaderGradientLowAsset from '../assets/review-header-gradient-low.svg'
 import reviewRefreshAsset from '../assets/review-refresh.svg'
 import reviewStarAsset from '../assets/review-star.png'
 import reviewStarLowAsset from '../assets/review-star-low.png'
@@ -266,10 +264,7 @@ function openOrder(order) {
 
     <div v-if="isReviewVisible" class="loan-success-mask">
       <section class="loan-success-review" role="dialog" aria-modal="true" :aria-label="LOAN_SUCCESS_TEXT.reviewTitle">
-        <header
-          class="loan-success-review__header"
-          :style="{ backgroundImage: `url(${isReviewHighRating ? reviewHeaderGradientAsset : reviewHeaderGradientLowAsset})` }"
-        >
+        <header class="loan-success-review__header">
           <img
             class="loan-success-review__star"
             :src="isReviewHighRating ? reviewStarAsset : reviewStarLowAsset"

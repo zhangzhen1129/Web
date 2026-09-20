@@ -1,6 +1,6 @@
 import { isBusinessHandledError } from '../../shared/businessError/index.js'
 import { addDecimalStrings } from './loanSuccessAmount.js'
-import { RECOMMENDED_COMMENTS, REVIEW_CONTENT_MAX_LENGTH } from './loanSuccessText.js'
+import { REVIEW_CONTENT_MAX_LENGTH } from './loanSuccessText.js'
 
 const ENTRY_PATTERN = /^(0|[1-9]\d*)$/
 const ROOT_STATES = Object.freeze({
@@ -71,10 +71,15 @@ function createOperationId(sequence) {
   return `loan-success-${Date.now().toString(36)}-${sequence.toString(36)}`
 }
 
-function pickRecommendedComment(random = Math.random) {
-  if (RECOMMENDED_COMMENTS.length === 0) return ''
-  const index = Math.min(Math.floor(random() * RECOMMENDED_COMMENTS.length), RECOMMENDED_COMMENTS.length - 1)
-  return RECOMMENDED_COMMENTS[index]
+async function loadGoogleReviewComments() {
+  const module = await import('./googleReview.js')
+  return Array.isArray(module.default) ? module.default : []
+}
+
+function pickRecommendedComment(comments, random = Math.random) {
+  if (!Array.isArray(comments) || comments.length === 0) return ''
+  const index = Math.min(Math.floor(random() * comments.length), comments.length - 1)
+  return comments[index]
 }
 
 function selectedAmount(products, selectedIds) {
@@ -98,6 +103,7 @@ export function createLoanSuccessController({
   setPhysicalBackIntercept,
   openGooglePlay,
   copyText,
+  loadRecommendedComments = loadGoogleReviewComments,
   createAbortController = () => new AbortController(),
   createOperation = createOperationId,
   random = Math.random,
@@ -392,12 +398,21 @@ export function createLoanSuccessController({
     }
     if (!isCurrent(id)) return
     if (result?.type === 'success' && result.enabled === true) {
+      let comments
+      try {
+        comments = await loadRecommendedComments()
+      } catch {
+        if (!isCurrent(id)) return
+        completeReviewFlow(origin)
+        return
+      }
+      if (!isCurrent(id)) return
       emit({
         overlay: OVERLAY_STATES.reviewPrompt,
         reviewOrigin: origin,
         reviewRating: 5,
         reviewContent: '',
-        recommendedComment: pickRecommendedComment(random),
+        recommendedComment: pickRecommendedComment(comments, random),
         reviewSubmitting: false,
       })
       return
@@ -706,14 +721,26 @@ export function createLoanSuccessController({
       emit({ reviewContent: content.slice(0, REVIEW_CONTENT_MAX_LENGTH) })
       return true
     },
-    refreshRecommendedComment() {
+    async refreshRecommendedComment() {
       if (
         disposed
         || state.overlay !== OVERLAY_STATES.reviewPrompt
         || state.reviewSubmitting
         || state.reviewRating < 4
       ) return false
-      emit({ recommendedComment: pickRecommendedComment(random) })
+      let comments
+      try {
+        comments = await loadRecommendedComments()
+      } catch {
+        return false
+      }
+      if (
+        disposed
+        || state.overlay !== OVERLAY_STATES.reviewPrompt
+        || state.reviewSubmitting
+        || state.reviewRating < 4
+      ) return false
+      emit({ recommendedComment: pickRecommendedComment(comments, random) })
       return true
     },
     submitReview,

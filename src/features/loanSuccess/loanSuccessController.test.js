@@ -66,6 +66,7 @@ function createHarness(overrides = {}) {
     },
     openGooglePlay: () => calls.push('google-play'),
     copyText: overrides.copyText ?? (async () => true),
+    loadRecommendedComments: overrides.loadRecommendedComments ?? (async () => ['First comment', 'Last comment']),
     createAbortController: () => ({
       signal: { aborted: false },
       abort() { this.signal.aborted = true; abortCount += 1 },
@@ -334,6 +335,32 @@ test('review gate opens the review and saves a high rating before Google Play', 
   assert.equal(harness.calls.includes('copy-success'), true)
   assert.equal(harness.calls.includes('google-play'), true)
   assert.equal(harness.calls.includes('navigate:order-list'), true)
+})
+
+test('refreshes the recommended comment by selecting from the local review resource', async () => {
+  const randomValues = [0, 0.999999]
+  const harness = createHarness({
+    random: () => randomValues.shift() ?? 0,
+    loadRecommendedComments: async () => ['First comment', 'Last comment'],
+    services: {
+      async loadRecommendedProducts() { return { type: 'empty' } },
+      async loadOrders() { return { type: 'empty' } },
+      async preApply() { return { type: 'success', orderIds: [] } },
+      async apply() { return { type: 'success' } },
+      async getReviewPromptEnabled() { return { type: 'success', enabled: true } },
+      async saveReview() { return { type: 'success' } },
+    },
+  })
+  harness.controller.initialize({ systemTime: '123' })
+  await flush()
+  harness.controller.openReviewFromMain()
+  await flush()
+  const firstComment = harness.controller.getState().recommendedComment
+  assert.equal(await harness.controller.refreshRecommendedComment(), true)
+  const refreshedComment = harness.controller.getState().recommendedComment
+  assert.notEqual(firstComment, '')
+  assert.notEqual(refreshedComment, '')
+  assert.notEqual(firstComment, refreshedComment)
 })
 
 test('review prompt false follows the origin navigation without opening the dialog', async () => {

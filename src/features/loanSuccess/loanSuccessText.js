@@ -25,8 +25,4 @@ export const LOAN_SUCCESS_TEXT = Object.freeze({
   copyFailure: 'No se pudo copiar el comentario',
 })
 
-export const RECOMMENDED_COMMENTS = Object.freeze([
-  'Muy cómodo, aprobación rápida, interfaz fácil de usar, tipos de interés relativamente razonables y ofrece diversas opciones de reembolso.',
-])
-
 export const REVIEW_CONTENT_MAX_LENGTH = 100
