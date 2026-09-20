@@ -21,6 +21,10 @@ export const ROUTE_PATH = Object.freeze({
   IDENTITY: '/identity',
   ADD_BANK: '/addBank',
   ORDER_DETAIL: '/orderDetail',
+  HELP_CENTER: '/helpCenter',
+  DEFER_DETAIL: '/deferDetail',
+  DEFER_HISTORY: '/deferHistory',
+  BANK_DETAIL: '/bankDetail',
   LOAN_CONFIRM: '/loanConfirm',
   LOAN_FAIL: '/loanFail',
   LOAN_SUCCESS: '/loanSuccess',
@@ -45,6 +49,53 @@ export const router = createRouter({
         { path: 'identity', name: 'identity', component: () => import('../features/identity/views/IdentityPage.vue') },
         { path: 'addBank', name: 'addBank', component: BankPage },
         { path: 'orderDetail', name: 'orderDetail', component: RoutePlaceholder, props: { title: 'Order detail' } },
+        { path: 'helpCenter', name: 'helpCenter', component: RoutePlaceholder, props: { title: 'Customer service' } },
+        {
+          path: 'deferDetail',
+          name: 'deferDetail',
+          component: RoutePlaceholder,
+          props: { title: 'Deferral detail' },
+          beforeEnter: (to) => {
+            const orderId = to.query.orderId
+            const isValidOrderId = Object.keys(to.query).length === 1
+              && typeof orderId === 'string'
+              && orderId.trim().length > 0
+            return isValidOrderId ? true : { name: 'home' }
+          },
+        },
+        {
+          path: 'deferHistory',
+          name: 'deferHistory',
+          component: RoutePlaceholder,
+          props: { title: 'Deferral history' },
+          beforeEnter: (to) => {
+            const allowedKeys = ['orderId', 'productId', 'orderStatus']
+            const orderId = to.query.orderId
+            const productId = to.query.productId
+            const orderStatus = to.query.orderStatus
+            const isValid = Object.keys(to.query).every((key) => allowedKeys.includes(key))
+              && typeof orderId === 'string'
+              && orderId.trim().length > 0
+              && (typeof productId === 'undefined' || typeof productId === 'string')
+              && typeof orderStatus === 'string'
+              && /^\d+$/.test(orderStatus)
+            return isValid ? true : { name: 'home' }
+          },
+        },
+        {
+          path: 'bankDetail',
+          name: 'bankDetail',
+          component: RoutePlaceholder,
+          props: { title: 'Update bank account' },
+          beforeEnter: (to) => {
+            const orderId = to.query.orderId
+            const isValid = Object.keys(to.query).length === 2
+              && typeof orderId === 'string'
+              && orderId.trim().length > 0
+              && to.query.type === 'bankAccess'
+            return isValid ? true : { name: 'home' }
+          },
+        },
         { path: 'loanConfirm', name: 'loanConfirm', component: LoanConfirmPage },
         {
           path: 'loanFail',
