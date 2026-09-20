@@ -10,6 +10,11 @@ function validStringArray(value) {
   return Array.isArray(value) && value.length > 0 && value.every((item) => typeof item === 'string' && item.length > 0)
 }
 
+function readAppliedOrderIds(payload) {
+  if (Array.isArray(payload?.aewM)) return payload.aewM
+  return payload?.aewM?.successList
+}
+
 function businessCode(response) {
   const code = response?.data?.cyiUgNvO2EPltj?.atY3WWbXIN
   return Number.isInteger(code) ? code : null
@@ -57,7 +62,7 @@ export function createMultiPushApplicationService(options = {}) {
         protocolId: 'multi-push-application',
       })
       if (businessCode(response) !== SUCCESS_CODE) return failure('APPLICATION_BUSINESS_FAILED')
-      const appliedOrderIds = response?.data?.aewM
+      const appliedOrderIds = readAppliedOrderIds(response?.data)
       if (!validStringArray(appliedOrderIds)) return failure('APPLICATION_ORDER_IDS_INVALID')
       return Object.freeze({ status: 'success' })
     } catch (error) {

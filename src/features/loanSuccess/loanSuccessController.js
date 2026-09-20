@@ -20,6 +20,7 @@ const REVIEW_ORIGINS = Object.freeze({
   return: 'return',
   orderListMain: 'order_list_main',
 })
+const INTERCEPT_COUNTDOWN_SECONDS = 10
 
 function createState() {
   return Object.freeze({
@@ -39,6 +40,7 @@ function createState() {
     reviewContent: '',
     recommendedComment: '',
     navigationLocked: false,
+    interceptCountdown: INTERCEPT_COUNTDOWN_SECONDS,
   })
 }
 
@@ -99,6 +101,8 @@ export function createLoanSuccessController({
   createAbortController = () => new AbortController(),
   createOperation = createOperationId,
   random = Math.random,
+  setTimer = setInterval,
+  clearTimer = clearInterval,
   onBusinessFailure = () => {},
   onUploadFailure = () => {},
   onSuccessNotice = () => {},
@@ -127,6 +131,7 @@ export function createLoanSuccessController({
   let reviewGateInFlight = false
   let nativeLoadingVisible = false
   let backInterceptEnabled = false
+  let interceptCountdownTimer = null
   const listeners = new Set()
   const physicalBackProxy = createConsumerProxy()
 
@@ -140,12 +145,18 @@ export function createLoanSuccessController({
     return isCurrentRequest(id, instanceId, disposed)
   }
 
+  function isCurrentSubmission(id) {
+    return !disposed && id === submissionId
+  }
+
   function isCurrentCycle(id) {
     return !disposed && id === loadCycleId
   }
 
   function invalidate() {
     instanceId += 1
+    loadCycleId += 1
+    submissionId += 1
     loadController?.abort()
     submissionController?.abort()
     reviewGateController?.abort()
@@ -155,6 +166,27 @@ export function createLoanSuccessController({
     reviewGateController = null
     reviewSubmitController = null
     reviewGateInFlight = false
+    stopInterceptCountdown()
+  }
+
+  function stopInterceptCountdown() {
+    if (interceptCountdownTimer === null) return
+    clearTimer(interceptCountdownTimer)
+    interceptCountdownTimer = null
+  }
+
+  function startInterceptCountdown() {
+    stopInterceptCountdown()
+    emit({ interceptCountdown: INTERCEPT_COUNTDOWN_SECONDS })
+    interceptCountdownTimer = setTimer(() => {
+      if (disposed || state.overlay !== OVERLAY_STATES.backIntercept) {
+        stopInterceptCountdown()
+        return
+      }
+      const next = Math.max(0, state.interceptCountdown - 1)
+      emit({ interceptCountdown: next })
+      if (next === 0) stopInterceptCountdown()
+    }, 1000)
   }
 
   function showNativeLoadingOnce() {
@@ -401,14 +433,18 @@ export function createLoanSuccessController({
         operationId: createOperation(id),
         signal,
         onStatus(status) {
-          if (!isCurrent(id) || (status !== 'collecting' && status !== 'uploading')) return
+          if (
+            !isCurrentSubmission(id)
+            || submissionController === null
+            || (status !== 'collecting' && status !== 'uploading')
+          ) return
           emit({ loadingBarStatus: status })
         },
       })
     } catch {
       uploadResult = Object.freeze({ status: 'unavailable' })
     }
-    if (!isCurrent(id)) return
+    if (!isCurrentSubmission(id)) return
 
     if (uploadResult?.status === 'cancelled') {
       submissionController = null
@@ -430,13 +466,13 @@ export function createLoanSuccessController({
         signal,
       })
     } catch (error) {
-      if (!isCurrent(id)) return
+      if (!isCurrentSubmission(id)) return
       submissionController = null
       emit({ rootState: ROOT_STATES.recommendation, loadingBarStatus: null, submitting: false })
       if (isBusinessHandledError(error)) return
       return
     }
-    if (!isCurrent(id)) return
+    if (!isCurrentSubmission(id)) return
     if (preApplicationResult?.type !== 'success') {
       submissionController = null
       if (preApplicationResult?.type === 'business_failure') handleBusinessFailure(preApplicationResult)
@@ -451,18 +487,18 @@ export function createLoanSuccessController({
         signal,
       })
     } catch (error) {
-      if (!isCurrent(id)) return
+      if (!isCurrentSubmission(id)) return
       submissionController = null
       emit({ rootState: ROOT_STATES.recommendation, loadingBarStatus: null, submitting: false })
       if (isBusinessHandledError(error)) return
       return
     }
-    if (!isCurrent(id)) return
+    if (!isCurrentSubmission(id)) return
     submissionController = null
     if (applicationResult?.type === 'success') {
       emit({ rootState: ROOT_STATES.recommendation, loadingBarStatus: null, submitting: false })
-      onSuccessNotice()
       startLoadCycle()
+      try { onSuccessNotice() } catch {}
       return
     }
     if (applicationResult?.type === 'business_failure') handleBusinessFailure(applicationResult)
@@ -472,6 +508,7 @@ export function createLoanSuccessController({
   function requestBack() {
     if (disposed || state.navigationLocked) return false
     if (state.overlay === OVERLAY_STATES.backIntercept) {
+      stopInterceptCountdown()
       emit({ overlay: null })
       return true
     }
@@ -484,6 +521,7 @@ export function createLoanSuccessController({
     }
     if (state.rootState === ROOT_STATES.recommendation) {
       emit({ overlay: OVERLAY_STATES.backIntercept })
+      startInterceptCountdown()
       return true
     }
     if ([ROOT_STATES.orderList, ROOT_STATES.emptyResult].includes(state.rootState)) {
@@ -627,11 +665,13 @@ export function createLoanSuccessController({
     },
     closeBackIntercept() {
       if (state.overlay !== OVERLAY_STATES.backIntercept) return false
+      stopInterceptCountdown()
       emit({ overlay: null })
       return true
     },
     cancelBackIntercept() {
       if (state.overlay !== OVERLAY_STATES.backIntercept) return false
+      stopInterceptCountdown()
       emit({ overlay: null })
       navigateBack()
       return true

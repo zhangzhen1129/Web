@@ -245,13 +245,21 @@
   flex: 0 0 auto;
   max-width: 3.2rem;
   overflow: hidden;
-  background: linear-gradient(90deg, #155dfc 0%, #4f39f6 100%);
-  background-clip: text;
-  color: transparent;
+  color: #155dfc;
   font-size: .41026rem;
   line-height: .61538rem;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .loan-success-product__amount {
+    background: linear-gradient(90deg, #155dfc 0%, #4f39f6 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
 }
 
 .loan-success-product__check {
@@ -309,7 +317,6 @@
   flex-direction: column;
   gap: .10256rem;
   margin-left: .41026rem;
-  padding-right: 2.46154rem;
   color: #6a7282;
   font-size: .35897rem;
   line-height: .51282rem;
@@ -323,12 +330,33 @@
   line-height: .61538rem;
 }
 
+.loan-success-order__amount-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: .30769rem;
+}
+
 .loan-success-order__amount {
-  background: linear-gradient(90deg, #155dfc 0%, #4f39f6 100%);
-  background-clip: text;
-  color: transparent;
+  flex: 0 0 auto;
+  max-width: 2.25641rem;
+  overflow: hidden;
+  color: #155dfc;
   font-size: .41026rem;
   line-height: .61538rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .loan-success-order__amount {
+    background: linear-gradient(90deg, #155dfc 0%, #4f39f6 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
 }
 
 .loan-success-order__status {

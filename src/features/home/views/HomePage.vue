@@ -6,7 +6,7 @@ import { createDataCollectionService } from '../../dataCollection/index.js'
 import { createMultiPushApplicationService } from '../services/multiPushApplicationService.js'
 import { createHomeBrowserPort } from '../homeBrowserPort.js'
 import { createHomeDataProvider } from '../providers/homeDataProvider.js'
-import { APP_MODE, resetHomeTabs, setAppMode, setHomeTabs } from '../../shell/appModeStore.js'
+import { syncAppModeFromHomePayload } from '../../shell/appModeStore.js'
 import { useGlobalStore } from '../../../shared/globalStore/globalStore.js'
 import { dispatchHomeRouteIntent } from '../homeRouteDispatcher.js'
 
@@ -25,21 +25,9 @@ let hasBeenActivated = false
 let isDisposed = false
 let needsBrowserReturnReload = false
 
-function syncMainTabs(payload) {
-  if (payload?.homeMode === 'multi_push' && Array.isArray(payload.tabs)) {
-    setAppMode(APP_MODE.MULTI_PUSH)
-    setHomeTabs(payload.tabs)
-  } else if (payload?.homeMode === 'cash_loan' && Array.isArray(payload.tabs)) {
-    setAppMode(APP_MODE.CASH_LOAN)
-    setHomeTabs(payload.tabs)
-  } else {
-    resetHomeTabs()
-  }
-}
-
 function updateHomeView(payload) {
   if (isDisposed) return
-  syncMainTabs(payload)
+  syncAppModeFromHomePayload(payload)
   homeView.value?.updateHomeView(payload)
 }
 

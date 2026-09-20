@@ -60,6 +60,32 @@ export function setHomeTabs(tabs) {
     : createDefaultHomeTabs()
 }
 
+export function syncAppModeFromHomePayload(payload) {
+  const tabs = Array.isArray(payload?.tabs) && payload.tabs.length > 0
+    ? payload.tabs
+    : null
+
+  if (payload?.homeMode === 'multi_push' && tabs) {
+    setAppMode(APP_MODE.MULTI_PUSH)
+    setHomeTabs(tabs)
+    return true
+  }
+
+  if (payload?.homeMode === 'cash_loan' && tabs) {
+    setAppMode(APP_MODE.CASH_LOAN)
+    setHomeTabs(tabs)
+    return true
+  }
+
+  if ((payload?.pageStatus === 'loading' || payload?.pageStatus === 'refreshing') && tabs) {
+    setHomeTabs(tabs)
+    return true
+  }
+
+  resetHomeTabs()
+  return false
+}
+
 export function resetHomeTabs() {
   state.mode = APP_MODE.CASH_LOAN
   state.homeTabs = createDefaultHomeTabs()

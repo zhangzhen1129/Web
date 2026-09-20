@@ -20,27 +20,37 @@ function result(type, extra = {}) {
   return Object.freeze({ type, ...extra })
 }
 
-function commonPayload(globalState) {
+function multiPushCommonPayload(globalState) {
   return {
-    afId: stringValue(globalState?.afId),
-    gaId: stringValue(globalState?.gaId),
-    fbId: stringValue(globalState?.fbId),
-    appName: stringValue(globalState?.appName),
-    appVersion: stringValue(globalState?.appVersion),
-    mobileType: '2',
-    packageName: stringValue(globalState?.packageName),
-    gps: '',
-    gpsAddress: '',
-    token: stringValue(globalState?.token),
+    cvgH: stringValue(globalState?.afId),
+    rsbhpZ3X: {
+      pwtL: stringValue(globalState?.gaId),
+    },
+    bgU88QMO: {
+      eybE: stringValue(globalState?.fbId),
+    },
+    amHasFw: stringValue(globalState?.appName),
+    mmNUCmQdMioQ2O: {
+      ux9jYLcC8H: stringValue(globalState?.appVersion),
+    },
+    qkNsXozI1oC5g3: {
+      tf69g5Spk5: '2',
+    },
+    uxzfxbBMxhB: stringValue(globalState?.packageName),
+    ulG: '',
+    vqfH0gehfvNYrW: {
+      rpryc7q8rm: '',
+    },
+    yjDnG: stringValue(globalState?.token),
   }
 }
 
-function readEnvelope(payload) {
-  const returnCode = payload?.returnCode
+function readMultiPushEnvelope(payload) {
+  const returnCode = payload?.cyiUgNvO2EPltj?.atY3WWbXIN
   return {
     valid: Number.isInteger(returnCode),
     returnCode,
-    message: stringValue(payload?.message),
+    message: stringValue(payload?.pl9xRlV),
   }
 }
 
@@ -95,17 +105,22 @@ function validStringArray(value) {
     && value.every((item) => typeof item === 'string' && item.trim().length > 0)
 }
 
+function readAppliedOrderIds(payload) {
+  if (Array.isArray(payload?.aewM)) return payload.aewM
+  return payload?.aewM?.successList
+}
+
 export function createLoanSuccessServices({ client = networkClient, getGlobalState } = {}) {
   if (typeof getGlobalState !== 'function') throw new TypeError('getGlobalState is required.')
 
   async function loadRecommendedProducts({ signal } = {}) {
-    const payload = await post(client, PRODUCT_PATH, 'API-001', commonPayload(getGlobalState()), signal)
+    const payload = await post(client, PRODUCT_PATH, 'API-001', multiPushCommonPayload(getGlobalState()), signal)
     if (payload.type === 'invalid_response') return payload
-    const envelope = readEnvelope(payload)
+    const envelope = readMultiPushEnvelope(payload)
     if (!envelope.valid) return result('invalid_response')
     if (envelope.returnCode !== 2000) return result('business_failure', { message: envelope.message })
 
-    const list = payload?.data?.list
+    const list = payload?.qrAbsjzu7WLU?.baIJ
     if (list === undefined || list === null || (Array.isArray(list) && list.length === 0)) {
       return result('empty')
     }
@@ -125,14 +140,14 @@ export function createLoanSuccessServices({ client = networkClient, getGlobalSta
   async function preApply({ productIds, signal } = {}) {
     if (!validStringArray(productIds)) return result('invalid_response')
     const payload = await post(client, PRE_APPLICATION_PATH, 'API-002', {
-      ...commonPayload(getGlobalState()),
-      productList: [...productIds],
+      ...multiPushCommonPayload(getGlobalState()),
+      npwxCwB9qMB: [...productIds],
     }, signal)
     if (payload.type === 'invalid_response') return payload
-    const envelope = readEnvelope(payload)
+    const envelope = readMultiPushEnvelope(payload)
     if (!envelope.valid) return result('invalid_response')
     if (envelope.returnCode !== 2000) return result('business_failure', { message: envelope.message })
-    const orderIds = payload?.data?.orderIdList
+    const orderIds = payload?.ik803hS46CSFXi8
     if (!validStringArray(orderIds)) return result('business_failure', { message: envelope.message })
     return result('success', { orderIds: Object.freeze([...orderIds]) })
   }
@@ -140,28 +155,31 @@ export function createLoanSuccessServices({ client = networkClient, getGlobalSta
   async function apply({ orderIds, signal } = {}) {
     if (!validStringArray(orderIds)) return result('invalid_response')
     const payload = await post(client, APPLICATION_PATH, 'API-003', {
-      ...commonPayload(getGlobalState()),
-      orderIdList: [...orderIds],
+      ...multiPushCommonPayload(getGlobalState()),
+      iiFpTXF0KDV: [...orderIds],
     }, signal)
     if (payload.type === 'invalid_response') return payload
-    const envelope = readEnvelope(payload)
+    const envelope = readMultiPushEnvelope(payload)
     if (!envelope.valid) return result('invalid_response')
     if (envelope.returnCode !== 2000) return result('business_failure', { message: envelope.message })
-    if (!validStringArray(payload?.data)) return result('business_failure', { message: envelope.message })
-    return result('success', { orderIds: Object.freeze([...payload.data]) })
+    const appliedOrderIds = readAppliedOrderIds(payload)
+    if (!validStringArray(appliedOrderIds)) return result('business_failure', { message: envelope.message })
+    return result('success', { orderIds: Object.freeze([...appliedOrderIds]) })
   }
 
   async function loadOrders({ startApplyTime, signal } = {}) {
     const payload = await post(client, ORDER_LIST_PATH, 'API-004', {
-      ...commonPayload(getGlobalState()),
-      startApplyTime: stringValue(startApplyTime),
+      ...multiPushCommonPayload(getGlobalState()),
+      pyV8ela66fIZ7VLCpA: {
+        vrjJCWyHuQ6Avw: stringValue(startApplyTime),
+      },
     }, signal)
     if (payload.type === 'invalid_response') return payload
-    const envelope = readEnvelope(payload)
+    const envelope = readMultiPushEnvelope(payload)
     if (!envelope.valid) return result('invalid_response')
     if (envelope.returnCode !== 2000) return result('business_failure', { message: envelope.message })
 
-    const list = payload?.data?.list
+    const list = payload?.qrAbsjzu7WLU?.baIJ
     if (list === undefined || list === null || (Array.isArray(list) && list.length === 0)) {
       return result('empty')
     }
@@ -177,13 +195,13 @@ export function createLoanSuccessServices({ client = networkClient, getGlobalSta
   }
 
   async function getReviewPromptEnabled({ signal } = {}) {
-    const payload = await post(client, REVIEW_PROMPT_PATH, 'API-005', commonPayload(getGlobalState()), signal)
+    const payload = await post(client, REVIEW_PROMPT_PATH, 'API-005', multiPushCommonPayload(getGlobalState()), signal)
     if (payload.type === 'invalid_response') return payload
-    const envelope = readEnvelope(payload)
+    const envelope = readMultiPushEnvelope(payload)
     if (!envelope.valid) return result('invalid_response')
     if (envelope.returnCode !== 2000) return result('business_failure', { message: envelope.message })
-    if (typeof payload?.data !== 'boolean') return result('invalid_response')
-    return result('success', { enabled: payload.data })
+    if (typeof payload?.aewM !== 'boolean') return result('invalid_response')
+    return result('success', { enabled: payload.aewM })
   }
 
   async function saveReview({ grade, content, signal } = {}) {
@@ -191,12 +209,14 @@ export function createLoanSuccessServices({ client = networkClient, getGlobalSta
       return result('invalid_response')
     }
     const payload = await post(client, SAVE_REVIEW_PATH, 'API-006', {
-      ...commonPayload(getGlobalState()),
-      grade,
-      content,
+      ...multiPushCommonPayload(getGlobalState()),
+      zhNZR: grade,
+      kqnBevt8VMT: {
+        il940Yf: content,
+      },
     }, signal)
     if (payload.type === 'invalid_response') return payload
-    const envelope = readEnvelope(payload)
+    const envelope = readMultiPushEnvelope(payload)
     if (!envelope.valid) return result('invalid_response')
     if (envelope.returnCode !== 2000) return result('business_failure', { message: envelope.message })
     if (!isPlainObject(payload?.data)) return result('invalid_response')

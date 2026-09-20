@@ -99,7 +99,10 @@ onBeforeUnmount(() => {
   controller.dispose()
 })
 
-const isRecommendation = computed(() => state.value?.rootState === 'recommendation')
+const isRecommendationContent = computed(() => (
+  state.value?.rootState === 'recommendation'
+  || state.value?.rootState === 'submitting'
+))
 const isOrderList = computed(() => state.value?.rootState === 'order_list')
 const isEmptyResult = computed(() => state.value?.rootState === 'empty_result')
 const isLoading = computed(() => state.value?.rootState === 'loading')
@@ -108,6 +111,8 @@ const isReviewHighRating = computed(() => state.value?.reviewRating >= 4)
 const isReviewSubmitting = computed(() => state.value?.reviewSubmitting === true)
 const productCountText = computed(() => LOAN_SUCCESS_TEXT.productCountTemplate.replace('{count}', String(state.value?.selectedCount ?? 0)))
 const applyButtonText = computed(() => LOAN_SUCCESS_TEXT.applyButtonTemplate.replace('{amount}', state.value?.selectedAmount || '0'))
+const interceptDescriptionText = computed(() => LOAN_SUCCESS_TEXT.interceptDescriptionTemplate.replace('{amount}', state.value?.selectedAmount || '0'))
+const interceptCountdownText = computed(() => LOAN_SUCCESS_TEXT.interceptCountdownValueTemplate.replace('{seconds}', String(state.value?.interceptCountdown ?? 0)))
 
 function productAmountText(product) {
   return `S/ ${formatDecimalString(product.minAmount)}`
@@ -160,14 +165,14 @@ function openOrder(order) {
       <div class="loan-success-scroll">
         <section class="loan-success-hero">
           <img class="loan-success-hero__illustration" :src="successIllustrationAsset" alt="" />
-          <h2 v-if="isRecommendation || isEmptyResult">
-            {{ isRecommendation ? LOAN_SUCCESS_TEXT.successTitle : LOAN_SUCCESS_TEXT.emptyResultTitle }}
+          <h2 v-if="isRecommendationContent || isEmptyResult">
+            {{ isRecommendationContent ? LOAN_SUCCESS_TEXT.successTitle : LOAN_SUCCESS_TEXT.emptyResultTitle }}
           </h2>
-          <p v-if="isRecommendation">{{ LOAN_SUCCESS_TEXT.successDescription }}</p>
+          <p v-if="isRecommendationContent">{{ LOAN_SUCCESS_TEXT.successDescription }}</p>
         </section>
 
         <button
-          v-if="isRecommendation"
+          v-if="isRecommendationContent"
           class="loan-success-primary"
           type="button"
           :disabled="state.submitting || state.navigationLocked || state.selectedCount < 1"
@@ -176,12 +181,12 @@ function openOrder(order) {
           {{ applyButtonText }}
         </button>
 
-        <section v-if="isRecommendation" class="loan-success-vip" aria-label="VIP">
+        <section v-if="isRecommendationContent" class="loan-success-vip" aria-label="VIP">
           <img class="loan-success-vip__badge" :src="vipBadgeAsset" alt="" />
           <p>{{ LOAN_SUCCESS_TEXT.vipDescription }}</p>
         </section>
 
-        <section v-if="isRecommendation" class="loan-success-products" aria-label="Productos recomendados">
+        <section v-if="isRecommendationContent" class="loan-success-products" aria-label="Productos recomendados">
           <h2>{{ productCountText }}</h2>
           <button
             v-for="product in state.products"
@@ -190,6 +195,7 @@ function openOrder(order) {
             :class="{ 'loan-success-product--selected': productSelected(product) }"
             type="button"
             :aria-pressed="productSelected(product)"
+            :disabled="state.submitting || state.navigationLocked"
             @click="controller?.toggleProduct(product.id)"
           >
             <img class="loan-success-product__icon" :src="product.icon" alt="" />
@@ -230,8 +236,10 @@ function openOrder(order) {
             <img class="loan-success-order__icon" :src="order.productIcon" alt="" />
             <span class="loan-success-order__content">
               <strong>{{ order.productName }}</strong>
-              <span>{{ LOAN_SUCCESS_TEXT.productAmountLabel }}</span>
-              <span class="loan-success-order__amount">{{ orderAmountText(order) }}</span>
+              <span class="loan-success-order__amount-row">
+                <span>{{ LOAN_SUCCESS_TEXT.productAmountLabel }}</span>
+                <span class="loan-success-order__amount">{{ orderAmountText(order) }}</span>
+              </span>
             </span>
             <span class="loan-success-order__status">{{ order.orderStatusText }}</span>
           </button>
@@ -244,9 +252,9 @@ function openOrder(order) {
         <div class="loan-success-intercept__icon">
           <img :src="interceptIconAsset" alt="" />
         </div>
-        <p class="loan-success-intercept__description">{{ LOAN_SUCCESS_TEXT.interceptDescription }}</p>
+        <p class="loan-success-intercept__description">{{ interceptDescriptionText }}</p>
         <p class="loan-success-intercept__countdown-label">{{ LOAN_SUCCESS_TEXT.interceptCountdownLabel }}</p>
-        <p class="loan-success-intercept__countdown">{{ LOAN_SUCCESS_TEXT.interceptCountdownValue }}</p>
+        <p class="loan-success-intercept__countdown">{{ interceptCountdownText }}</p>
         <button class="loan-success-modal__primary" type="button" @click="controller?.closeBackIntercept()">
           {{ LOAN_SUCCESS_TEXT.interceptContinue }}
         </button>

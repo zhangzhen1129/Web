@@ -41,11 +41,11 @@ test('pre-application rejects business failures and invalid order identifier arr
   assert.deepEqual(await service.preApply({ productIds: [] }), { status: 'failed', code: 'PRE_APPLICATION_INPUT_INVALID' })
 })
 
-test('application uses pre-application order identifiers and requires a successful response array', async () => {
+test('application uses pre-application order identifiers and requires a successful successList array', async () => {
   const requests = []
   const service = createMultiPushApplicationService({
     store: createStore(),
-    client: { request: async (request) => { requests.push(request); return successEnvelope('aewM', ['order-1']) } },
+    client: { request: async (request) => { requests.push(request); return successEnvelope('aewM', { successList: ['order-1'] }) } },
   })
 
   assert.deepEqual(await service.apply({ orderIds: ['order-1'] }), { status: 'success' })
@@ -57,7 +57,7 @@ test('application uses pre-application order identifiers and requires a successf
 test('application maps request and business failures without exposing server payloads', async () => {
   const failedResponse = createMultiPushApplicationService({
     store: createStore(),
-    client: { request: async () => ({ data: { cyiUgNvO2EPltj: { atY3WWbXIN: 5000 }, aewM: ['order-1'] } }) },
+    client: { request: async () => ({ data: { cyiUgNvO2EPltj: { atY3WWbXIN: 5000 }, aewM: { successList: ['order-1'] } } }) },
   })
   const failedRequest = createMultiPushApplicationService({
     store: createStore(),

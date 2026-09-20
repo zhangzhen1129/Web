@@ -153,6 +153,115 @@ test('runs upload, pre-application, application, success notice, and a new produ
   assert.equal(harness.calls.includes('success-notice'), true)
   assert.equal(harness.calls.filter((call) => call === 'api:products').length, 2)
   assert.equal(harness.controller.getState().rootState, 'recommendation')
+  assert.equal(harness.controller.getState().loadingBarStatus, null)
+})
+
+test('refreshes recommendations and accepts consecutive submissions', async () => {
+  let productLoadCount = 0
+  let applyCount = 0
+  const productCycles = [
+    [{ id: 'p1', productName: 'One', minAmount: '1500', icon: 'https://cdn.example.com/1.png' }],
+    [{ id: 'p2', productName: 'Two', minAmount: '2500', icon: 'https://cdn.example.com/2.png' }],
+    [{ id: 'p3', productName: 'Three', minAmount: '3500', icon: 'https://cdn.example.com/3.png' }],
+  ]
+  const harness = createHarness({
+    services: {
+      async loadRecommendedProducts() {
+        const products = productCycles[Math.min(productLoadCount, productCycles.length - 1)]
+        productLoadCount += 1
+        return { type: 'success', products }
+      },
+      async loadOrders() { return { type: 'empty' } },
+      async preApply() { return { type: 'success', orderIds: ['o1'] } },
+      async apply() {
+        applyCount += 1
+        return { type: 'success', orderIds: [`o${applyCount}`] }
+      },
+      async getReviewPromptEnabled() { return { type: 'success', enabled: false } },
+      async saveReview() { return { type: 'success' } },
+    },
+  })
+
+  harness.controller.initialize({ systemTime: '123' })
+  await waitFor(() => productLoadCount === 1 && harness.controller.getState().rootState === 'recommendation')
+  assert.equal(harness.controller.getState().products[0].id, 'p1')
+
+  assert.equal(harness.controller.submitRecommendation(), true)
+  await waitFor(() => productLoadCount === 2
+    && harness.controller.getState().rootState === 'recommendation'
+    && harness.controller.getState().submitting === false)
+  assert.equal(harness.controller.getState().products[0].id, 'p2')
+  assert.equal(harness.controller.getState().loadingBarStatus, null)
+
+  assert.equal(harness.controller.submitRecommendation(), true)
+  await waitFor(() => productLoadCount === 3
+    && harness.controller.getState().rootState === 'recommendation'
+    && harness.controller.getState().submitting === false)
+  assert.equal(harness.controller.getState().products[0].id, 'p3')
+  assert.equal(harness.controller.getState().loadingBarStatus, null)
+  assert.equal(applyCount, 2)
+})
+
+test('ignores a pending load cycle after navigation invalidates the page instance', async () => {
+  let productLoadCount = 0
+  let resolvePendingProducts = null
+  const harness = createHarness({
+    services: {
+      async loadRecommendedProducts() {
+        productLoadCount += 1
+        if (productLoadCount === 1) {
+          return {
+            type: 'success',
+            products: [{ id: 'p1', productName: 'One', minAmount: '1500', icon: 'https://cdn.example.com/1.png' }],
+          }
+        }
+        return new Promise((resolve) => { resolvePendingProducts = resolve })
+      },
+      async loadOrders() { return { type: 'empty' } },
+      async preApply() { return { type: 'success', orderIds: ['o1'] } },
+      async apply() { return { type: 'success', orderIds: ['o1'] } },
+      async getReviewPromptEnabled() { return { type: 'success', enabled: false } },
+      async saveReview() { return { type: 'success' } },
+    },
+  })
+
+  harness.controller.initialize({ systemTime: '123' })
+  await waitFor(() => productLoadCount === 1 && harness.controller.getState().rootState === 'recommendation')
+  harness.controller.submitRecommendation()
+  await waitFor(() => productLoadCount === 2 && harness.controller.getState().rootState === 'loading')
+
+  assert.equal(harness.controller.requestBack(), true)
+  assert.equal(harness.calls.includes('navigate:back'), true)
+  assert.equal(harness.controller.getState().rootState, 'inactive')
+
+  resolvePendingProducts({
+    type: 'success',
+    products: [{ id: 'p2', productName: 'Two', minAmount: '2500', icon: 'https://cdn.example.com/2.png' }],
+  })
+  await flush()
+  assert.equal(harness.controller.getState().rootState, 'inactive')
+  assert.equal(harness.controller.getState().products.length, 0)
+  assert.equal(harness.controller.getState().loadingBarStatus, null)
+})
+
+test('ignores late upload status after a successful application', async () => {
+  let emitLateStatus = () => {}
+  const harness = createHarness({
+    triggerUpload: async ({ onStatus }) => {
+      onStatus?.('collecting')
+      emitLateStatus = () => onStatus?.('uploading')
+      return { status: 'success' }
+    },
+  })
+  harness.controller.initialize({ systemTime: '123' })
+  await flush()
+  harness.controller.submitRecommendation()
+  await waitFor(() => harness.calls.filter((call) => call === 'api:products').length === 2
+    && harness.controller.getState().rootState === 'recommendation')
+  emitLateStatus()
+  await flush()
+  assert.equal(harness.controller.getState().loadingBarStatus, null)
+  assert.equal(harness.controller.getState().rootState, 'recommendation')
 })
 
 test('keeps selection and skips application when upload fails', async () => {
@@ -180,6 +289,27 @@ test('recommendation back opens intercept; cancel returns to the previous histor
   assert.equal(harness.controller.requestBack(), true)
   assert.equal(harness.controller.cancelBackIntercept(), true)
   assert.equal(harness.calls.includes('navigate:back'), true)
+})
+
+test('intercept countdown starts at ten and stops at zero without navigating', async () => {
+  let tick = null
+  const harness = createHarness({
+    setTimer(callback) {
+      tick = callback
+      return 1
+    },
+    clearTimer() {},
+  })
+  harness.controller.initialize({ systemTime: '123' })
+  await flush()
+  harness.controller.requestBack()
+  assert.equal(harness.controller.getState().interceptCountdown, 10)
+  tick()
+  assert.equal(harness.controller.getState().interceptCountdown, 9)
+  for (let index = 0; index < 9; index += 1) tick()
+  assert.equal(harness.controller.getState().interceptCountdown, 0)
+  assert.equal(harness.controller.getState().overlay, 'back_intercept')
+  assert.equal(harness.calls.includes('navigate:back'), false)
 })
 
 test('review gate opens the review and saves a high rating before Google Play', async () => {
