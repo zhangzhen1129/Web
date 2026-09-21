@@ -7,14 +7,16 @@ function flush() {
 }
 
 async function waitFor(predicate) {
-  for (let attempt = 0; attempt < 20; attempt += 1) {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
     if (predicate()) return
     await flush()
   }
+  throw new Error('Timed out waiting for test condition')
 }
 
 function createHarness(overrides = {}) {
   const calls = []
+  const { services: serviceOverrides, ...controllerOverrides } = overrides
   let backConfig = null
   let abortCount = 0
   const products = [
@@ -46,7 +48,7 @@ function createHarness(overrides = {}) {
       calls.push(`api:save:${grade}:${content}`)
       return { type: 'success' }
     },
-    ...overrides.services,
+    ...serviceOverrides,
   }
   const controller = createLoanSuccessController({
     services,
@@ -81,7 +83,7 @@ function createHarness(overrides = {}) {
     onNavigateOrderList: () => calls.push('navigate:order-list'),
     onNavigateOrderDetail: ({ orderId }) => calls.push(`navigate:order-detail:${orderId}`),
     onNavigateBack: () => calls.push('navigate:back'),
-    ...overrides,
+    ...controllerOverrides,
   })
   return { calls, controller, getBackConfig: () => backConfig, abortCount: () => abortCount }
 }
@@ -325,15 +327,36 @@ test('review gate opens the review and saves a high rating before Google Play', 
     },
   })
   harness.controller.initialize({ systemTime: '123' })
-  await flush()
-  harness.controller.openReviewFromMain()
-  await flush()
+  await waitFor(() => harness.controller.getState().rootState === 'order_list')
+  assert.equal(harness.controller.openReviewFromMain(), true)
+  await waitFor(() => harness.controller.getState().overlay === 'review_prompt')
   assert.equal(harness.controller.getState().overlay, 'review_prompt')
   assert.equal(harness.controller.getState().reviewRating, 5)
   assert.equal(await harness.controller.submitReview(), true)
   await flush()
   assert.equal(harness.calls.includes('copy-success'), true)
   assert.equal(harness.calls.includes('google-play'), true)
+  assert.equal(harness.calls.includes('navigate:order-list'), true)
+})
+
+test('saves a low rating without opening Google Play', async () => {
+  const harness = createHarness({
+    services: {
+      async loadRecommendedProducts() { return { type: 'empty' } },
+      async loadOrders() { return { type: 'empty' } },
+    },
+  })
+  harness.controller.initialize({ systemTime: '123' })
+  await waitFor(() => harness.controller.getState().rootState === 'empty_result')
+  assert.equal(harness.controller.openReviewFromMain(), true)
+  await waitFor(() => harness.controller.getState().overlay === 'review_prompt')
+  assert.equal(harness.controller.setReviewRating(3), true)
+  assert.equal(harness.controller.setReviewContent('User comment'), true)
+  assert.equal(await harness.controller.submitReview(), true)
+  await flush()
+  assert.equal(harness.calls.includes('api:save:3:User comment'), true)
+  assert.equal(harness.calls.includes('copy-success'), false)
+  assert.equal(harness.calls.includes('google-play'), false)
   assert.equal(harness.calls.includes('navigate:order-list'), true)
 })
 

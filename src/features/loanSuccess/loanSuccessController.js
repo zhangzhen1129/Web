@@ -21,6 +21,7 @@ const REVIEW_ORIGINS = Object.freeze({
   orderListMain: 'order_list_main',
 })
 const INTERCEPT_COUNTDOWN_SECONDS = 10
+const REVIEW_HIGH_RATING_MIN = 4
 
 function createState() {
   return Object.freeze({
@@ -599,8 +600,9 @@ export function createLoanSuccessController({
     ) return false
 
     const origin = state.reviewOrigin
-    const content = state.reviewRating >= 4 ? state.recommendedComment : state.reviewContent
-    if (state.reviewRating >= 4) {
+    const isHighRating = state.reviewRating >= REVIEW_HIGH_RATING_MIN
+    const content = isHighRating ? state.recommendedComment : state.reviewContent
+    if (isHighRating) {
       let copied = false
       try { copied = await copyText?.(content) === true } catch { copied = false }
       if (!isCurrent(instanceId) || state.overlay !== OVERLAY_STATES.reviewPrompt) return false
@@ -631,7 +633,9 @@ export function createLoanSuccessController({
     if (!isCurrent(instanceId)) return false
     reviewSubmitController = null
     if (result?.type === 'success') {
-      try { openGooglePlay?.() } catch {}
+      if (isHighRating) {
+        try { openGooglePlay?.() } catch {}
+      }
       emit({ overlay: null, reviewSubmitting: false, reviewOrigin: null })
       completeReviewFlow(origin)
       return true

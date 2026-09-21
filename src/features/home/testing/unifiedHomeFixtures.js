@@ -52,9 +52,9 @@ function creditSummary({ locked = false, refreshEnabled = true, availableText = 
     availableLabelText: 'Crédito disponible',
     availableText,
     totalLabelText: 'Crédito total',
-    totalText: 'S/ 5,000',
+    totalText: '5,000',
     usedLabelText: 'Crédito usado',
-    usedText: locked ? 'S/ 3,000' : 'S/ 0',
+    usedText: locked ? '3,000' : '0',
     locked,
     refreshEnabled,
   }
