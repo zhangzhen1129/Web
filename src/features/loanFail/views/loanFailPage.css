@@ -1,0 +1,128 @@
+.loan-fail-page {
+  position: relative;
+  width: 100%;
+  height: 100dvh;
+  min-height: 100vh;
+  overflow: hidden;
+  background: #f8f9fc;
+  color: #2a303c;
+  font-family: Roboto, Arial, sans-serif;
+}
+
+.loan-fail-header {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: calc(1.64103rem + var(--app-safe-area-top));
+  padding-top: var(--app-safe-area-top);
+  background: #f8f9fc;
+}
+
+.loan-fail-header__nav {
+  position: relative;
+  display: flex;
+  height: 1.64103rem;
+  align-items: center;
+  justify-content: center;
+  padding: .25641rem .41026rem;
+}
+
+.loan-fail-header__nav h1 {
+  max-width: 6.2rem;
+  margin: 0;
+  overflow: hidden;
+  color: #333;
+  font-size: .46154rem;
+  font-weight: 900;
+  line-height: .61538rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.loan-fail-header__back {
+  position: absolute;
+  top: .25641rem;
+  left: .41026rem;
+  display: grid;
+  width: 1.12821rem;
+  height: 1.12821rem;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: .30769rem;
+  background: #fff;
+  box-shadow: 0 .05128rem .10256rem rgb(0 0 0 / 8%);
+}
+
+.loan-fail-header__back img {
+  width: .51282rem;
+  height: .51282rem;
+}
+
+.loan-fail-header__back:disabled {
+  opacity: .65;
+}
+
+.loan-fail-content {
+  position: absolute;
+  top: calc(1.64103rem + var(--app-safe-area-top));
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1.48718rem .41026rem calc(1.5rem + env(safe-area-inset-bottom));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.loan-fail-content__illustration {
+  display: block;
+  width: 4.69231rem;
+  height: 2.76923rem;
+  flex: 0 0 auto;
+  object-fit: contain;
+}
+
+.loan-fail-content__description {
+  width: calc(100% - .51282rem);
+  margin: .41026rem 0 0;
+  color: #2a303c;
+  font-size: .41026rem;
+  font-weight: 500;
+  line-height: .51282rem;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.loan-fail-content__home {
+  display: block;
+  width: 100%;
+  height: 1.4359rem;
+  flex: 0 0 auto;
+  margin-top: .61538rem;
+  padding: 0 .30769rem;
+  overflow: hidden;
+  border: 0;
+  border-radius: .41026rem;
+  background: linear-gradient(90deg, #155dfc 0%, #4f39f6 50%, #9810fa 100%);
+  color: #fff;
+  font-size: .41026rem;
+  font-weight: 900;
+  line-height: .61538rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.loan-fail-content__home:disabled {
+  opacity: .65;
+}
+
+.loan-fail-header__back:focus-visible,
+.loan-fail-content__home:focus-visible {
+  outline: .07692rem solid #111827;
+  outline-offset: .05128rem;
+}

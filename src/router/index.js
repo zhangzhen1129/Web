@@ -10,6 +10,7 @@ const ContactsPage = () => import('../features/contacts/views/ContactsPage.vue')
 const BankPage = () => import('../features/bank/views/BankPage.vue')
 const LoanConfirmPage = () => import('../features/loanConfirm/views/LoanConfirmPage.vue')
 const LoanSuccessPage = () => import('../features/loanSuccess/views/LoanSuccessPage.vue')
+const LoanFailPage = () => import('../features/loanFail/views/LoanFailPage.vue')
 
 export const ROUTE_PATH = Object.freeze({
   HOME: '/home',
@@ -100,8 +101,7 @@ export const router = createRouter({
         {
           path: 'loanFail',
           name: 'loanFail',
-          component: RoutePlaceholder,
-          props: { title: 'Loan failure' },
+          component: LoanFailPage,
           beforeEnter: (to) => {
             const orderId = to.query.orderId
             const isValidOrderId = Object.keys(to.query).length === 1
