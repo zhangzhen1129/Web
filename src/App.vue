@@ -126,6 +126,11 @@ function handleAppWheel(event) {
   <div class="app" @wheel="handleAppWheel">
     <div class="safe-area-probe" aria-hidden="true"></div>
     <RouterView />
-    <HomeTabs v-if="showMainTabs" :tabs="tabs" @navigate="navigateTabIntent" />
+    <HomeTabs
+      v-if="showMainTabs"
+      :tabs="tabs"
+      :repayment-count="appModeState.repaymentCount"
+      @navigate="navigateTabIntent"
+    />
   </div>
 </template>

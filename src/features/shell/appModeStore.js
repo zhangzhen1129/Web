@@ -19,6 +19,7 @@ function createDefaultHomeTabs() {
 const state = reactive({
   mode: APP_MODE.CASH_LOAN,
   homeTabs: createDefaultHomeTabs(),
+  repaymentCount: 0,
   diagnosticCode: null,
 })
 
@@ -36,6 +37,10 @@ function normalizeAppMode(value) {
     return normalized
   }
   return null
+}
+
+function normalizeRepaymentCount(value) {
+  return Number.isSafeInteger(value) && value >= 0 ? value : null
 }
 
 export function setAppMode(value) {
@@ -60,6 +65,13 @@ export function setHomeTabs(tabs) {
     : createDefaultHomeTabs()
 }
 
+export function setRepaymentCount(value) {
+  const normalized = normalizeRepaymentCount(value)
+  if (normalized === null) return false
+  state.repaymentCount = normalized
+  return true
+}
+
 export function syncAppModeFromHomePayload(payload) {
   const tabs = Array.isArray(payload?.tabs) && payload.tabs.length > 0
     ? payload.tabs
@@ -68,6 +80,7 @@ export function syncAppModeFromHomePayload(payload) {
   if (payload?.homeMode === 'multi_push' && tabs) {
     setAppMode(APP_MODE.MULTI_PUSH)
     setHomeTabs(tabs)
+    if (payload.multiPushViewData) setRepaymentCount(payload.multiPushViewData.repaymentCount)
     return true
   }
 

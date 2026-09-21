@@ -9,7 +9,7 @@ test('renders main tabs only for routes with a tab key', () => {
   assert.match(appSource, /const showMainTabs = computed\(\(\) => route\.meta\.showTab === true\)/)
   assert.match(appSource, /createHomeRouteConsumer\(\{ router \}\)/)
   assert.match(appSource, /installHomeRouteDispatcher\(router\)/)
-  assert.match(appSource, /<HomeTabs v-if="showMainTabs" :tabs="tabs" @navigate="navigateTabIntent" \/>/)
+  assert.match(appSource, /<HomeTabs[\s\S]*:tabs="tabs"[\s\S]*:repayment-count="appModeState\.repaymentCount"[\s\S]*@navigate="navigateTabIntent"[\s\S]*\/>/)
   assert.match(routerSource, /component: MainTabShell/)
   assert.match(routerSource, /children: \[/)
   assert.match(routerSource, /showTab: true, tabKey: 'home'/)

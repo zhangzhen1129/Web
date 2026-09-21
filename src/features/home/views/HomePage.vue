@@ -26,9 +26,10 @@ let isDisposed = false
 let needsBrowserReturnReload = false
 
 function updateHomeView(payload) {
-  if (isDisposed) return
-  syncAppModeFromHomePayload(payload)
-  homeView.value?.updateHomeView(payload)
+  if (isDisposed) return false
+  const accepted = homeView.value?.updateHomeView(payload) === true
+  if (accepted) syncAppModeFromHomePayload(payload)
+  return accepted
 }
 
 function handleHomeOperation(operation) {

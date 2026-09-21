@@ -239,6 +239,7 @@ function validateProductSummary(value, path, issues) {
 function validateMultiPushViewData(value, path, issues) {
   const keys = new Set([
     'variant',
+    'repaymentCount',
     'steps',
     'broadcast',
     'creditSummary',
@@ -249,6 +250,7 @@ function validateMultiPushViewData(value, path, issues) {
   ])
   if (!exactRecord(value, keys, path, issues)) return
   if (!multiPushVariants.has(value.variant)) issue(issues, `${path}.variant`, 'invalid_enum')
+  if (!Number.isSafeInteger(value.repaymentCount) || value.repaymentCount < 0) issue(issues, `${path}.repaymentCount`, 'invalid_repayment_count')
   if (hasOwn(value, 'steps')) {
     arrayValue(value.steps, `${path}.steps`, issues, validateStep)
     uniqueField(value.steps, 'key', `${path}.steps`, issues)

@@ -6,6 +6,10 @@ import { createUnifiedHomeFixture } from './unifiedHomeFixtures.js'
 const query = new URLSearchParams(window.location.search)
 const scenario = query.get('scenario') ?? 'cash-apply'
 const activeTab = query.get('tab') ?? 'home'
+const repaymentCountParam = Number(query.get('repaymentCount'))
+const repaymentCount = Number.isSafeInteger(repaymentCountParam) && repaymentCountParam >= 0
+  ? repaymentCountParam
+  : undefined
 const payload = createUnifiedHomeFixture(scenario, activeTab)
 const homeView = ref(null)
 const operationLog = []
@@ -37,6 +41,7 @@ onMounted(async () => {
   <UnifiedHomeView
     ref="homeView"
     :initial-payload="payload"
+    :repayment-count="repaymentCount"
     :request-id-factory="() => `home-browser-${operationSequence += 1}`"
     @emit-home-operation="recordOperation"
     @diagnostic="recordDiagnostic"

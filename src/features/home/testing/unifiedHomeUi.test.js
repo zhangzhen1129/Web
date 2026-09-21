@@ -90,6 +90,10 @@ test('payload validation enforces exact broadcast, product and count-template co
   const invalidTemplate = createUnifiedHomeFixture('multi-available-only')
   invalidTemplate.multiPushViewData.productSummary.countTextTemplate = '{count} de {count}'
   assert.ok(validateHomeViewPayload(invalidTemplate).some((item) => item.code === 'invalid_count_placeholder'))
+
+  const invalidRepaymentCount = createUnifiedHomeFixture('multi-available-only')
+  invalidRepaymentCount.multiPushViewData.repaymentCount = -1
+  assert.ok(validateHomeViewPayload(invalidRepaymentCount).some((item) => item.code === 'invalid_repayment_count'))
 })
 
 test('multi-push submission presentation is model-driven and scoped to its operation', () => {

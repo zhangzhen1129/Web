@@ -281,7 +281,7 @@ function validateMultiPushProduct(value, path, issues) {
 }
 
 function validateMultiPushViewData(value, path, issues) {
-  const keys = new Set(['titleText', 'steps', 'broadcast', 'availableProductCount', 'activeLoanCount', 'allProcessing', 'availableAmount', 'availableLabelText', 'totalCredit', 'totalCreditLabelText', 'usedCredit', 'usedCreditLabelText', 'selectedProductCount', 'selectedMinimumAmount', 'serverRemainingAmount', 'locked', 'refreshEnabled', 'primaryButtonText', 'creditRefreshLabelText', 'primaryAction', 'statusDescription', 'products', 'minimumSelectionCount', 'selectionSubmitText', 'productSummaryText', 'productCountText', 'loanAmountLabelText', 'dueDateLabelText', 'reloanLabelText', 'tabs'])
+  const keys = new Set(['titleText', 'steps', 'broadcast', 'repaymentCount', 'availableProductCount', 'activeLoanCount', 'allProcessing', 'availableAmount', 'availableLabelText', 'totalCredit', 'totalCreditLabelText', 'usedCredit', 'usedCreditLabelText', 'selectedProductCount', 'selectedMinimumAmount', 'serverRemainingAmount', 'locked', 'refreshEnabled', 'primaryButtonText', 'creditRefreshLabelText', 'primaryAction', 'statusDescription', 'products', 'minimumSelectionCount', 'selectionSubmitText', 'productSummaryText', 'productCountText', 'loanAmountLabelText', 'dueDateLabelText', 'reloanLabelText', 'tabs'])
   if (!validateExactKeys(value, keys, path, issues)) return
   for (const key of ['availableAmount', 'availableLabelText', 'totalCredit', 'totalCreditLabelText', 'usedCredit', 'usedCreditLabelText', 'primaryButtonText', 'creditRefreshLabelText']) validateRequiredString(value[key], `${path}.${key}`, issues)
   if (typeof value.statusDescription !== 'string') addIssue(issues, `${path}.statusDescription`, 'required_string')
@@ -291,6 +291,7 @@ function validateMultiPushViewData(value, path, issues) {
   if (hasOwn(value, 'productCountText')) validateRequiredString(value.productCountText, `${path}.productCountText`, issues)
   if (hasOwn(value, 'steps')) { validateArray(value.steps, `${path}.steps`, issues, validateStep); validateUniqueKeys(value.steps, `${path}.steps`, issues) }
   if (hasOwn(value, 'broadcast')) validateBroadcast(value.broadcast, `${path}.broadcast`, issues)
+  if (!Number.isSafeInteger(value.repaymentCount) || value.repaymentCount < 0) addIssue(issues, `${path}.repaymentCount`, 'invalid_non_negative_integer')
   for (const key of ['availableProductCount', 'activeLoanCount']) {
     if (!Number.isInteger(value[key]) || value[key] < 0) addIssue(issues, `${path}.${key}`, 'invalid_non_negative_integer')
   }

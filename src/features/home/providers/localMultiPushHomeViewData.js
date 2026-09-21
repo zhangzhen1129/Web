@@ -161,6 +161,7 @@ export function createLocalMultiPushHomeViewData(scenario) {
   const { appMode, ...displayData } = data
   return {
     ...displayData,
+    repaymentCount: Number.isSafeInteger(data.activeLoanCount) && data.activeLoanCount >= 0 ? data.activeLoanCount : 0,
     titleText: 'Solicitud rápida en 3 pasos',
     creditRefreshLabelText: 'Actualizar crédito',
     loanAmountLabelText: 'Monto del préstamo',

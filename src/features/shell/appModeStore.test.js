@@ -7,6 +7,7 @@ import {
   resetHomeTabs,
   setAppMode,
   setHomeTabs,
+  setRepaymentCount,
   shouldShowRepaymentTab,
   syncAppModeFromHomePayload,
 } from './appModeStore.js'
@@ -80,4 +81,33 @@ test('keeps cash-loan mode stable when a loading model only carries the current 
   assert.equal(syncAppModeFromHomePayload({ pageStatus: 'loading', tabs }), true)
   assert.equal(appModeState.mode, APP_MODE.CASH_LOAN)
   assert.deepEqual(appModeState.homeTabs.map((tab) => tab.key), ['home', 'account'])
+})
+
+test('publishes a repayment count only from a successful multi-push payload and preserves it', () => {
+  const tabs = [
+    { key: 'home', text: 'Prestamos', iconResourceKey: 'home', active: true, enabled: true },
+    { key: 'repayment', text: 'Reembolso', iconResourceKey: 'repayment', active: false, enabled: true },
+    { key: 'account', text: 'Mi cuenta', iconResourceKey: 'account', active: false, enabled: true },
+  ]
+  setRepaymentCount(0)
+  assert.equal(syncAppModeFromHomePayload({
+    pageStatus: 'content',
+    homeMode: 'multi_push',
+    tabs,
+    multiPushViewData: { repaymentCount: 12 },
+  }), true)
+  assert.equal(appModeState.repaymentCount, 12)
+
+  assert.equal(syncAppModeFromHomePayload({ pageStatus: 'loading', tabs }), true)
+  assert.equal(appModeState.repaymentCount, 12)
+  assert.equal(syncAppModeFromHomePayload({ pageStatus: 'error', tabs }), false)
+  assert.equal(appModeState.repaymentCount, 12)
+
+  assert.equal(syncAppModeFromHomePayload({
+    pageStatus: 'content',
+    homeMode: 'multi_push',
+    tabs,
+    multiPushViewData: { repaymentCount: -1 },
+  }), true)
+  assert.equal(appModeState.repaymentCount, 12)
 })

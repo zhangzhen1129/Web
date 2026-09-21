@@ -94,6 +94,7 @@ async function main() {
   const baseUrl = readArgument('--base-url', 'http://127.0.0.1:5173/home-preview.html')
   const browserExecutable = readArgument('--browser')
   const outputDirectory = path.resolve(readArgument('--output-dir', 'home-ui-browser-output'))
+  const badgeOnly = process.argv.includes('--badge-only')
   if (!browserExecutable) throw new Error('Missing --browser')
   await mkdir(outputDirectory, { recursive: true })
   const profileDirectory = await mkdtemp(path.join(os.tmpdir(), 'unified-home-browser-'))
@@ -210,6 +211,42 @@ async function main() {
       await navigate(`scenario=cash-apply&tab=${tabKey}`)
       assert.equal(await evaluate(`document.querySelector('.unified-home__tabs .is-active span').textContent`), tabKey === 'repayment' ? 'Reembolso' : 'Mi cuenta')
       await screenshot(`tab-${tabKey}-375x812`)
+    }
+
+    const repaymentBadgeCases = [
+      { query: 'scenario=multi-available-only', text: null },
+      { query: 'scenario=multi-available-only&repaymentCount=0', text: null },
+      { query: 'scenario=multi-available-only&repaymentCount=-1', text: null },
+      { query: 'scenario=multi-available-only&repaymentCount=1', text: '1' },
+      { query: 'scenario=multi-available-only&repaymentCount=99', text: '99' },
+      { query: 'scenario=multi-available-only&repaymentCount=100', text: '99+' },
+      { query: 'scenario=multi-available-only&repaymentCount=1000', text: '99+' },
+    ]
+    for (const badgeCase of repaymentBadgeCases) {
+      await navigate(badgeCase.query)
+      const badgeText = await evaluate(`document.querySelector('.unified-home__tabs button:nth-child(2) .van-badge')?.textContent ?? null`)
+      assert.equal(badgeText, badgeCase.text)
+    }
+    await navigate('scenario=multi-available-only&repaymentCount=100')
+    await evaluate(`document.querySelectorAll('.unified-home__tabs button')[1].click()`)
+    assert.equal(await evaluate(`document.querySelector('.unified-home__tabs button:nth-child(2) .van-badge')?.textContent`), '99+')
+    await evaluate(`document.querySelectorAll('.unified-home__tabs button')[1].click()`)
+    assert.deepEqual(await evaluate('window.unifiedHomePreview.operationLog'), [
+      { requestId: 'home-browser-1', type: 'select_tab', data: { tabKey: 'repayment' } },
+    ])
+    await screenshot('repayment-badge-99plus-375x812')
+
+    if (badgeOnly) {
+      assert.deepEqual(browserErrors, [])
+      const report = {
+        status: 'passed',
+        browserErrors,
+        badgeCases: repaymentBadgeCases.length + 1,
+        screenshot: 'repayment-badge-99plus-375x812.png',
+      }
+      await writeFile(path.join(outputDirectory, 'browser-check.json'), `${JSON.stringify(report, null, 2)}\n`, 'utf8')
+      process.stdout.write(`${JSON.stringify(report, null, 2)}\n`)
+      return
     }
 
     await navigate('scenario=multi-available-only')

@@ -1,18 +1,26 @@
 <script setup>
+import { computed } from 'vue'
+import { Badge } from 'vant'
+import 'vant/es/badge/style'
 import accountTabIcon from '../../../assets/home/account-tab.svg'
 import accountTabActiveIcon from '../../../assets/home/account-tab-active.svg'
 import loanTabIcon from '../../../assets/home/loan-tab.svg'
 import loanTabInactiveIcon from '../../../assets/home/loan-tab-inactive.svg'
 import repaymentTabActiveIcon from '../../../assets/home/repayment-tab-active.svg'
 import repaymentTabIcon from '../../../assets/home/repayment-tab.svg'
+import { getRepaymentBadgeText } from '../ui/homeRepaymentBadge.js'
 
-defineProps({ tabs: { type: Array, default: () => [] } })
+const props = defineProps({
+  tabs: { type: Array, default: () => [] },
+  repaymentCount: { type: Number, default: undefined },
+})
 defineEmits(['navigate'])
 const tabIcons = {
   home: { active: loanTabIcon, inactive: loanTabInactiveIcon },
   repayment: { active: repaymentTabActiveIcon, inactive: repaymentTabIcon },
   account: { active: accountTabActiveIcon, inactive: accountTabIcon },
 }
+const repaymentBadgeText = computed(() => getRepaymentBadgeText(props.repaymentCount))
 
 function getTabIcon(tab) {
   const iconSet = tabIcons[tab.iconResourceKey] || tabIcons[tab.key]
@@ -33,7 +41,10 @@ function getTabIcon(tab) {
       :aria-current="tab.active ? 'page' : undefined"
       @click="$emit('navigate', tab)"
     >
-      <img class="home-tab__icon" :src="getTabIcon(tab)" alt="" />
+      <Badge v-if="tab.key === 'repayment' && repaymentBadgeText" :content="repaymentBadgeText">
+        <img class="home-tab__icon" :src="getTabIcon(tab)" alt="" />
+      </Badge>
+      <img v-else class="home-tab__icon" :src="getTabIcon(tab)" alt="" />
       <span>{{ tab.text }}</span>
     </button>
   </nav>

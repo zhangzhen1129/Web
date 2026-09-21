@@ -95,6 +95,7 @@ function multiPayload(requestId, revision, variant, options = {}) {
   const fixtureProducts = options.products === undefined ? clone(products) : clone(options.products)
   const data = {
     variant,
+    repaymentCount: options.repaymentCount ?? 0,
     steps: clone(steps),
     broadcast: clone(broadcast),
     creditSummary: creditSummary({ locked: options.locked, refreshEnabled: !options.locked, availableText: options.availableText }),

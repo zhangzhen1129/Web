@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue'
-import { Loading, PullRefresh, Skeleton, showToast } from 'vant'
+import { Badge, Loading, PullRefresh, Skeleton, showToast } from 'vant'
+import 'vant/es/badge/style'
 import 'vant/es/loading/style'
 import 'vant/es/pull-refresh/style'
 import 'vant/es/skeleton/style'
@@ -13,6 +14,7 @@ import productDialogClose from '../../../assets/home/product-dialog-close.svg'
 import refreshIcon from '../../../assets/home/refresh.svg'
 import { HOME_MODE, HOME_OPERATION_TYPE, HOME_PAGE_STATUS, MULTI_PUSH_VARIANT } from './homeUiContract.js'
 import { getHomeStepIcon, getHomeTabIcon } from './homeUiResources.js'
+import { getRepaymentBadgeText } from './homeRepaymentBadge.js'
 import { createHomeUiSession } from './homeUiSession.js'
 import { formatAmountText } from './homeAmountText.js'
 import { homeUiText } from './homeUiText.js'
@@ -24,6 +26,7 @@ const props = defineProps({
   initialPayload: { type: Object, default: null },
   requestIdFactory: { type: Function, default: undefined },
   showTabs: { type: Boolean, default: true },
+  repaymentCount: { type: Number, default: undefined },
 })
 const emit = defineEmits(['emitHomeOperation', 'diagnostic'])
 const session = createHomeUiSession({
@@ -54,6 +57,7 @@ const selectedCountText = computed(() => {
 const showProductSummary = computed(() => products.value.length > 0
   || state.value.multiPushViewData?.variant === MULTI_PUSH_VARIANT.ACTIVE_ONLY)
 const isActiveOnly = computed(() => state.value.multiPushViewData?.variant === MULTI_PUSH_VARIANT.ACTIVE_ONLY)
+const repaymentBadgeText = computed(() => getRepaymentBadgeText(props.repaymentCount))
 const isPageBusy = computed(() => [HOME_PAGE_STATUS.LOADING, HOME_PAGE_STATUS.REFRESHING].includes(state.value.pageStatus))
 const contentVisible = computed(() => [HOME_PAGE_STATUS.CONTENT, HOME_PAGE_STATUS.REFRESHING].includes(state.value.pageStatus))
 const canDecreaseAmount = computed(() => canSelectAdjacentAmount('previous'))
@@ -133,7 +137,7 @@ onBeforeUnmount(() => {
 
 defineExpose({
   updateHomeView(payload) {
-    session.updateHomeView(payload)
+    return session.updateHomeView(payload)
   },
 })
 </script>
@@ -284,7 +288,10 @@ defineExpose({
         :aria-current="tab.active ? 'page' : undefined"
         @click="session.selectTab(tab.key)"
       >
-        <img v-if="getHomeTabIcon(tab)" :src="getHomeTabIcon(tab)" alt="" />
+        <Badge v-if="tab.key === 'repayment' && repaymentBadgeText" :content="repaymentBadgeText">
+          <img v-if="getHomeTabIcon(tab)" :src="getHomeTabIcon(tab)" alt="" />
+        </Badge>
+        <img v-else-if="getHomeTabIcon(tab)" :src="getHomeTabIcon(tab)" alt="" />
         <span>{{ tab.text }}</span>
       </button>
     </nav>
