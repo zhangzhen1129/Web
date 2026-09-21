@@ -175,3 +175,14 @@ test('validates review prompt and review save response structures', async () => 
   assert.equal(client.calls[1].data.grade, undefined)
   assert.equal(client.calls[1].data.content, undefined)
 })
+
+test('accepts a successful review save without consuming the business data field', async () => {
+  const client = createClient({
+    'API-006': {
+      cyiUgNvO2EPltj: { atY3WWbXIN: 2000 },
+      pl9xRlV: '',
+    },
+  })
+  const services = createLoanSuccessServices({ client, getGlobalState: () => globalState })
+  assert.equal((await services.saveReview({ grade: 5, content: 'ok' })).type, 'success')
+})

@@ -219,7 +219,6 @@ export function createLoanSuccessServices({ client = networkClient, getGlobalSta
     const envelope = readMultiPushEnvelope(payload)
     if (!envelope.valid) return result('invalid_response')
     if (envelope.returnCode !== 2000) return result('business_failure', { message: envelope.message })
-    if (!isPlainObject(payload?.data)) return result('invalid_response')
     return result('success')
   }
 

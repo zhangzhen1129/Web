@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createLoanSuccessController } from './loanSuccessController.js'
+import { createLoanSuccessServices } from './services/loanSuccessServices.js'
 
 function flush() {
   return new Promise((resolve) => setTimeout(resolve, 0))
@@ -357,6 +358,49 @@ test('saves a low rating without opening Google Play', async () => {
   assert.equal(harness.calls.includes('api:save:3:User comment'), true)
   assert.equal(harness.calls.includes('copy-success'), false)
   assert.equal(harness.calls.includes('google-play'), false)
+  assert.equal(harness.calls.includes('navigate:order-list'), true)
+})
+
+test('closes the review and navigates when API-006 succeeds without a data field', async () => {
+  const client = {
+    async request(config) {
+      if (config.protocolId === 'API-001' || config.protocolId === 'API-004') {
+        return {
+          data: {
+            cyiUgNvO2EPltj: { atY3WWbXIN: 2000 },
+            pl9xRlV: '',
+            qrAbsjzu7WLU: { baIJ: [] },
+          },
+        }
+      }
+      if (config.protocolId === 'API-005') {
+        return {
+          data: {
+            cyiUgNvO2EPltj: { atY3WWbXIN: 2000 },
+            pl9xRlV: '',
+            aewM: true,
+          },
+        }
+      }
+      if (config.protocolId === 'API-006') {
+        return {
+          data: {
+            cyiUgNvO2EPltj: { atY3WWbXIN: 2000 },
+            pl9xRlV: '',
+          },
+        }
+      }
+      throw new Error('Unexpected protocol request.')
+    },
+  }
+  const services = createLoanSuccessServices({ client, getGlobalState: () => ({}) })
+  const harness = createHarness({ services })
+  harness.controller.initialize({ systemTime: '123' })
+  await waitFor(() => harness.controller.getState().rootState === 'empty_result')
+  assert.equal(harness.controller.openReviewFromMain(), true)
+  await waitFor(() => harness.controller.getState().overlay === 'review_prompt')
+  assert.equal(await harness.controller.submitReview(), true)
+  assert.equal(harness.controller.getState().overlay, null)
   assert.equal(harness.calls.includes('navigate:order-list'), true)
 })
 
