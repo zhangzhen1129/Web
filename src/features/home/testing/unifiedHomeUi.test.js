@@ -274,7 +274,7 @@ test('new selectable products must first arrive selected', () => {
     productId: 'new-product',
     iconUrl: 'https://example.test/product.png',
     name: 'Producto nuevo',
-    loanAmountText: 'S/ 800',
+    loanAmountText: '800',
     dueDateText: '2026-09-09',
     isReloan: false,
     selectable: true,

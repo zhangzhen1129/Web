@@ -14,6 +14,7 @@ import refreshIcon from '../../../assets/home/refresh.svg'
 import { HOME_MODE, HOME_OPERATION_TYPE, HOME_PAGE_STATUS, MULTI_PUSH_VARIANT } from './homeUiContract.js'
 import { getHomeStepIcon, getHomeTabIcon } from './homeUiResources.js'
 import { createHomeUiSession } from './homeUiSession.js'
+import { formatAmountText } from './homeAmountText.js'
 import { homeUiText } from './homeUiText.js'
 import LoadingBar from '../../dataCollection/components/LoadingBar.vue'
 
@@ -193,7 +194,7 @@ defineExpose({
                   >
                     <img :src="minusIcon" alt="" />
                   </button>
-                  <strong>{{ selectedOption(productSelection.amountOptions, productSelection.selectedAmountKey)?.text }}</strong>
+                  <strong>{{ formatAmountText(selectedOption(productSelection.amountOptions, productSelection.selectedAmountKey)?.text) }}</strong>
                   <button
                     type="button"
                     :disabled="!canIncreaseAmount"
@@ -234,7 +235,7 @@ defineExpose({
                   :aria-label="creditSummary.availableLabelText"
                   @click="session.refreshCredit"
                 ><img :src="refreshIcon" alt="" /></button>
-                <strong>{{ creditSummary.availableText }}</strong>
+                <strong>{{ formatAmountText(creditSummary.availableText) }}</strong>
               </div>
               <div class="unified-home__credit-details">
                 <div><span>{{ creditSummary.totalLabelText }}</span><strong>{{ creditSummary.totalText }}</strong></div>
@@ -314,7 +315,7 @@ defineExpose({
             <span v-if="product.isReloan" class="unified-home__reloan">{{ homeUiText.reloanLabel }}</span>
             <strong class="unified-home__product-name">{{ product.name }}</strong>
             <span class="unified-home__product-amount-label">{{ homeUiText.productLoanAmountLabel }}</span>
-            <span class="unified-home__product-amount">{{ product.loanAmountText }}</span>
+            <span class="unified-home__product-amount">{{ formatAmountText(product.loanAmountText) }}</span>
             <span class="unified-home__product-date-label">{{ homeUiText.productDueDateLabel }}</span>
             <span class="unified-home__product-date">{{ product.dueDateText }}</span>
           </button>

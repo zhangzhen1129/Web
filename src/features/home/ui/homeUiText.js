@@ -1,6 +1,7 @@
 export const homeUiText = Object.freeze({
   quickStepsTitle: 'Solicitud rápida en 3 pasos',
   creditLimitTitle: 'Límite de crédito',
+  amountCurrencyPrefix: 'S/ ',
   loanTermTitle: 'Plazo del préstamo',
   productSummaryTitle: 'Soluciones personalizadas',
   productLoanAmountLabel: 'Monto del préstamo',

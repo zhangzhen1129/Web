@@ -23,7 +23,7 @@ const broadcast = Object.freeze({
 
 const amountOptions = Object.freeze(Array.from({ length: 50 }, (_, index) => {
   const amount = (index + 1) * 100
-  return Object.freeze({ key: String(amount), text: `S/ ${amount.toLocaleString('en-US')}`, disabled: false })
+  return Object.freeze({ key: String(amount), text: amount.toLocaleString('en-US'), disabled: false })
 }))
 
 const termOptions = Object.freeze([
@@ -36,7 +36,7 @@ const products = Object.freeze(Array.from({ length: 5 }, (_, index) => Object.fr
   productId: `product-${index + 1}`,
   iconUrl: `https://fixtures.invalid/product-${index + 1}.png`,
   name: `Producto ${index + 1}`,
-  loanAmountText: `S/ ${(index + 1) * 1000}`,
+  loanAmountText: String((index + 1) * 1000),
   dueDateText: '2026-09-09',
   isReloan: index < 2,
   selectable: true,
@@ -47,7 +47,7 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value))
 }
 
-function creditSummary({ locked = false, refreshEnabled = true, availableText = 'S/ 5,000' } = {}) {
+function creditSummary({ locked = false, refreshEnabled = true, availableText = '5,000' } = {}) {
   return {
     availableLabelText: 'Crédito disponible',
     availableText,
@@ -151,7 +151,7 @@ export const unifiedHomeFixtures = Object.freeze({
   'multi-active-only': multiPayload('model-multi-active', 1, 'active_only', {
     products: [],
     locked: true,
-    availableText: 'S/ 0',
+    availableText: '0',
     actionText: 'Ir a reembolsar',
     supportingText: 'Tienes un pago pendiente',
   }),
