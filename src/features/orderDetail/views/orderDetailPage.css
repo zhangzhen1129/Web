@@ -1,0 +1,316 @@
+.order-detail-page {
+  position: relative;
+  width: 100%;
+  height: 100dvh;
+  min-height: 100vh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  background: #f8f9fc;
+  color: #374151;
+  font-family: Roboto, Arial, sans-serif;
+}
+
+.order-detail-hero {
+  position: relative;
+  min-height: 6.61538rem;
+  padding-top: var(--app-safe-area-top);
+  padding-bottom: .41026rem;
+  background: #155dfc;
+}
+
+.order-detail-hero--tall {
+  min-height: 7.02564rem;
+}
+
+.order-detail-hero--disbursing {
+  min-height: 8.15385rem;
+}
+
+.order-detail-header {
+  position: relative;
+  display: flex;
+  height: 1.64103rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0 .41026rem;
+}
+
+.order-detail-header h1 {
+  max-width: 5.89744rem;
+  margin: 0;
+  overflow: hidden;
+  color: #fff;
+  font-size: .46154rem;
+  font-weight: 900;
+  line-height: .61538rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.order-detail-header__back,
+.order-detail-header__help {
+  position: absolute;
+  display: grid;
+  width: 1.12821rem;
+  height: 1.12821rem;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.order-detail-header__back {
+  top: .25641rem;
+  left: .41026rem;
+  border-radius: .30769rem;
+  background: #fff;
+  box-shadow: 0 .05128rem .10256rem rgb(0 0 0 / 8%);
+}
+
+.order-detail-header__help {
+  top: .25641rem;
+  right: .10256rem;
+}
+
+.order-detail-header__back img,
+.order-detail-header__help img {
+  display: block;
+  width: .51282rem;
+  height: .51282rem;
+}
+
+.order-detail-header__back:disabled,
+.order-detail-header__help:disabled {
+  opacity: .65;
+}
+
+.order-detail-notice {
+  display: flex;
+  width: calc(100% - .82051rem);
+  min-height: 1.33333rem;
+  align-items: flex-start;
+  gap: .20513rem;
+  margin: 0 .41026rem;
+  padding: .20513rem .41026rem;
+  border-radius: .41026rem;
+  background: #fef8e8;
+  color: #f5a623;
+}
+
+.order-detail-notice img {
+  display: block;
+  width: .30769rem;
+  height: .30769rem;
+  flex: 0 0 auto;
+  margin-top: .02564rem;
+}
+
+.order-detail-notice p {
+  margin: 0;
+  font-size: .25641rem;
+  font-weight: 500;
+  line-height: .30769rem;
+  overflow-wrap: anywhere;
+}
+
+.order-detail-status-card {
+  display: flex;
+  width: calc(100% - .82051rem);
+  min-height: 2.97436rem;
+  flex-direction: column;
+  align-items: center;
+  gap: .10256rem;
+  margin: .41026rem .41026rem 0;
+  padding: .41026rem;
+  border-radius: .41026rem;
+  background: #fff;
+  text-align: center;
+}
+
+.order-detail-hero--disbursing .order-detail-status-card {
+  min-height: 3.38462rem;
+  margin-top: .20513rem;
+}
+
+.order-detail-hero--tall .order-detail-status-card {
+  min-height: 3.38462rem;
+}
+
+.order-detail-status-card > img {
+  display: block;
+  width: 1.02564rem;
+  height: 1.02564rem;
+  flex: 0 0 auto;
+}
+
+.order-detail-status-card h2 {
+  margin: 0;
+  color: #333;
+  font-size: .41026rem;
+  font-weight: 900;
+  line-height: .61538rem;
+}
+
+.order-detail-status-card p {
+  margin: 0;
+  color: #333;
+  font-size: .30769rem;
+  font-weight: 400;
+  line-height: .41026rem;
+  overflow-wrap: anywhere;
+}
+
+.order-detail-content {
+  display: flex;
+  flex-direction: column;
+  gap: .20513rem;
+  padding: .41026rem .41026rem calc(1.02564rem + env(safe-area-inset-bottom));
+}
+
+.order-detail-card {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: .41026rem;
+  padding: .41026rem;
+  border: .02564rem solid #e5e7eb;
+  border-radius: .41026rem;
+  background: #fff;
+}
+
+.order-detail-card--penalty {
+  gap: .51282rem;
+}
+
+.order-detail-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: .25641rem;
+  color: #374151;
+  font-size: .35897rem;
+  font-weight: 400;
+  line-height: .51282rem;
+}
+
+.order-detail-row > span:first-child {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.order-detail-row > span:last-child {
+  min-width: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.order-detail-row__account {
+  white-space: pre-wrap;
+}
+
+.order-detail-row--amount strong {
+  color: #fc0f0f;
+  font-size: .46154rem;
+  font-weight: 900;
+  line-height: .51282rem;
+  text-align: right;
+}
+
+.order-detail-history {
+  position: relative;
+  display: flex;
+  min-height: 1.33333rem;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: .20513rem;
+  padding: .41026rem;
+  color: #374151;
+  font-size: .35897rem;
+  line-height: .51282rem;
+  text-align: left;
+}
+
+.order-detail-history__count {
+  flex: 0 0 auto;
+  padding: 0 .10256rem;
+  border-radius: .48718rem;
+  background: #f7de5a;
+}
+
+.order-detail-history img {
+  display: block;
+  width: .17094rem;
+  height: .25641rem;
+  flex: 0 0 auto;
+}
+
+.order-detail-error {
+  display: grid;
+  min-height: 8rem;
+  place-items: center;
+  padding: 1.5rem .41026rem;
+  color: #374151;
+  font-size: .41026rem;
+  line-height: .61538rem;
+  text-align: center;
+}
+
+.order-detail-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 4;
+  display: grid;
+  gap: .35897rem;
+  margin-top: .20513rem;
+  padding: .41026rem .41026rem calc(.61538rem + env(safe-area-inset-bottom));
+  background: linear-gradient(180deg, rgb(248 249 252 / 88%) 0%, #f8f9fc 32%);
+}
+
+.order-detail-actions--double {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.order-detail-actions--single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.order-detail-action {
+  height: 1.4359rem;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: .41026rem;
+  font-size: .41026rem;
+  font-weight: 900;
+  line-height: .61538rem;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.order-detail-action--primary {
+  border: 0;
+  background: #155dfc;
+  color: #fff;
+}
+
+.order-detail-action--secondary {
+  border: .02564rem solid #999;
+  background: #fff;
+  color: #999;
+}
+
+.order-detail-action:disabled {
+  opacity: .65;
+}
+
+.order-detail-header__back:focus-visible,
+.order-detail-header__help:focus-visible,
+.order-detail-history:focus-visible,
+.order-detail-action:focus-visible {
+  outline: .07692rem solid #111827;
+  outline-offset: .05128rem;
+}

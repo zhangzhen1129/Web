@@ -1,0 +1,54 @@
+export const ORDER_DETAIL_ROOT_STATE = Object.freeze({
+  LOADING: 'loading',
+  REVIEWING: 'reviewing',
+  REJECTED: 'rejected',
+  DISBURSING: 'disbursing',
+  REPAYING: 'repaying',
+  OVERDUE: 'overdue',
+  COMPLETED: 'completed',
+  TRANSFER_FAILED: 'transfer_failed',
+  ERROR: 'error',
+  INACTIVE: 'inactive',
+})
+
+export const BUSINESS_ROOT_STATES = Object.freeze([
+  ORDER_DETAIL_ROOT_STATE.REVIEWING,
+  ORDER_DETAIL_ROOT_STATE.REJECTED,
+  ORDER_DETAIL_ROOT_STATE.DISBURSING,
+  ORDER_DETAIL_ROOT_STATE.REPAYING,
+  ORDER_DETAIL_ROOT_STATE.OVERDUE,
+  ORDER_DETAIL_ROOT_STATE.COMPLETED,
+  ORDER_DETAIL_ROOT_STATE.TRANSFER_FAILED,
+])
+
+export const REPAYMENT_ROOT_STATES = Object.freeze([
+  ORDER_DETAIL_ROOT_STATE.REPAYING,
+  ORDER_DETAIL_ROOT_STATE.OVERDUE,
+  ORDER_DETAIL_ROOT_STATE.COMPLETED,
+])
+
+export const ORDER_STATUS_ROOT_STATE = Object.freeze({
+  20: ORDER_DETAIL_ROOT_STATE.REVIEWING,
+  21: ORDER_DETAIL_ROOT_STATE.REVIEWING,
+  30: ORDER_DETAIL_ROOT_STATE.DISBURSING,
+  40: ORDER_DETAIL_ROOT_STATE.REJECTED,
+  70: ORDER_DETAIL_ROOT_STATE.DISBURSING,
+  80: ORDER_DETAIL_ROOT_STATE.REPAYING,
+  90: ORDER_DETAIL_ROOT_STATE.OVERDUE,
+  100: ORDER_DETAIL_ROOT_STATE.COMPLETED,
+  101: ORDER_DETAIL_ROOT_STATE.COMPLETED,
+  110: ORDER_DETAIL_ROOT_STATE.TRANSFER_FAILED,
+})
+
+export function isBusinessRootState(rootState) {
+  return BUSINESS_ROOT_STATES.includes(rootState)
+}
+
+export function isRepaymentRootState(rootState) {
+  return REPAYMENT_ROOT_STATES.includes(rootState)
+}
+
+export function mapOrderStatusToRootState(orderStatus) {
+  if (!Number.isInteger(orderStatus)) return null
+  return ORDER_STATUS_ROOT_STATE[orderStatus] ?? null
+}

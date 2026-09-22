@@ -11,6 +11,7 @@ const BankPage = () => import('../features/bank/views/BankPage.vue')
 const LoanConfirmPage = () => import('../features/loanConfirm/views/LoanConfirmPage.vue')
 const LoanSuccessPage = () => import('../features/loanSuccess/views/LoanSuccessPage.vue')
 const LoanFailPage = () => import('../features/loanFail/views/LoanFailPage.vue')
+const OrderDetailPage = () => import('../features/orderDetail/views/OrderDetailPage.vue')
 
 export const ROUTE_PATH = Object.freeze({
   HOME: '/home',
@@ -49,7 +50,18 @@ export const router = createRouter({
         { path: 'contacts', name: 'contacts', component: ContactsPage },
         { path: 'identity', name: 'identity', component: () => import('../features/identity/views/IdentityPage.vue') },
         { path: 'addBank', name: 'addBank', component: BankPage },
-        { path: 'orderDetail', name: 'orderDetail', component: RoutePlaceholder, props: { title: 'Order detail' } },
+        {
+          path: 'orderDetail',
+          name: 'orderDetail',
+          component: OrderDetailPage,
+          beforeEnter: (to) => {
+            const orderId = to.query.orderId
+            const isValidOrderId = Object.keys(to.query).length === 1
+              && typeof orderId === 'string'
+              && orderId.trim().length > 0
+            return isValidOrderId ? true : { name: 'home' }
+          },
+        },
         { path: 'helpCenter', name: 'helpCenter', component: RoutePlaceholder, props: { title: 'Customer service' } },
         {
           path: 'deferDetail',
