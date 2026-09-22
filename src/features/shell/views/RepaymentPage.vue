@@ -1,9 +1,9 @@
-<script>
-export default { name: 'RepaymentPage' }
+<script setup>
+import RepaymentTabPage from '../../repayment/views/RepaymentTabPage.vue'
+
+defineOptions({ name: 'RepaymentPage' })
 </script>
 
 <template>
-  <main class="shell-tab-page" aria-labelledby="repayment-title">
-    <h1 id="repayment-title">Reembolso</h1>
-  </main>
+  <RepaymentTabPage />
 </template>

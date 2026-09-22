@@ -1,7 +1,5 @@
 <script setup>
 import { computed } from 'vue'
-import { Badge } from 'vant'
-import 'vant/es/badge/style'
 import accountTabIcon from '../../../assets/home/account-tab.svg'
 import accountTabActiveIcon from '../../../assets/home/account-tab-active.svg'
 import loanTabIcon from '../../../assets/home/loan-tab.svg'
@@ -41,10 +39,16 @@ function getTabIcon(tab) {
       :aria-current="tab.active ? 'page' : undefined"
       @click="$emit('navigate', tab)"
     >
-      <Badge v-if="tab.key === 'repayment' && repaymentBadgeText" :content="repaymentBadgeText">
+      <span class="home-tab__icon-wrap">
         <img class="home-tab__icon" :src="getTabIcon(tab)" alt="" />
-      </Badge>
-      <img v-else class="home-tab__icon" :src="getTabIcon(tab)" alt="" />
+        <span
+          v-if="tab.key === 'repayment' && repaymentBadgeText"
+          class="home-tab__badge"
+          aria-hidden="true"
+        >
+          {{ repaymentBadgeText }}
+        </span>
+      </span>
       <span>{{ tab.text }}</span>
     </button>
   </nav>
@@ -90,10 +94,37 @@ function getTabIcon(tab) {
   content: '';
 }
 
+.home-tab__icon-wrap {
+  position: relative;
+  display: grid;
+  width: .66667rem;
+  height: .66667rem;
+  place-items: center;
+  margin: auto;
+}
+
 .home-tab__icon {
   display: block;
   width: .61538rem;
   height: .61538rem;
-  margin: auto;
+}
+
+.home-tab__badge {
+  position: absolute;
+  top: -.10256rem;
+  right: -.07692rem;
+  display: grid;
+  min-width: .35897rem;
+  height: .35897rem;
+  place-items: center;
+  padding: 0 .10256rem;
+  border-radius: .17949rem;
+  background: #ff4a43;
+  color: #fff;
+  font-size: .25641rem;
+  font-weight: 700;
+  line-height: .25641rem;
+  white-space: nowrap;
+  box-sizing: border-box;
 }
 </style>
