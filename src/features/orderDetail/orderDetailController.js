@@ -348,7 +348,6 @@ export function createOrderDetailController({
       ) return false
       return navigate(() => onNavigateBankDetail({
         orderId: state.displayModel.orderNo,
-        type: 'bankAccess',
       }))
     },
     requestReapply() {

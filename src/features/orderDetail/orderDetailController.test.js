@@ -71,7 +71,7 @@ function createHarness(overrides = {}) {
     onNavigateBack: () => calls.push('navigate:back'),
     onNavigateDeferDetail: ({ orderId }) => calls.push(`navigate:defer:${orderId}`),
     onNavigateDeferHistory: (query) => calls.push(`navigate:history:${query.orderId}:${query.productId ?? ''}:${query.orderStatus}`),
-    onNavigateBankDetail: ({ orderId, type }) => calls.push(`navigate:bank:${orderId}:${type}`),
+    onNavigateBankDetail: ({ orderId }) => calls.push(`navigate:bank:${orderId}`),
     onNavigateHome: () => calls.push('navigate:home'),
     onNavigateHelpCenter: () => calls.push('navigate:help'),
     ...overrides,
@@ -212,7 +212,7 @@ test('routes extension, history, bank account, reapply, help, and back with cont
   bank.controller.initialize({ orderId: 'route-order' })
   await flush()
   assert.equal(bank.controller.requestBankDetail(), true)
-  assert.equal(bank.calls.includes('navigate:bank:order-001:bankAccess'), true)
+  assert.equal(bank.calls.includes('navigate:bank:order-001'), true)
 
   const completed = createHarness({
     services: {
@@ -280,4 +280,26 @@ test('dispose aborts active requests and releases native loading', async () => {
   harness.controller.dispose()
   assert.equal(harness.abortCount(), 1)
   assert.equal(harness.calls.includes('loading:hide'), true)
+})
+
+test('bank detail navigation sends only the order number', async () => {
+  const queries = []
+  const harness = createHarness({
+    services: {
+      async loadOrderDetail() {
+        return {
+          type: 'success',
+          rootState: 'transfer_failed',
+          displayModel: displayModel({ orderStatus: 110, rootState: 'transfer_failed', extensionFlag: 0 }),
+        }
+      },
+      async loadExtensionHistory() { return { type: 'success', historyCount: 0 } },
+      async requestRepayment() { return { type: 'success', repaymentUrl: 'https://pay.example.test/session' } },
+    },
+    onNavigateBankDetail: (query) => queries.push(query),
+  })
+  harness.controller.initialize({ orderId: 'route-order' })
+  await flush()
+  assert.equal(harness.controller.requestBankDetail(), true)
+  assert.deepEqual(queries, [{ orderId: 'order-001' }])
 })

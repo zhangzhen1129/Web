@@ -38,3 +38,10 @@ test('bottom action texts match the confirmed Figma button nodes', () => {
   assert.equal(ORDER_DETAIL_TEXT.actions.payNow, 'Pagar ahora')
   assert.equal(ORDER_DETAIL_TEXT.actions.extension, 'Prórroga')
 })
+
+test('bank detail route accepts only an optional order id', () => {
+  const source = readFileSync(new URL('../../../router/index.js', import.meta.url), 'utf8')
+  assert.match(source, /name:\s*'bankDetail'/)
+  assert.match(source, /const allowedKeys = \['orderId'\]/)
+  assert.doesNotMatch(source, /bankAccess/)
+})

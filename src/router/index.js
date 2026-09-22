@@ -101,11 +101,11 @@ export const router = createRouter({
           component: RoutePlaceholder,
           props: { title: 'Update bank account' },
           beforeEnter: (to) => {
+            const allowedKeys = ['orderId']
             const orderId = to.query.orderId
-            const isValid = Object.keys(to.query).length === 2
-              && typeof orderId === 'string'
-              && orderId.trim().length > 0
-              && to.query.type === 'bankAccess'
+            const isValid = Object.keys(to.query).every((key) => allowedKeys.includes(key))
+              && (typeof orderId === 'undefined'
+                || (typeof orderId === 'string' && orderId.trim().length > 0))
             return isValid ? true : { name: 'home' }
           },
         },

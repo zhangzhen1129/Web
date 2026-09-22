@@ -62,8 +62,8 @@ const controller = createOrderDetailController({
   onNavigateDeferHistory(query) {
     void router.push({ name: 'deferHistory', query })
   },
-  onNavigateBankDetail({ orderId, type }) {
-    void router.push({ name: 'bankDetail', query: { orderId, type } })
+  onNavigateBankDetail({ orderId }) {
+    void router.push({ name: 'bankDetail', query: { orderId } })
   },
   onNavigateHome() {
     void router.replace({ name: 'home' })
