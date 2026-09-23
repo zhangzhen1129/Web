@@ -8,7 +8,7 @@ const props = defineProps({
 })
 const emit = defineEmits(['open'])
 
-const statusText = computed(() => getRepaymentStatusText(props.order.statusKey))
+const statusText = computed(() => getRepaymentStatusText(props.order.statusCode))
 
 function openOrder() {
   if (props.disabled) return

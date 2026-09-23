@@ -46,6 +46,42 @@ const PROJECT_MESSAGES = Object.freeze({
     es: 'Carga fallida, inténtelo más tarde.',
     sw: 'Upakiaji umeshindwa. Tafadhali jaribu tena baadaye.',
   }),
+  '50': Object.freeze({
+    en: 'Pending to apply',
+    es: 'Pendiente de aplicar',
+  }),
+  '51': Object.freeze({
+    en: 'Reviewing',
+    es: 'Revisando',
+  }),
+  '52': Object.freeze({
+    en: 'Approved',
+    es: 'Aprobado',
+  }),
+  '53': Object.freeze({
+    en: 'Rejected',
+    es: 'Rechazado',
+  }),
+  '54': Object.freeze({
+    en: 'Disbursing',
+    es: 'Desembolsando',
+  }),
+  '55': Object.freeze({
+    en: 'Repaying',
+    es: 'Reembolsando',
+  }),
+  '56': Object.freeze({
+    en: 'overdue',
+    es: 'Atrasado',
+  }),
+  '57': Object.freeze({
+    en: 'Done',
+    es: 'Completado',
+  }),
+  '58': Object.freeze({
+    en: 'Failed',
+    es: 'Fracaso',
+  }),
 })
 
 export function getProjectMessage(messageId, language = CURRENT_LANGUAGE) {

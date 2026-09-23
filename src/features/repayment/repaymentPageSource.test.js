@@ -11,6 +11,10 @@ test('keeps repayment card visuals in separate components', () => {
   assert.match(page, /import OverdueOrderCard from '\.\.\/components\/OverdueOrderCard\.vue'/)
   assert.match(repaying, /class="repaying-card"/)
   assert.match(overdue, /class="overdue-card"/)
+  assert.match(repaying, /getRepaymentStatusText\(props\.order\.statusCode\)/)
+  assert.match(overdue, /getRepaymentStatusText\(props\.order\.statusCode\)/)
+  assert.doesNotMatch(repaying, /Pendiente de pago/)
+  assert.doesNotMatch(overdue, /Atrasado/)
   assert.doesNotMatch(page, /v-html/)
 })
 
