@@ -251,7 +251,42 @@ async function main() {
 
     await navigate('scenario=multi-available-only')
     await evaluate(`document.querySelector('.unified-home__product-summary').click()`)
+    assert.deepEqual(await evaluate('window.unifiedHomePreview.operationLog'), [
+      { requestId: 'home-browser-1', type: 'open_product_dialog' },
+    ])
+    assert.equal(await evaluate(`Boolean(document.querySelector('.unified-home__dialog'))`), false)
+    const openingSamples = await evaluate(`(async () => {
+      const fixtures = await import('/src/features/home/testing/unifiedHomeFixtures.js')
+      const payload = fixtures.createUnifiedHomeFixture('multi-available-only', 'home')
+      payload.requestId = 'home-browser-open-1'
+      payload.revision = 900
+      payload.sourceOperationId = 'home-browser-1'
+      payload.productDialogVisible = true
+      window.unifiedHomePreview.updateHomeView(payload)
+      const samples = []
+      const startedAt = performance.now()
+      while (performance.now() - startedAt < 700) {
+        const popup = document.querySelector('.unified-home__dialog')
+        const overlay = document.querySelector('.unified-home__dialog-overlay')
+        samples.push({
+          popupClass: popup ? popup.className : null,
+          popupTop: popup ? Math.round(popup.getBoundingClientRect().top) : null,
+          overlayClass: overlay ? overlay.className : null,
+        })
+        await new Promise((resolve) => setTimeout(resolve, 16))
+      }
+      return samples
+    })()`)
+    assert.equal(openingSamples.some((sample) => /van-popup-slide-bottom-enter-active/.test(sample.popupClass ?? '')), true)
+    assert.equal(openingSamples.some((sample) => /van-fade-enter-active/.test(sample.overlayClass ?? '')), true)
+    const slidingTops = openingSamples.map((sample) => sample.popupTop).filter((top) => top !== null)
+    assert.ok(slidingTops.length > 1, 'dialog should be measurable during the opening transition')
+    assert.ok(slidingTops[0] > slidingTops[slidingTops.length - 1], 'dialog should slide up from the bottom')
     assert.equal(await evaluate(`Boolean(document.querySelector('.unified-home__dialog'))`), true)
+    assert.match(await evaluate(`document.querySelector('.unified-home__dialog').className`), /van-popup--bottom/)
+    assert.equal(await evaluate(`getComputedStyle(document.querySelector('.unified-home__dialog')).transitionDuration`), '0.3s')
+    assert.equal(await evaluate(`getComputedStyle(document.querySelector('.unified-home__dialog')).transitionProperty`), 'transform')
+    assert.equal(await evaluate(`getComputedStyle(document.querySelector('.unified-home__dialog-overlay')).backgroundColor`), 'rgba(0, 0, 0, 0.7)')
     assert.equal(await evaluate(`[...document.querySelectorAll('.unified-home__product-icon')].every((image) => image.complete && image.naturalWidth > 0)`), true)
     await evaluate(`document.querySelectorAll('.unified-home__product')[1].click()`)
     const dialogInteractionState = await evaluate(`({
@@ -265,16 +300,76 @@ async function main() {
       count: '4 productos',
       selected: false,
       disabled: false,
-      operations: [{ requestId: 'home-browser-1', type: 'toggle_product_selection', data: { productId: 'product-2', selected: false } }],
+      operations: [
+        { requestId: 'home-browser-1', type: 'open_product_dialog' },
+        { requestId: 'home-browser-2', type: 'toggle_product_selection', data: { productId: 'product-2', selected: false } },
+      ],
       diagnostics: [],
     })
-    await evaluate(`document.querySelector('.unified-home__dialog-close').click()`)
+    const closingSamples = await evaluate(`(async () => {
+      document.querySelector('.unified-home__dialog-close').click()
+      const samples = []
+      const startedAt = performance.now()
+      while (performance.now() - startedAt < 700) {
+        const popup = document.querySelector('.unified-home__dialog')
+        const overlay = document.querySelector('.unified-home__dialog-overlay')
+        samples.push({
+          popupClass: popup ? popup.className : null,
+          popupTop: popup ? Math.round(popup.getBoundingClientRect().top) : null,
+          overlayClass: overlay ? overlay.className : null,
+        })
+        await new Promise((resolve) => setTimeout(resolve, 16))
+      }
+      return samples
+    })()`)
+    assert.equal(closingSamples.some((sample) => /van-popup-slide-bottom-leave-active/.test(sample.popupClass ?? '')), true)
+    assert.equal(closingSamples.some((sample) => /van-fade-leave-active/.test(sample.overlayClass ?? '')), true)
+    const closingTops = closingSamples.map((sample) => sample.popupTop).filter((top) => top !== null)
+    assert.ok(closingTops[closingTops.length - 1] > closingTops[0], 'dialog should slide down while closing')
+    assert.equal(await evaluate(`Boolean(document.querySelector('.unified-home__dialog'))`), false)
     await evaluate(`document.querySelector('.unified-home__product-summary').click()`)
+    await evaluate(`(async () => {
+      const fixtures = await import('/src/features/home/testing/unifiedHomeFixtures.js')
+      const payload = fixtures.createUnifiedHomeFixture('multi-available-only', 'home')
+      payload.requestId = 'home-browser-open-2'
+      payload.revision = 901
+      payload.sourceOperationId = 'home-browser-3'
+      payload.multiPushViewData.products[1].selected = false
+      payload.productDialogVisible = true
+      return window.unifiedHomePreview.updateHomeView(payload)
+    })()`)
+    await wait(600)
     assert.equal(await evaluate(`document.querySelector('.unified-home__dialog-action span').textContent`), '4 productos')
     await screenshot('multi-product-dialog-375x812')
     assert.deepEqual(await evaluate('window.unifiedHomePreview.operationLog'), [
-      { requestId: 'home-browser-1', type: 'toggle_product_selection', data: { productId: 'product-2', selected: false } },
+      { requestId: 'home-browser-1', type: 'open_product_dialog' },
+      { requestId: 'home-browser-2', type: 'toggle_product_selection', data: { productId: 'product-2', selected: false } },
+      { requestId: 'home-browser-3', type: 'open_product_dialog' },
     ])
+
+    await evaluate(`document.querySelector('.unified-home__dialog-close').click()`)
+    await wait(600)
+    await evaluate(`(async () => {
+      const fixtures = await import('/src/features/home/testing/unifiedHomeFixtures.js')
+      const payload = fixtures.createUnifiedHomeFixture('multi-available-only', 'home')
+      payload.requestId = 'home-browser-open-3'
+      payload.revision = 902
+      payload.multiPushViewData.products[1].selected = false
+      payload.productDialogVisible = true
+      return window.unifiedHomePreview.updateHomeView(payload)
+    })()`)
+    let capturedOpeningFrame = false
+    for (let attempt = 0; attempt < 15; attempt += 1) {
+      const top = await evaluate(`document.querySelector('.unified-home__dialog')?.getBoundingClientRect().top ?? null`)
+      if (top !== null && top > 150 && top < 600) {
+        await screenshot('multi-product-dialog-opening-375x812')
+        capturedOpeningFrame = true
+        break
+      }
+      await wait(16)
+    }
+    assert.equal(capturedOpeningFrame, true)
+    await wait(600)
 
     await navigate('scenario=cash-apply')
     await evaluate(`document.querySelector('.unified-home__amount-controls button').click()`)
@@ -306,7 +401,7 @@ async function main() {
     const report = {
       status: 'passed',
       browserErrors,
-      screenshots: rootScenarios.length + 8,
+      screenshots: rootScenarios.length + 9,
       results,
     }
     await writeFile(path.join(outputDirectory, 'browser-check.json'), `${JSON.stringify(report, null, 2)}\n`, 'utf8')

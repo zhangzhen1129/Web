@@ -134,7 +134,7 @@ test('keeps history hidden on API-002 failure and never overwrites the main stat
       async loadOrderDetail() {
         return { type: 'success', rootState: 'repaying', displayModel: displayModel() }
       },
-      async loadExtensionHistory() { return { type: 'business_failure', message: 'Hidden' } },
+      async loadExtensionHistory() { return { type: 'business_failure', message: 'History unavailable.' } },
       async requestRepayment() { return { type: 'success', repaymentUrl: 'https://pay.example.test/session' } },
     },
   })
@@ -142,18 +142,102 @@ test('keeps history hidden on API-002 failure and never overwrites the main stat
   await flush()
   assert.equal(harness.controller.getState().rootState, 'repaying')
   assert.equal(harness.controller.getState().historyVisible, false)
-  assert.equal(harness.calls.some((call) => call.startsWith('business:')), false)
+  assert.equal(harness.calls.includes('business:History unavailable.'), true)
+})
+
+test('queries extension history silently only for repayment-related order statuses', async () => {
+  for (const orderStatus of [80, 90, 100, 101]) {
+    const rootState = {
+      80: 'repaying', 90: 'overdue', 100: 'completed', 101: 'completed',
+    }[orderStatus]
+    const harness = createHarness({
+      services: {
+        async loadOrderDetail() {
+          return { type: 'success', rootState, displayModel: displayModel({ orderStatus, rootState }) }
+        },
+        async loadExtensionHistory({ orderId, signal }) {
+          harness.calls.push(`history:${orderId}:${Boolean(signal)}`)
+          return { type: 'success', historyCount: 0 }
+        },
+        async requestRepayment() { return { type: 'success', repaymentUrl: 'https://pay.example.test/session' } },
+      },
+    })
+    harness.controller.initialize({ orderId: 'route-order' })
+    await flush()
+    assert.equal(harness.calls.filter((call) => call.startsWith('history:')).length, 1)
+    assert.equal(harness.calls.filter((call) => call === 'loading:show').length, 1)
+    assert.equal(harness.calls.filter((call) => call === 'loading:hide').length, 1)
+    assert.equal(harness.calls.some((call) => call.startsWith('business:')), false)
+    assert.equal(harness.calls.some((call) => call.startsWith('request:')), false)
+  }
+})
+
+test('does not query extension history for order statuses outside 80, 90, 100, and 101', async () => {
+  for (const orderStatus of [20, 21, 30, 40, 70, 110]) {
+    const rootState = {
+      20: 'reviewing', 21: 'reviewing', 30: 'disbursing', 40: 'rejected', 70: 'disbursing',
+      110: 'transfer_failed',
+    }[orderStatus]
+    const harness = createHarness({
+      services: {
+        async loadOrderDetail() {
+          return { type: 'success', rootState, displayModel: displayModel({ orderStatus, rootState }) }
+        },
+        async loadExtensionHistory() {
+          harness.calls.push('history:unexpected')
+          return { type: 'success', historyCount: 0 }
+        },
+        async requestRepayment() { return { type: 'success', repaymentUrl: 'https://pay.example.test/session' } },
+      },
+    })
+    harness.controller.initialize({ orderId: 'route-order' })
+    await flush()
+    assert.equal(harness.calls.some((call) => call.startsWith('history:')), false)
+    assert.equal(harness.calls.filter((call) => call === 'loading:show').length, 1)
+    assert.equal(harness.calls.filter((call) => call === 'loading:hide').length, 1)
+    assert.equal(harness.controller.getState().rootState, rootState)
+    assert.equal(harness.controller.getState().historyVisible, false)
+  }
+})
+
+test('reports extension history request failures once without touching native loading', async () => {
+  const harness = createHarness({
+    services: {
+      async loadOrderDetail() {
+        return { type: 'success', rootState: 'repaying', displayModel: displayModel() }
+      },
+      async loadExtensionHistory() {
+        throw Object.assign(new Error('offline'), { displayMessage: 'History network unavailable.' })
+      },
+      async requestRepayment() { return { type: 'success', repaymentUrl: 'https://pay.example.test/session' } },
+    },
+  })
+  harness.controller.initialize({ orderId: 'route-order' })
+  await flush()
+  assert.equal(harness.controller.getState().rootState, 'repaying')
+  assert.equal(harness.controller.getState().historyVisible, false)
+  assert.equal(harness.calls.includes('request:History network unavailable.'), true)
+  assert.equal(harness.calls.filter((call) => call === 'loading:show').length, 1)
+  assert.equal(harness.calls.filter((call) => call === 'loading:hide').length, 1)
 })
 
 test('opens repayment once, sends only the bill id, and restores the action after host acceptance', async () => {
   const harness = createHarness()
   harness.controller.initialize({ orderId: 'route-order' })
   await flush()
+  const loadingShowsBeforePayment = harness.calls.filter((call) => call === 'loading:show').length
+  const loadingHidesBeforePayment = harness.calls.filter((call) => call === 'loading:hide').length
   assert.equal(harness.controller.requestPayment(), true)
   assert.equal(harness.controller.requestPayment(), false)
   await flush()
+  const paymentShowIndex = harness.calls.indexOf('loading:show', loadingShowsBeforePayment)
+  const paymentHideIndex = harness.calls.indexOf('loading:hide', paymentShowIndex + 1)
   assert.equal(harness.calls.includes('repay:bill-001:true'), true)
   assert.equal(harness.calls.includes('open:https://pay.example.test/session'), true)
+  assert.equal(harness.calls.filter((call) => call === 'loading:show').length, loadingShowsBeforePayment + 1)
+  assert.equal(harness.calls.filter((call) => call === 'loading:hide').length, loadingHidesBeforePayment + 1)
+  assert.equal(paymentShowIndex < harness.calls.indexOf('repay:bill-001:true'), true)
+  assert.equal(paymentHideIndex < harness.calls.indexOf('open:https://pay.example.test/session'), true)
   assert.equal(harness.controller.getState().paymentSubmitting, false)
 })
 
@@ -167,8 +251,15 @@ test('keeps a controlled failure when repayment is rejected or not accepted by t
   })
   business.controller.initialize({ orderId: 'route-order' })
   await flush()
+  const businessShowIndex = business.calls.filter((call) => call === 'loading:show').length - 1
   business.controller.requestPayment()
   await flush()
+  const businessPaymentShowIndex = business.calls.indexOf('loading:show', businessShowIndex + 1)
+  const businessHideIndex = business.calls.indexOf('loading:hide', businessPaymentShowIndex + 1)
+  const businessFailureIndex = business.calls.indexOf('business:Payment unavailable.')
+  assert.equal(businessPaymentShowIndex > -1, true)
+  assert.equal(businessHideIndex > businessPaymentShowIndex, true)
+  assert.equal(businessHideIndex < businessFailureIndex, true)
   assert.equal(business.calls.includes('business:Payment unavailable.'), true)
   assert.equal(business.controller.getState().paymentSubmitting, false)
 
@@ -181,6 +272,71 @@ test('keeps a controlled failure when repayment is rejected or not accepted by t
   await flush()
   assert.equal(rejected.calls.some((call) => call.startsWith('request:')), false)
   assert.equal(rejected.controller.getState().paymentSubmitting, false)
+  assert.equal(rejected.calls[rejected.calls.length - 1], 'loading:hide')
+})
+
+test('allows a second repayment attempt after the first one reaches its terminal state', async () => {
+  const harness = createHarness()
+  harness.controller.initialize({ orderId: 'route-order' })
+  await flush()
+  const showsBefore = harness.calls.filter((call) => call === 'loading:show').length
+  const hidesBefore = harness.calls.filter((call) => call === 'loading:hide').length
+
+  assert.equal(harness.controller.requestPayment(), true)
+  await flush()
+  assert.equal(harness.controller.getState().paymentSubmitting, false)
+
+  assert.equal(harness.controller.requestPayment(), true)
+  await flush()
+  assert.equal(harness.controller.getState().paymentSubmitting, false)
+
+  assert.equal(harness.calls.filter((call) => call === 'repay:bill-001:true').length, 2)
+  assert.equal(harness.calls.filter((call) => call === 'loading:show').length, showsBefore + 2)
+  assert.equal(harness.calls.filter((call) => call === 'loading:hide').length, hidesBefore + 2)
+  assert.equal(harness.calls.filter((call) => call.startsWith('open:')).length, 2)
+})
+
+test('lets a new repayment attempt start after the host refuses the previous payment page', async () => {
+  const harness = createHarness({ openPaymentPage: () => false })
+  harness.controller.initialize({ orderId: 'route-order' })
+  await flush()
+  const showsBefore = harness.calls.filter((call) => call === 'loading:show').length
+  const hidesBefore = harness.calls.filter((call) => call === 'loading:hide').length
+
+  assert.equal(harness.controller.requestPayment(), true)
+  await flush()
+  assert.equal(harness.controller.getState().paymentSubmitting, false)
+
+  assert.equal(harness.controller.requestPayment(), true)
+  await flush()
+  assert.equal(harness.controller.getState().paymentSubmitting, false)
+
+  assert.equal(harness.calls.filter((call) => call === 'repay:bill-001:true').length, 2)
+  assert.equal(harness.calls.filter((call) => call === 'loading:show').length, showsBefore + 2)
+  assert.equal(harness.calls.filter((call) => call === 'loading:hide').length, hidesBefore + 2)
+})
+
+test('hides repayment loading before reporting a request failure', async () => {
+  const harness = createHarness({
+    services: {
+      async loadOrderDetail() { return { type: 'success', rootState: 'repaying', displayModel: displayModel() } },
+      async loadExtensionHistory() { return { type: 'success', historyCount: 0 } },
+      async requestRepayment() {
+        throw Object.assign(new Error('offline'), { displayMessage: 'Network unavailable.' })
+      },
+    },
+  })
+  harness.controller.initialize({ orderId: 'route-order' })
+  await flush()
+  const showIndex = harness.calls.filter((call) => call === 'loading:show').length - 1
+  harness.controller.requestPayment()
+  await flush()
+  const paymentShowIndex = harness.calls.indexOf('loading:show', showIndex + 1)
+  const hideIndex = harness.calls.indexOf('loading:hide', paymentShowIndex + 1)
+  assert.equal(paymentShowIndex > -1, true)
+  assert.equal(hideIndex > paymentShowIndex, true)
+  assert.equal(hideIndex < harness.calls.indexOf('request:Network unavailable.'), true)
+  assert.equal(harness.controller.getState().paymentSubmitting, false)
 })
 
 test('routes extension, history, bank account, reapply, help, and back with controlled parameters', async () => {
@@ -280,6 +436,33 @@ test('dispose aborts active requests and releases native loading', async () => {
   harness.controller.dispose()
   assert.equal(harness.abortCount(), 1)
   assert.equal(harness.calls.includes('loading:hide'), true)
+})
+
+test('leaving during repayment hides native loading once and ignores the late result', async () => {
+  let resolvePayment
+  const harness = createHarness({
+    services: {
+      async loadOrderDetail() { return { type: 'success', rootState: 'repaying', displayModel: displayModel() } },
+      async loadExtensionHistory() { return { type: 'success', historyCount: 0 } },
+      async requestRepayment() {
+        return new Promise((resolve) => { resolvePayment = resolve })
+      },
+    },
+  })
+  harness.controller.initialize({ orderId: 'route-order' })
+  await flush()
+  const showIndex = harness.calls.filter((call) => call === 'loading:show').length - 1
+  harness.controller.requestPayment()
+  const paymentShowIndex = harness.calls.indexOf('loading:show', showIndex + 1)
+  harness.controller.requestBack()
+  resolvePayment({ type: 'success', repaymentUrl: 'https://pay.example.test/session' })
+  await flush()
+  const hidesAfterPaymentShow = harness.calls
+    .slice(paymentShowIndex + 1)
+    .filter((call) => call === 'loading:hide')
+  assert.equal(hidesAfterPaymentShow.length, 1)
+  assert.equal(harness.calls.some((call) => call.startsWith('open:')), false)
+  assert.equal(harness.controller.getState().rootState, 'inactive')
 })
 
 test('bank detail navigation sends only the order number', async () => {

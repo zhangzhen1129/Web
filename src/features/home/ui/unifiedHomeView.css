@@ -518,20 +518,17 @@ img.unified-home__credit-state {
   height: .66667rem;
 }
 
-.unified-home__dialog {
-  position: fixed;
-  inset: 0;
-  z-index: 20;
-  overflow: hidden;
+.unified-home .unified-home__dialog {
+  --van-popup-background: transparent;
+  overflow: visible;
+}
+
+.unified-home__dialog-overlay {
   background: rgba(0, 0, 0, .7);
-  overscroll-behavior: contain;
 }
 
 .unified-home__dialog-sheet {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
+  position: relative;
   height: calc(100dvh - 3.07692rem);
   min-height: 0;
   border-radius: .41026rem .41026rem 0 0;

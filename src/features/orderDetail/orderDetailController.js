@@ -100,7 +100,6 @@ export function createOrderDetailController({
   let detailController = null
   let historyController = null
   let paymentController = null
-  let paymentSequence = 0
   const listeners = new Set()
 
   function emit(partial = {}) {
@@ -121,11 +120,14 @@ export function createOrderDetailController({
     detailController = null
     historyController = null
     paymentController = null
-    paymentSequence += 1
   }
 
   function hideLoading() {
     try { hideNativeLoading?.() } catch {}
+  }
+
+  function showLoading() {
+    try { showNativeLoading?.() } catch {}
   }
 
   function navigate(action) {
@@ -157,8 +159,15 @@ export function createOrderDetailController({
         return
       }
       emit({ historyCount: null, historyVisible: false })
-    } catch {
-      if (isCurrent(id)) emit({ historyCount: null, historyVisible: false })
+      if (result?.type === 'business_failure') {
+        const message = textMessage(result.message)
+        if (message) onBusinessFailure(message)
+      }
+    } catch (error) {
+      if (!isCurrent(id)) return
+      emit({ historyCount: null, historyVisible: false })
+      if (isBusinessHandledError(error) || error?.category === 'canceled') return
+      onRequestFailure(safeRequestMessage(error))
     } finally {
       if (isCurrent(id)) historyController = null
     }
@@ -182,7 +191,9 @@ export function createOrderDetailController({
           paymentSubmitting: false,
         })
         hideLoading()
-        void loadHistory(id, result.displayModel, result.rootState)
+        if (isRepaymentRootState(result.rootState)) {
+          void loadHistory(id, result.displayModel, result.rootState)
+        }
         return
       }
 
@@ -216,7 +227,7 @@ export function createOrderDetailController({
     }
   }
 
-  async function submitRepayment(id, signal) {
+  async function submitRepayment(pageId, signal) {
     let result
     try {
       result = await services.requestRepayment({
@@ -224,34 +235,38 @@ export function createOrderDetailController({
         signal,
       })
     } catch (error) {
-      if (!isCurrent(id)) return
+      if (!isCurrent(pageId)) return
       paymentController = null
+      hideLoading()
       emit({ paymentSubmitting: false })
       if (isBusinessHandledError(error) || error?.category === 'canceled') return
       onRequestFailure(safeRequestMessage(error))
       return
     }
-    if (!isCurrent(id)) return
+    if (!isCurrent(pageId)) return
     paymentController = null
 
     if (result?.type === 'business_failure') {
+      hideLoading()
       emit({ paymentSubmitting: false })
       const message = textMessage(result.message)
       if (message) onBusinessFailure(message)
       return
     }
     if (result?.type !== 'success') {
+      hideLoading()
       emit({ paymentSubmitting: false })
       return
     }
 
+    hideLoading()
     let accepted = false
     try {
       accepted = openPaymentPage(result.repaymentUrl) === true
     } catch {
       accepted = false
     }
-    if (!isCurrent(id)) return
+    if (!isCurrent(pageId)) return
     emit({ paymentSubmitting: false })
     if (!accepted) return
   }
@@ -305,11 +320,11 @@ export function createOrderDetailController({
         || textMessage(state.displayModel.billId) === ''
       ) return false
 
-      const id = paymentSequence + 1
-      paymentSequence = id
+      const pageId = instanceId
       paymentController = createAbortController()
       emit({ paymentSubmitting: true })
-      void submitRepayment(id, paymentController.signal)
+      showLoading()
+      void submitRepayment(pageId, paymentController.signal)
       return true
     },
     requestExtension() {

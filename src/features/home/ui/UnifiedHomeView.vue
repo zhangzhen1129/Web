@@ -1,8 +1,9 @@
 <script setup>
 import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue'
-import { Badge, Loading, PullRefresh, Skeleton, showToast } from 'vant'
+import { Badge, Loading, Popup, PullRefresh, Skeleton, showToast } from 'vant'
 import 'vant/es/badge/style'
 import 'vant/es/loading/style'
+import 'vant/es/popup/style'
 import 'vant/es/pull-refresh/style'
 import 'vant/es/skeleton/style'
 import 'vant/es/toast/style'
@@ -119,6 +120,15 @@ function handleVisibilityChange() {
 
 function handleOverlayKeydown(event) {
   if (event.key === 'Escape') session.dismissOverlayNotice()
+}
+
+function stopWheelPropagation(event) {
+  event.stopPropagation()
+}
+
+function handleDialogVisibility(visible) {
+  if (visible) return
+  session.closeProductDialog()
 }
 
 onMounted(() => {
@@ -296,8 +306,22 @@ defineExpose({
       </button>
     </nav>
 
-    <div v-if="state.dialogOpen" class="unified-home__dialog" role="presentation" @wheel.stop @touchmove.stop>
-      <section class="unified-home__dialog-sheet" role="dialog" aria-modal="true">
+    <Popup
+      :show="state.dialogOpen"
+      position="bottom"
+      :z-index="20"
+      :close-on-click-overlay="false"
+      :close-on-popstate="false"
+      :lock-scroll="true"
+      :destroy-on-close="true"
+      class="unified-home__dialog"
+      overlay-class="unified-home__dialog-overlay"
+      aria-modal="true"
+      :overlay-props="{ onWheel: stopWheelPropagation }"
+      @wheel="stopWheelPropagation"
+      @update:show="handleDialogVisibility"
+    >
+      <section class="unified-home__dialog-sheet">
         <button
           class="unified-home__dialog-close"
           type="button"
@@ -334,7 +358,7 @@ defineExpose({
           <span>{{ selectedCountText }}</span>
         </div>
       </section>
-    </div>
+    </Popup>
 
     <Transition name="unified-home-overlay">
       <div
