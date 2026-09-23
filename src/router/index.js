@@ -12,6 +12,7 @@ const LoanConfirmPage = () => import('../features/loanConfirm/views/LoanConfirmP
 const LoanSuccessPage = () => import('../features/loanSuccess/views/LoanSuccessPage.vue')
 const LoanFailPage = () => import('../features/loanFail/views/LoanFailPage.vue')
 const OrderDetailPage = () => import('../features/orderDetail/views/OrderDetailPage.vue')
+const MinePage = () => import('../features/mine/views/MinePage.vue')
 
 export const ROUTE_PATH = Object.freeze({
   HOME: '/home',
@@ -24,6 +25,8 @@ export const ROUTE_PATH = Object.freeze({
   ADD_BANK: '/addBank',
   ORDER_DETAIL: '/orderDetail',
   HELP_CENTER: '/helpCenter',
+  COMPLAIN_HOME: '/complainHome',
+  SETTINGS: '/settings',
   DEFER_DETAIL: '/deferDetail',
   DEFER_HISTORY: '/deferHistory',
   BANK_DETAIL: '/bankDetail',
@@ -44,7 +47,7 @@ export const router = createRouter({
       children: [
         { path: ROUTE_PATH.HOME, name: 'home', component: HomePage, meta: { keepAlive: true, showTab: true, tabKey: 'home' } },
         { path: ROUTE_PATH.REPAYMENT, name: 'repayment', component: RepaymentPage, meta: { keepAlive: true, showTab: true, tabKey: 'repayment' } },
-        { path: ROUTE_PATH.MINE, name: 'mine', component: RoutePlaceholder, props: { title: 'Mi cuenta' }, meta: { showTab: true, tabKey: 'account' } },
+        { path: ROUTE_PATH.MINE, name: 'mine', component: MinePage, meta: { showTab: true, tabKey: 'account' } },
         { path: 'orderList', name: 'orderList', component: RoutePlaceholder, props: { title: 'Order list' } },
         { path: 'information', name: 'information', component: InformationPage },
         { path: 'contacts', name: 'contacts', component: ContactsPage },
@@ -63,6 +66,8 @@ export const router = createRouter({
           },
         },
         { path: 'helpCenter', name: 'helpCenter', component: RoutePlaceholder, props: { title: 'Customer service' } },
+        { path: 'complainHome', name: 'complainHome', component: RoutePlaceholder, props: { title: 'Complaints' } },
+        { path: 'settings', name: 'settings', component: RoutePlaceholder, props: { title: 'Settings' } },
         {
           path: 'deferDetail',
           name: 'deferDetail',
