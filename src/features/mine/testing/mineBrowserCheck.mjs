@@ -137,7 +137,7 @@ async function main() {
   const client = await createProtocolClient(webSocketUrl)
   const browserErrors = []
   const requestCounts = { profile: 0, redDot: 0, deletion: 0 }
-  let profileFixture = profileResponse('678****989')
+  let profileFixture = profileResponse('980****00')
   let redDotFixture = redDotResponse(true)
   let deletionResponseDelayMs = 0
 
@@ -267,7 +267,7 @@ async function main() {
     }
 
     process.stdout.write('stage: initial mine\n')
-    await openMine({ expectedPhone: '678****989', expectedRedDot: true })
+    await openMine({ expectedPhone: '980****00', expectedRedDot: true })
     process.stdout.write('stage: initial mine loaded\n')
     const baseMetrics = await readPageMetrics()
     assert.equal(baseMetrics.menuCount, 6, JSON.stringify(baseMetrics))
@@ -359,18 +359,18 @@ async function main() {
     await screenshot('mine-delete-confirmed-375x812')
     process.stdout.write('stage: deletion confirmed\n')
 
-    await evaluate(`localStorage.setItem('DineroPro:global:mobile', JSON.stringify({ version: 1, value: '678123989' }))`)
+    await evaluate(`localStorage.setItem('DineroPro:global:mobile', JSON.stringify({ version: 1, value: '980123498' }))`)
     profileFixture = profileResponse('')
     redDotFixture = redDotResponse(false)
     process.stdout.write('stage: fallback navigation\n')
-    await openMine({ expectedPhone: '678****989', expectedRedDot: false })
+    await openMine({ expectedPhone: '980****98', expectedRedDot: false })
     process.stdout.write('stage: fallback loaded\n')
     const fallbackMetrics = await readPageMetrics()
     assert.equal(fallbackMetrics.redDotCount, 0)
-    assert.equal(fallbackMetrics.phoneText, '678****989')
+    assert.equal(fallbackMetrics.phoneText, '980****98')
     assert.equal(fallbackMetrics.loadingCallCount, 0, JSON.stringify(fallbackMetrics))
     assert.equal(fallbackMetrics.loadingOverlayCount, 0, JSON.stringify(fallbackMetrics))
-    assert.doesNotMatch(fallbackMetrics.textContent, /678123989/)
+    assert.doesNotMatch(fallbackMetrics.textContent, /980123498/)
     await screenshot('mine-fallback-masked-375x812')
 
     assert.deepEqual(browserErrors, [])

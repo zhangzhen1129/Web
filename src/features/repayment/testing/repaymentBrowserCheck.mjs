@@ -9,6 +9,8 @@ function readArgument(name, fallback = '') {
   return index >= 0 ? process.argv[index + 1] : fallback
 }
 
+const REPAYMENT_ORDER_LIST_PATH = '/vvf/lxako/rtSkmgvsbtqYojbxMopz'
+
 function wait(delay) {
   return new Promise((resolve) => setTimeout(resolve, delay))
 }
@@ -134,6 +136,9 @@ async function main() {
   const browserErrors = []
   let fixture = response([])
   let fixtureDelayMs = 0
+  let requestCount = 0
+  let repaymentRequestCount = 0
+  const requestLog = []
 
   try {
     const target = await client.send('Target.createTarget', { url: 'about:blank' })
@@ -151,6 +156,7 @@ async function main() {
 
     await send('Page.enable')
     await send('Runtime.enable')
+    await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 })
     await send('Fetch.enable', {
       patterns: [
         { urlPattern: 'http://127.0.0.1:4173/vvf/*', requestStage: 'Request' },
@@ -162,6 +168,11 @@ async function main() {
       const requestUrl = new URL(event.request.url)
       const isIcon = requestUrl.pathname === '/icon.png'
       const isPreflight = event.request.method === 'OPTIONS'
+      if (!isIcon && !isPreflight) {
+        requestCount += 1
+        requestLog.push(`${event.request.method} ${requestUrl.pathname}`)
+        if (requestUrl.pathname === REPAYMENT_ORDER_LIST_PATH) repaymentRequestCount += 1
+      }
       const fulfill = () => send('Fetch.fulfillRequest', {
         requestId: event.requestId,
         responseCode: 200,
@@ -205,6 +216,17 @@ async function main() {
       await wait(250)
       await evaluate(`location.hash = '#/repayment'`)
       await waitForValue(() => evaluate('Boolean(document.querySelector(".repayment-page"))'))
+    }
+
+    async function pullToRefresh() {
+      const touchPoints = (y) => [{ x: 187, y, radiusX: 4, radiusY: 4, force: 1, id: 1 }]
+      await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: touchPoints(140) })
+      for (const y of [160, 190, 220, 250, 280]) {
+        await send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: touchPoints(y) })
+        await wait(20)
+      }
+      await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+      await wait(60)
     }
 
     async function openRepayment(nextFixture, width = 375, height = 812, waitForTerminal = true) {
@@ -302,6 +324,86 @@ async function main() {
     await screenshot('repayment-reactivation-refreshed-375x812')
     fixtureDelayMs = 0
 
+    const pullBaseMetrics = await openRepayment(response([
+      order('ORDER-80', 80, 1500, 'Préstamo Rápido'),
+    ]))
+    assert.equal(pullBaseMetrics.cardCount, 1)
+    fixture = response([order('ORDER-80-PULLED', 80, 1900, 'Préstamo Tirado')])
+    fixtureDelayMs = 700
+    const requestsBeforePull = repaymentRequestCount
+    await pullToRefresh()
+    await waitForValue(() => evaluate('Boolean(document.querySelector(".browser-native-loading"))'))
+    const duringPull = await evaluate(`({
+      listCount: document.querySelectorAll('.repayment-page__list').length,
+      skeletonCount: document.querySelectorAll('.repayment-page__loading').length,
+      errorCount: document.querySelectorAll('.repayment-page__error').length,
+      cardCount: document.querySelectorAll('.repaying-card, .overdue-card').length,
+      title: document.querySelector('.repaying-card__title')?.textContent.trim() ?? null,
+    })`)
+    assert.equal(duringPull.listCount, 1, JSON.stringify(duringPull))
+    assert.equal(duringPull.skeletonCount, 0)
+    assert.equal(duringPull.errorCount, 0)
+    assert.equal(duringPull.cardCount, 1)
+    assert.equal(duringPull.title, 'Préstamo Rápido')
+    await screenshot('repayment-pull-refresh-loading-375x812')
+    await waitForValue(() => evaluate(`document.querySelector('.repaying-card__title')?.textContent.trim() === 'Préstamo Tirado'`))
+    await waitForValue(() => evaluate('!document.querySelector(".browser-native-loading")'))
+    const afterPull = await evaluate(`({
+      listCount: document.querySelectorAll('.repayment-page__list').length,
+      skeletonCount: document.querySelectorAll('.repayment-page__loading').length,
+      cardCount: document.querySelectorAll('.repaying-card, .overdue-card').length,
+      title: document.querySelector('.repaying-card__title')?.textContent.trim() ?? null,
+      trackTransform: document.querySelector('.repayment-page__refresh .van-pull-refresh__track')?.style.transform ?? null,
+      badge: document.querySelector('.home-tab__badge')?.textContent.trim() ?? null,
+    })`)
+    assert.equal(afterPull.listCount, 1)
+    assert.equal(afterPull.skeletonCount, 0)
+    assert.equal(afterPull.cardCount, 1)
+    assert.equal(afterPull.title, 'Préstamo Tirado')
+    assert.equal(afterPull.trackTransform, '')
+    assert.equal(afterPull.badge, '1')
+    assert.equal(repaymentRequestCount - requestsBeforePull, 1, JSON.stringify(requestLog.slice(-6)))
+    await screenshot('repayment-pull-refresh-refreshed-375x812')
+    fixtureDelayMs = 0
+
+    const errorPullMetrics = await openRepayment({
+      cyiUgNvO2EPltj: { atY3WWbXIN: 2001 },
+      pl9xRlV: 'No disponible',
+    })
+    assert.equal(errorPullMetrics.errorCount, 1)
+    fixture = response([order('ORDER-80-RECOVERED', 80, 2100, 'Préstamo Recuperado')])
+    fixtureDelayMs = 600
+    // The business-failure Toast uses forbidClick, which blocks touch input
+    // until the Toast auto-closes and releases the body lock class.
+    await waitForValue(() => evaluate('!document.body.classList.contains("van-toast--unclickable")'))
+    await pullToRefresh()
+    const duringErrorPull = await evaluate(`({
+      errorCount: document.querySelectorAll('.repayment-page__error').length,
+      errorText: document.querySelector('.repayment-page__error')?.textContent.trim() ?? null,
+      listCount: document.querySelectorAll('.repayment-page__list').length,
+      skeletonCount: document.querySelectorAll('.repayment-page__loading').length,
+    })`)
+    assert.equal(duringErrorPull.errorCount, 1, JSON.stringify(duringErrorPull))
+    assert.equal(duringErrorPull.errorText, 'No disponible')
+    assert.equal(duringErrorPull.listCount, 0)
+    assert.equal(duringErrorPull.skeletonCount, 0)
+    await screenshot('repayment-pull-refresh-error-loading-375x812')
+    await waitForValue(() => evaluate('Boolean(document.querySelector(".repayment-page__list"))'))
+    const recoveredFromError = await evaluate(`({
+      errorCount: document.querySelectorAll('.repayment-page__error').length,
+      listCount: document.querySelectorAll('.repayment-page__list').length,
+      cardCount: document.querySelectorAll('.repaying-card, .overdue-card').length,
+      title: document.querySelector('.repaying-card__title')?.textContent.trim() ?? null,
+      trackTransform: document.querySelector('.repayment-page__refresh .van-pull-refresh__track')?.style.transform ?? null,
+    })`)
+    assert.equal(recoveredFromError.errorCount, 0)
+    assert.equal(recoveredFromError.listCount, 1)
+    assert.equal(recoveredFromError.cardCount, 1)
+    assert.equal(recoveredFromError.title, 'Préstamo Recuperado')
+    assert.equal(recoveredFromError.trackTransform, '')
+    await screenshot('repayment-pull-refresh-error-recovered-375x812')
+    fixtureDelayMs = 0
+
     const compactMetrics = await openRepayment(response([
       order('ORDER-80', 80, 1500, 'Préstamo Rápido'),
       order('ORDER-90', 90, 2300, 'Préstamo Express'),
@@ -314,6 +416,14 @@ async function main() {
       order('ORDER-80', 80, 1500, 'Préstamo Rápido'),
     ]), 375, 812, false)
     assert.equal(loadingMetrics.loadingCount, 1)
+    const requestsBeforeLoadingPull = repaymentRequestCount
+    await pullToRefresh()
+    await wait(200)
+    assert.equal(repaymentRequestCount, requestsBeforeLoadingPull, JSON.stringify(requestLog.slice(-6)))
+    assert.equal(
+      await evaluate(`document.querySelector('.repayment-page__refresh .van-pull-refresh__track')?.style.transform ?? ''`),
+      '',
+    )
     await screenshot('repayment-loading-375x812')
     fixtureDelayMs = 0
 
@@ -407,6 +517,10 @@ async function main() {
         'repayment-list-375x812.png',
         'repayment-reactivation-loading-375x812.png',
         'repayment-reactivation-refreshed-375x812.png',
+        'repayment-pull-refresh-loading-375x812.png',
+        'repayment-pull-refresh-refreshed-375x812.png',
+        'repayment-pull-refresh-error-loading-375x812.png',
+        'repayment-pull-refresh-error-recovered-375x812.png',
         'repayment-list-360x800.png',
         'repayment-empty-375x812.png',
         'repayment-empty-null-375x812.png',
@@ -418,6 +532,12 @@ async function main() {
       listMetrics,
       preservedDuringRefresh,
       refreshedState,
+      pullBaseMetrics,
+      duringPull,
+      afterPull,
+      errorPullMetrics,
+      duringErrorPull,
+      recoveredFromError,
       loadingMetrics,
       compactMetrics,
       emptyMetrics,
@@ -425,6 +545,8 @@ async function main() {
       invalidMetrics,
       businessFailureMetrics,
       badgeStyle,
+      repaymentRequestCount,
+      requestLog,
     }
     await writeFile(path.join(outputDirectory, 'browser-check.json'), `${JSON.stringify(report, null, 2)}\n`, 'utf8')
     process.stdout.write(`${JSON.stringify(report, null, 2)}\n`)

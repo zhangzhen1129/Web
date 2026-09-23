@@ -244,3 +244,199 @@ test('order-detail navigation is accepted once until activation resets the lock'
   assert.equal(controller.requestOrderDetail('ORDER-1'), false)
   assert.deepEqual(calls.filter(([name]) => name === 'detail'), [['detail', { orderId: 'ORDER-1' }]])
 })
+
+test('pull refresh keeps the confirmed list visible until the reload succeeds', async () => {
+  const refresh = deferred()
+  let callCount = 0
+  const { controller, calls } = createHarness({
+    loadOrders: async () => {
+      callCount += 1
+      return callCount === 1
+        ? { type: 'success', orders: [{ key: 'old', orderId: 'OLD' }] }
+        : refresh.promise
+    },
+  })
+
+  controller.start()
+  await flush()
+  assert.equal(controller.getState().rootState, REPAYMENT_ROOT_STATE.LIST)
+
+  assert.equal(controller.refresh(), true)
+  assert.equal(controller.getState().rootState, REPAYMENT_ROOT_STATE.LIST)
+  assert.equal(controller.getState().orders[0].orderId, 'OLD')
+  assert.equal(controller.getState().refreshing, true)
+  assert.equal(calls.filter(([name]) => name === 'load').length, 2)
+  assert.equal(calls.filter(([name]) => name === 'loading:show').length, 2)
+
+  refresh.resolve({ type: 'success', orders: [{ key: 'new', orderId: 'NEW' }] })
+  await flush()
+  assert.equal(controller.getState().rootState, REPAYMENT_ROOT_STATE.LIST)
+  assert.equal(controller.getState().orders[0].orderId, 'NEW')
+  assert.equal(controller.getState().refreshing, false)
+  assert.deepEqual(calls.filter(([name]) => name === 'count'), [['count', 1], ['count', 1]])
+})
+
+test('pull refresh is rejected during the first loading cycle', async () => {
+  const pending = deferred()
+  const { controller, calls } = createHarness({ loadOrders: async () => pending.promise })
+
+  controller.start()
+  assert.equal(controller.getState().rootState, REPAYMENT_ROOT_STATE.LOADING)
+  assert.equal(controller.refresh(), false)
+  assert.equal(calls.filter(([name]) => name === 'load').length, 1)
+})
+
+test('a second pull during the waiting state does not start another request', async () => {
+  const refresh = deferred()
+  let callCount = 0
+  const { controller, calls } = createHarness({
+    loadOrders: async () => {
+      callCount += 1
+      return callCount === 1
+        ? { type: 'success', orders: [{ key: 'a', orderId: 'A' }] }
+        : refresh.promise
+    },
+  })
+
+  controller.start()
+  await flush()
+
+  assert.equal(controller.refresh(), true)
+  assert.equal(controller.refresh(), false)
+  assert.equal(calls.filter(([name]) => name === 'load').length, 2)
+
+  refresh.resolve({ type: 'success', orders: [{ key: 'b', orderId: 'B' }] })
+  await flush()
+  assert.equal(controller.getState().refreshing, false)
+  assert.equal(controller.getState().orders[0].orderId, 'B')
+})
+
+test('pull refresh from the error root state recovers into the list', async () => {
+  let callCount = 0
+  const { controller, calls } = createHarness({
+    loadOrders: async () => {
+      callCount += 1
+      if (callCount === 1) throw new Error('offline')
+      return { type: 'success', orders: [{ key: 'ok', orderId: 'OK' }] }
+    },
+  })
+
+  controller.start()
+  await flush()
+  assert.equal(controller.getState().rootState, REPAYMENT_ROOT_STATE.ERROR)
+
+  assert.equal(controller.refresh(), true)
+  assert.equal(controller.getState().rootState, REPAYMENT_ROOT_STATE.ERROR)
+  assert.equal(controller.getState().refreshing, true)
+
+  await flush()
+  assert.equal(controller.getState().rootState, REPAYMENT_ROOT_STATE.LIST)
+  assert.equal(controller.getState().orders[0].orderId, 'OK')
+  assert.equal(controller.getState().refreshing, false)
+  assert.deepEqual(calls.filter(([name]) => name === 'count'), [['count', 1]])
+})
+
+test('pull refresh from the empty root state keeps the empty state until the reload succeeds', async () => {
+  const refresh = deferred()
+  let callCount = 0
+  const { controller, calls } = createHarness({
+    loadOrders: async () => {
+      callCount += 1
+      return callCount === 1 ? { type: 'success', orders: [] } : refresh.promise
+    },
+  })
+
+  controller.start()
+  await flush()
+  assert.equal(controller.getState().rootState, REPAYMENT_ROOT_STATE.EMPTY)
+
+  assert.equal(controller.refresh(), true)
+  assert.equal(controller.getState().rootState, REPAYMENT_ROOT_STATE.EMPTY)
+  assert.equal(controller.getState().refreshing, true)
+
+  refresh.resolve({ type: 'success', orders: [{ key: 'late', orderId: 'LATE' }] })
+  await flush()
+  assert.equal(controller.getState().rootState, REPAYMENT_ROOT_STATE.LIST)
+  assert.deepEqual(calls.filter(([name]) => name === 'count'), [['count', 0], ['count', 1]])
+})
+
+test('a failed pull refresh keeps the confirmed list and publishes no count', async () => {
+  let callCount = 0
+  const { controller, calls } = createHarness({
+    loadOrders: async () => {
+      callCount += 1
+      return callCount === 1
+        ? { type: 'success', orders: [{ key: 'old', orderId: 'OLD' }] }
+        : { type: 'business_failure', message: 'Try again' }
+    },
+  })
+
+  controller.start()
+  await flush()
+  assert.equal(controller.refresh(), true)
+  await flush()
+
+  assert.equal(controller.getState().rootState, REPAYMENT_ROOT_STATE.LIST)
+  assert.equal(controller.getState().orders[0].orderId, 'OLD')
+  assert.equal(controller.getState().refreshing, false)
+  assert.deepEqual(calls.filter(([name]) => name === 'count'), [['count', 1]])
+  assert.deepEqual(calls.find(([name]) => name === 'business-failure'), ['business-failure', 'Try again'])
+})
+
+test('a failed pull refresh keeps the error root state and its controlled feedback', async () => {
+  let callCount = 0
+  const { controller } = createHarness({
+    loadOrders: async () => {
+      callCount += 1
+      return { type: 'business_failure', message: 'Try again' }
+    },
+  })
+
+  controller.start()
+  await flush()
+  assert.equal(controller.getState().rootState, REPAYMENT_ROOT_STATE.ERROR)
+  assert.equal(controller.getState().errorMessage, 'Try again')
+
+  assert.equal(controller.refresh(), true)
+  await flush()
+  assert.equal(controller.getState().rootState, REPAYMENT_ROOT_STATE.ERROR)
+  assert.equal(controller.getState().errorMessage, 'Try again')
+  assert.equal(controller.getState().refreshing, false)
+})
+
+test('deactivation releases the pull waiting state and hides loading', async () => {
+  const refresh = deferred()
+  let callCount = 0
+  const { controller, calls } = createHarness({
+    loadOrders: async () => {
+      callCount += 1
+      return callCount === 1
+        ? { type: 'success', orders: [{ key: 'old', orderId: 'OLD' }] }
+        : refresh.promise
+    },
+  })
+
+  controller.start()
+  await flush()
+  assert.equal(controller.refresh(), true)
+  assert.equal(controller.getState().refreshing, true)
+  const hidesBeforeDeactivate = calls.filter(([name]) => name === 'loading:hide').length
+
+  controller.deactivate()
+  assert.equal(controller.getState().refreshing, false)
+  assert.equal(calls.filter(([name]) => name === 'loading:hide').length, hidesBeforeDeactivate + 1)
+
+  refresh.resolve({ type: 'success', orders: [{ key: 'stale', orderId: 'STALE' }] })
+  await flush()
+  assert.equal(controller.getState().orders[0].orderId, 'OLD')
+  assert.deepEqual(calls.filter(([name]) => name === 'count'), [['count', 1]])
+})
+
+test('pull refresh is rejected after disposal', async () => {
+  const { controller } = createHarness()
+  controller.start()
+  await flush()
+
+  controller.dispose()
+  assert.equal(controller.refresh(), false)
+})

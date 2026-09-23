@@ -193,6 +193,17 @@ export function createRepaymentController(options = {}) {
     return true
   }
 
+  function refresh() {
+    if (disposed || !initialized) return false
+    // Pull refresh is only offered once a confirmed root state exists, so the
+    // first loading cycle and duplicate pulls are rejected here.
+    if (!hasConfirmedContent() || state.refreshing) return false
+    invalidate()
+    const id = instanceId
+    void loadOrders(id, { preserveContent: true })
+    return true
+  }
+
   function deactivate() {
     if (disposed) return
     invalidate()
@@ -234,6 +245,7 @@ export function createRepaymentController(options = {}) {
     },
     start,
     activate,
+    refresh,
     deactivate,
     requestOrderDetail,
     requestHome,

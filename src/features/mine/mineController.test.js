@@ -35,7 +35,7 @@ function createHarness(overrides = {}) {
       calls.push(['navigate', location])
       return Promise.resolve()
     },
-    getFallbackMobileText: () => '678****989',
+    getFallbackMobileText: () => '980****00',
     clearGlobal: () => {
       calls.push(['clear'])
       return true
@@ -86,7 +86,7 @@ test('uses the controlled fallback when profile succeeds without a mask or fails
   controller.start()
   await flush()
 
-  assert.equal(controller.getState().phoneText, '678****989')
+  assert.equal(controller.getState().phoneText, '980****00')
   assert.deepEqual(calls.find(([name]) => name === 'business-failure'), ['business-failure', 'Try again'])
 })
 

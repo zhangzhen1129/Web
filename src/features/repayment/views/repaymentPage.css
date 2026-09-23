@@ -1,10 +1,40 @@
 .repayment-page {
+  position: relative;
   width: 100%;
-  min-height: 100dvh;
-  overflow-x: hidden;
+  height: 100dvh;
+  overflow: hidden;
   background: #f8f9fc;
   color: #364153;
   font-family: Roboto, Arial, sans-serif;
+}
+
+.repayment-page__refresh {
+  width: 100%;
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.repayment-page__refresh::-webkit-scrollbar {
+  display: none;
+}
+
+.repayment-page__refresh .van-pull-refresh__track {
+  min-height: 100%;
+}
+
+.repayment-page__refresh .van-pull-refresh__head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.repayment-page__refresh .van-loading__spinner {
+  width: .8rem !important;
+  height: .8rem !important;
 }
 
 .repayment-page__list {
