@@ -13,6 +13,7 @@ const LoanSuccessPage = () => import('../features/loanSuccess/views/LoanSuccessP
 const LoanFailPage = () => import('../features/loanFail/views/LoanFailPage.vue')
 const OrderDetailPage = () => import('../features/orderDetail/views/OrderDetailPage.vue')
 const MinePage = () => import('../features/mine/views/MinePage.vue')
+const OrderListPage = () => import('../features/orderList/views/OrderListPage.vue')
 
 export const ROUTE_PATH = Object.freeze({
   HOME: '/home',
@@ -48,7 +49,7 @@ export const router = createRouter({
         { path: ROUTE_PATH.HOME, name: 'home', component: HomePage, meta: { keepAlive: true, showTab: true, tabKey: 'home' } },
         { path: ROUTE_PATH.REPAYMENT, name: 'repayment', component: RepaymentPage, meta: { keepAlive: true, showTab: true, tabKey: 'repayment' } },
         { path: ROUTE_PATH.MINE, name: 'mine', component: MinePage, meta: { showTab: true, tabKey: 'account' } },
-        { path: 'orderList', name: 'orderList', component: RoutePlaceholder, props: { title: 'Order list' } },
+        { path: 'orderList', name: 'orderList', component: OrderListPage },
         { path: 'information', name: 'information', component: InformationPage },
         { path: 'contacts', name: 'contacts', component: ContactsPage },
         { path: 'identity', name: 'identity', component: () => import('../features/identity/views/IdentityPage.vue') },

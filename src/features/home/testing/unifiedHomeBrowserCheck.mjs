@@ -287,6 +287,43 @@ async function main() {
     assert.equal(await evaluate(`getComputedStyle(document.querySelector('.unified-home__dialog')).transitionDuration`), '0.3s')
     assert.equal(await evaluate(`getComputedStyle(document.querySelector('.unified-home__dialog')).transitionProperty`), 'transform')
     assert.equal(await evaluate(`getComputedStyle(document.querySelector('.unified-home__dialog-overlay')).backgroundColor`), 'rgba(0, 0, 0, 0.7)')
+    const dialogGeometry = await evaluate(`(() => {
+      const popup = document.querySelector('.unified-home__dialog')
+      const overlay = document.querySelector('.unified-home__dialog-overlay')
+      const sheet = document.querySelector('.unified-home__dialog-sheet')
+      const close = document.querySelector('.unified-home__dialog-close')
+      const list = document.querySelector('.unified-home__product-list')
+      const sheetRect = sheet.getBoundingClientRect()
+      return {
+        popupZIndex: getComputedStyle(popup).zIndex,
+        popupOverflow: getComputedStyle(popup).overflow,
+        overlayZIndex: getComputedStyle(overlay).zIndex,
+        sheetHeight: Math.round(sheetRect.height),
+        sheetTop: Math.round(sheetRect.top),
+        closeAboveSheet: Math.round(close.getBoundingClientRect().top) < Math.round(sheetRect.top),
+        listScrollable: list.scrollHeight > list.clientHeight,
+        bodyLocked: document.body.classList.contains('van-overflow-hidden'),
+      }
+    })()`)
+    assert.deepEqual(dialogGeometry, {
+      popupZIndex: '20',
+      popupOverflow: 'visible',
+      overlayZIndex: '20',
+      sheetHeight: 697,
+      sheetTop: 115,
+      closeAboveSheet: true,
+      listScrollable: true,
+      bodyLocked: true,
+    })
+    const dialogScrollIsolation = await evaluate(`(async () => {
+      const page = document.querySelector('.unified-home__refresh')
+      const overlay = document.querySelector('.unified-home__dialog-overlay')
+      page.scrollTop = 0
+      overlay.dispatchEvent(new WheelEvent('wheel', { deltaY: 400, bubbles: true, cancelable: true }))
+      await new Promise((resolve) => setTimeout(resolve, 120))
+      return page.scrollTop
+    })()`)
+    assert.equal(dialogScrollIsolation, 0)
     assert.equal(await evaluate(`[...document.querySelectorAll('.unified-home__product-icon')].every((image) => image.complete && image.naturalWidth > 0)`), true)
     await evaluate(`document.querySelectorAll('.unified-home__product')[1].click()`)
     const dialogInteractionState = await evaluate(`({
@@ -371,6 +408,36 @@ async function main() {
     assert.equal(capturedOpeningFrame, true)
     await wait(600)
 
+    await evaluate(`document.querySelector('.unified-home__dialog-action button').click()`)
+    const submitOperationId = (await evaluate('window.unifiedHomePreview.operationLog')).at(-1).requestId
+    await evaluate(`(async () => {
+      const fixtures = await import('/src/features/home/testing/unifiedHomeFixtures.js')
+      const payload = fixtures.createUnifiedHomeFixture('multi-available-only', 'home')
+      payload.requestId = 'home-browser-submit-1'
+      payload.revision = 903
+      payload.sourceOperationId = ${JSON.stringify(submitOperationId)}
+      payload.multiPushViewData.products[1].selected = false
+      payload.productDialogVisible = true
+      payload.submissionOverlay = { phase: 'collecting', operationId: ${JSON.stringify(submitOperationId)} }
+      return window.unifiedHomePreview.updateHomeView(payload)
+    })()`)
+    await wait(300)
+    const submissionStacking = await evaluate(`(() => {
+      const popup = document.querySelector('.unified-home__dialog')
+      const loading = document.querySelector('.data-collection-loading-bar')
+      return {
+        popupVisible: Boolean(popup),
+        popupZIndex: popup ? getComputedStyle(popup).zIndex : null,
+        loadingZIndex: loading ? getComputedStyle(loading).zIndex : null,
+      }
+    })()`)
+    assert.deepEqual(submissionStacking, {
+      popupVisible: true,
+      popupZIndex: '20',
+      loadingZIndex: '1000',
+    })
+    await screenshot('multi-product-dialog-submitting-375x812')
+
     await navigate('scenario=cash-apply')
     await evaluate(`document.querySelector('.unified-home__amount-controls button').click()`)
     await evaluate(`document.querySelector('.unified-home__primary').click()`)
@@ -401,7 +468,7 @@ async function main() {
     const report = {
       status: 'passed',
       browserErrors,
-      screenshots: rootScenarios.length + 9,
+      screenshots: rootScenarios.length + 11,
       results,
     }
     await writeFile(path.join(outputDirectory, 'browser-check.json'), `${JSON.stringify(report, null, 2)}\n`, 'utf8')

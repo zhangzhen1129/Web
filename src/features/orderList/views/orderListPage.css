@@ -1,0 +1,206 @@
+.order-list-page {
+  position: relative;
+  width: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  background: #f8f9fc;
+  color: #364153;
+  font-family: Roboto, Arial, sans-serif;
+}
+
+.order-list-page__refresh {
+  width: 100%;
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.order-list-page__refresh::-webkit-scrollbar {
+  display: none;
+}
+
+.order-list-page__refresh .van-pull-refresh__track {
+  min-height: 100%;
+}
+
+.order-list-page__refresh .van-pull-refresh__head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.order-list-page__refresh .van-loading__spinner {
+  width: .8rem !important;
+  height: .8rem !important;
+}
+
+.order-list-header {
+  position: relative;
+  display: flex;
+  height: 1.64103rem;
+  align-items: center;
+  justify-content: center;
+  margin-top: var(--app-safe-area-top);
+  padding: 0 .41026rem;
+}
+
+.order-list-header__title {
+  max-width: 5.89744rem;
+  margin: 0;
+  overflow: hidden;
+  color: #333;
+  font-size: .46154rem;
+  font-weight: 900;
+  line-height: .61538rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.order-list-header__back {
+  position: absolute;
+  top: .25641rem;
+  left: .41026rem;
+  display: grid;
+  width: 1.12821rem;
+  height: 1.12821rem;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: .30769rem;
+  background: #fff;
+  box-shadow: 0 .05128rem .10256rem rgb(0 0 0 / 8%);
+}
+
+.order-list-header__back img {
+  display: block;
+  width: .51282rem;
+  height: .51282rem;
+}
+
+.order-list-header__back:disabled {
+  opacity: .65;
+}
+
+.order-list-filters {
+  display: flex;
+  gap: .20513rem;
+  margin: .41026rem .41026rem 0;
+}
+
+.order-list-filter {
+  display: inline-flex;
+  height: 1.02564rem;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  padding: 0 .10256rem;
+  border: .02564rem solid #e5e7eb;
+  border-radius: .41026rem;
+  background: #fff;
+  color: #999;
+  font-size: .41026rem;
+  font-weight: 900;
+  line-height: .61538rem;
+  white-space: nowrap;
+}
+
+.order-list-filter--active {
+  border-color: #155dfc;
+  color: #155dfc;
+}
+
+.order-list-items,
+.order-list-loading {
+  display: flex;
+  flex-direction: column;
+  gap: .41026rem;
+  padding: .41026rem .41026rem calc(.82051rem + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+}
+
+.order-list-skeleton-card {
+  width: 100%;
+  min-height: 4.92308rem;
+  padding: .41026rem;
+  border: .02564rem solid #f3f4f6;
+  border-radius: .41026rem;
+  background: #fff;
+  box-sizing: border-box;
+}
+
+.order-list-skeleton-card .van-skeleton__row {
+  height: .41026rem;
+  margin-top: .25641rem;
+  background: #e5e7eb;
+  border-radius: .10256rem;
+}
+
+.order-list-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1.02564rem .41026rem calc(.82051rem + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+}
+
+.order-list-empty__image {
+  display: block;
+  width: 4.69231rem;
+  height: 2.76923rem;
+  flex: 0 0 auto;
+}
+
+.order-list-empty__text {
+  margin: .20513rem 0 0;
+  color: #a7a7a7;
+  font-size: .30769rem;
+  font-weight: 400;
+  line-height: .41026rem;
+  text-align: center;
+}
+
+.order-list-empty__action {
+  width: 100%;
+  height: 1.4359rem;
+  margin-top: 1.02564rem;
+  border: 0;
+  border-radius: .41026rem;
+  background: linear-gradient(90deg, #155dfc, #4f39f6 50%, #9810fa);
+  color: #fff;
+  font-size: .41026rem;
+  font-weight: 900;
+  line-height: .61538rem;
+}
+
+.order-list-empty__action:disabled {
+  opacity: .65;
+}
+
+.order-list-error {
+  display: flex;
+  min-height: 6rem;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 1.53846rem .61538rem calc(.82051rem + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+  color: #6a7282;
+  font-size: .41026rem;
+  line-height: .61538rem;
+  text-align: center;
+}
+
+.order-list-error p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.order-list-header__back:focus-visible,
+.order-list-filter:focus-visible,
+.order-list-empty__action:focus-visible {
+  outline: .07692rem solid #111827;
+  outline-offset: .05128rem;
+}
