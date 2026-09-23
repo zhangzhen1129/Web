@@ -44,6 +44,8 @@ function createHarness(overrides = {}) {
       calls.push(['logout'])
       return true
     },
+    showNativeLoading: () => calls.push(['show-loading']),
+    hideNativeLoading: () => calls.push(['hide-loading']),
     onBusinessFailure: (message) => calls.push(['business-failure', message]),
     onRequestFailure: (error) => calls.push(['request-failure', error?.message ?? error]),
     onTerminalRisk: (code) => calls.push(['risk', code]),
@@ -73,6 +75,7 @@ test('starts profile and red-dot requests once and applies only strict red-dot s
   assert.deepEqual(calls.filter(([name]) => name === 'red-dot').map(([, request]) => request.signal), ['signal'])
   assert.equal(controller.getState().phoneText, '111****222')
   assert.equal(controller.getState().showComplaintRedDot, true)
+  assert.equal(calls.some(([name]) => name === 'show-loading' || name === 'hide-loading'), false)
 })
 
 test('uses the controlled fallback when profile succeeds without a mask or fails', async () => {
@@ -136,6 +139,10 @@ test('confirm deletion closes the dialog, submits once, clears state, and logs o
     ['clear'],
     ['logout'],
   ])
+  assert.deepEqual(calls.filter(([name]) => name === 'show-loading' || name === 'hide-loading'), [
+    ['show-loading'],
+    ['hide-loading'],
+  ])
 })
 
 test('delete failure unlocks the menu and reports the protocol message', async () => {
@@ -147,6 +154,10 @@ test('delete failure unlocks the menu and reports the protocol message', async (
   assert.equal(await controller.confirmDelete(), false)
   assert.equal(controller.getState().deleteSubmitting, false)
   assert.deepEqual(calls.find(([name]) => name === 'business-failure'), ['business-failure', 'Denied'])
+  assert.deepEqual(calls.filter(([name]) => name === 'show-loading' || name === 'hide-loading'), [
+    ['show-loading'],
+    ['hide-loading'],
+  ])
 })
 
 test('delete success still runs global cleanup and logout after page disposal', async () => {
@@ -163,5 +174,72 @@ test('delete success still runs global cleanup and logout after page disposal', 
   assert.deepEqual(calls.filter(([name]) => name === 'clear' || name === 'logout'), [
     ['clear'],
     ['logout'],
+  ])
+  assert.deepEqual(calls.filter(([name]) => name === 'show-loading' || name === 'hide-loading'), [
+    ['show-loading'],
+    ['hide-loading'],
+  ])
+})
+
+test('keeps account deletion loading visible until the request reaches a terminal result', async () => {
+  const pending = deferred()
+  const { controller, calls } = createHarness({
+    deleteAccount: async () => pending.promise,
+  })
+  controller.openDeleteDialog()
+  const deletion = controller.confirmDelete()
+
+  assert.deepEqual(calls.filter(([name]) => name === 'show-loading' || name === 'hide-loading'), [
+    ['show-loading'],
+  ])
+
+  pending.resolve({ type: 'success' })
+  assert.equal(await deletion, true)
+  assert.deepEqual(calls.filter(([name]) => name === 'show-loading' || name === 'hide-loading'), [
+    ['show-loading'],
+    ['hide-loading'],
+  ])
+})
+
+test('hides account deletion loading on request failure and duplicate confirmation', async () => {
+  const pending = deferred()
+  const { controller, calls } = createHarness({
+    deleteAccount: async () => pending.promise,
+  })
+  controller.openDeleteDialog()
+
+  const deletion = controller.confirmDelete()
+  assert.equal(await controller.confirmDelete(), false)
+  assert.deepEqual(calls.filter(([name]) => name === 'show-loading' || name === 'hide-loading'), [
+    ['show-loading'],
+  ])
+
+  pending.reject(new Error('Network unavailable'))
+  assert.equal(await deletion, false)
+  assert.deepEqual(calls.filter(([name]) => name === 'show-loading' || name === 'hide-loading'), [
+    ['show-loading'],
+    ['hide-loading'],
+  ])
+})
+
+test('hides account deletion loading when the page deactivates before the request resolves', async () => {
+  const pending = deferred()
+  const { controller, calls } = createHarness({
+    deleteAccount: async () => pending.promise,
+  })
+  controller.openDeleteDialog()
+  const deletion = controller.confirmDelete()
+
+  controller.deactivate()
+  assert.deepEqual(calls.filter(([name]) => name === 'show-loading' || name === 'hide-loading'), [
+    ['show-loading'],
+    ['hide-loading'],
+  ])
+
+  pending.resolve({ type: 'success' })
+  assert.equal(await deletion, true)
+  assert.deepEqual(calls.filter(([name]) => name === 'show-loading' || name === 'hide-loading'), [
+    ['show-loading'],
+    ['hide-loading'],
   ])
 })

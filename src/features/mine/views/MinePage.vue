@@ -6,6 +6,7 @@ import 'vant/es/toast/style'
 import { useRouter } from 'vue-router'
 import { setPopstateGuard } from '../../../shared/navigation/popstateGuard.js'
 import { logoutToOtpLoginNative } from '../../../shared/bridge/nativeBusinessActions.js'
+import { hideNativeLoading, showNativeLoading } from '../../../shared/bridge/nativeLoading.js'
 import { useGlobalStore } from '../../../shared/globalStore/globalStore.js'
 import { maskMobile } from '../minePhone.js'
 import { MINE_TEXT } from '../mineText.js'
@@ -59,6 +60,8 @@ const controller = createMineController({
   getFallbackMobileText: () => maskMobile(globalStore.mobile),
   clearGlobal: () => globalStore.clearGlobal(),
   logout: logoutToOtpLoginNative,
+  showNativeLoading,
+  hideNativeLoading,
   onBusinessFailure: showMessage,
   onRequestFailure: showRequestFailure,
   onTerminalRisk: (code) => {

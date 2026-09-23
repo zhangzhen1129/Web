@@ -139,6 +139,7 @@ async function main() {
   const requestCounts = { profile: 0, redDot: 0, deletion: 0 }
   let profileFixture = profileResponse('678****989')
   let redDotFixture = redDotResponse(true)
+  let deletionResponseDelayMs = 0
 
   try {
     const target = await client.send('Target.createTarget', { url: 'about:blank' })
@@ -156,13 +157,18 @@ async function main() {
     await send('Page.enable')
     await send('Runtime.enable')
     await send('Page.addScriptToEvaluateOnNewDocument', {
-      source: `localStorage.setItem('DineroPro:global:api-host', JSON.stringify({ version: 1, value: 'https://fixtures.invalid' }))`,
+      source: `localStorage.setItem('DineroPro:global:api-host', JSON.stringify({ version: 1, value: 'https://fixtures.invalid' }));
+        window.__mineLoadingCalls = [];
+        window.plahub = {
+          showLoading() { window.__mineLoadingCalls.push('show'); },
+          hideLoading() { window.__mineLoadingCalls.push('hide'); },
+        };`,
     })
     await send('Fetch.enable', {
       patterns: [{ urlPattern: 'https://fixtures.invalid/*', requestStage: 'Request' }],
     })
 
-    client.on('Fetch.requestPaused', (event, eventSessionId) => {
+    client.on('Fetch.requestPaused', async (event, eventSessionId) => {
       if (eventSessionId !== sessionId) return
       const requestUrl = new URL(event.request.url)
       const isPreflight = event.request.method === 'OPTIONS'
@@ -179,7 +185,11 @@ async function main() {
         fixture = deletionResponse()
       }
 
-      void send('Fetch.fulfillRequest', {
+      if (!isPreflight && requestUrl.pathname === '/tEH/THDG/ANvNJS' && deletionResponseDelayMs > 0) {
+        await wait(deletionResponseDelayMs)
+      }
+
+      await send('Fetch.fulfillRequest', {
         requestId: event.requestId,
         responseCode: 200,
         responseHeaders: [
@@ -247,6 +257,8 @@ async function main() {
           phoneText: document.querySelector('.mine-profile__phone')?.textContent.trim() ?? '',
           menuCount: document.querySelectorAll('.mine-menu__item').length,
           redDotCount: document.querySelectorAll('.mine-menu__red-dot').length,
+          loadingCallCount: window.__mineLoadingCalls?.length ?? 0,
+          loadingOverlayCount: document.querySelectorAll('[data-dinero-browser-loading]').length,
           iconsLoaded: icons.every((icon) => icon.complete && icon.naturalWidth > 0),
           labels: Array.from(document.querySelectorAll('.mine-menu__label')).map((node) => node.textContent.trim()),
           textContent: document.querySelector('.mine-page').textContent,
@@ -260,6 +272,8 @@ async function main() {
     const baseMetrics = await readPageMetrics()
     assert.equal(baseMetrics.menuCount, 6, JSON.stringify(baseMetrics))
     assert.equal(baseMetrics.redDotCount, 1)
+    assert.equal(baseMetrics.loadingCallCount, 0, JSON.stringify(baseMetrics))
+    assert.equal(baseMetrics.loadingOverlayCount, 0, JSON.stringify(baseMetrics))
     assert.equal(baseMetrics.iconsLoaded, true)
     assert.deepEqual(baseMetrics.labels, [
       'Todos los pedidos',
@@ -328,9 +342,17 @@ async function main() {
     await waitForValue(() => evaluate(DELETE_DIALOG_VISIBLE))
     await wait(350)
     await evaluate(`window.__mineTerminalRisk = []; window.addEventListener('dinero-pro:mine-terminal-risk', (event) => window.__mineTerminalRisk.push(event.detail.code))`)
+    deletionResponseDelayMs = 350
     await evaluate(`document.querySelector('.mine-delete-dialog__confirm').click()`)
+    await waitForValue(() => evaluate('window.__mineLoadingCalls.includes("show")'))
+    assert.deepEqual(await evaluate('window.__mineLoadingCalls'), ['show'])
     await waitForValue(() => evaluate('window.__mineTerminalRisk.length > 0'))
+    deletionResponseDelayMs = 0
     assert.equal(requestCounts.deletion, 1)
+    const deletionLoadingCalls = await evaluate('window.__mineLoadingCalls')
+    const deletionLoadingOverlayCount = await evaluate('document.querySelectorAll("[data-dinero-browser-loading]").length')
+    assert.deepEqual(deletionLoadingCalls, ['show', 'hide'])
+    assert.equal(deletionLoadingOverlayCount, 0)
     assert.deepEqual(await evaluate('window.__mineTerminalRisk'), ['LOGOUT_FAILED'])
     assert.equal(await evaluate('Boolean(document.querySelector(".van-toast"))'), false)
     assert.equal(await evaluate('localStorage.getItem("DineroPro:global:mobile")'), null)
@@ -346,6 +368,8 @@ async function main() {
     const fallbackMetrics = await readPageMetrics()
     assert.equal(fallbackMetrics.redDotCount, 0)
     assert.equal(fallbackMetrics.phoneText, '678****989')
+    assert.equal(fallbackMetrics.loadingCallCount, 0, JSON.stringify(fallbackMetrics))
+    assert.equal(fallbackMetrics.loadingOverlayCount, 0, JSON.stringify(fallbackMetrics))
     assert.doesNotMatch(fallbackMetrics.textContent, /678123989/)
     await screenshot('mine-fallback-masked-375x812')
 
@@ -357,6 +381,8 @@ async function main() {
       baseMetrics,
       compactMetrics,
       dialogState,
+      deletionLoadingCalls,
+      deletionLoadingOverlayCount,
       fallbackMetrics,
       screenshots: [
         'mine-default-375x812.png',

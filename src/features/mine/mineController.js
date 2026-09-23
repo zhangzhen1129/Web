@@ -23,6 +23,8 @@ export function createMineController(options = {}) {
   const navigate = options.navigate
   const clearGlobal = options.clearGlobal
   const logout = options.logout
+  const showNativeLoading = options.showNativeLoading
+  const hideNativeLoading = options.hideNativeLoading
   const getFallbackMobileText = options.getFallbackMobileText ?? (() => '')
   const onBusinessFailure = options.onBusinessFailure ?? (() => {})
   const onRequestFailure = options.onRequestFailure ?? (() => {})
@@ -51,6 +53,7 @@ export function createMineController(options = {}) {
   let initialized = false
   let instanceId = 0
   let activeRequest = null
+  let deleteLoadingVisible = false
   let deletionTerminalHandled = false
   const listeners = new Set()
 
@@ -144,6 +147,7 @@ export function createMineController(options = {}) {
   function deactivate() {
     if (disposed) return
     invalidateRequests()
+    hideDeleteLoading()
     emit({
       deleteDialogVisible: false,
       navigationLocked: false,
@@ -164,6 +168,18 @@ export function createMineController(options = {}) {
 
   function reportTerminalRisk(code) {
     try { onTerminalRisk(code) } catch {}
+  }
+
+  function showDeleteLoading() {
+    if (deleteLoadingVisible) return
+    deleteLoadingVisible = true
+    try { showNativeLoading?.() } catch {}
+  }
+
+  function hideDeleteLoading() {
+    if (!deleteLoadingVisible) return
+    deleteLoadingVisible = false
+    try { hideNativeLoading?.() } catch {}
   }
 
   function completeDeletion() {
@@ -188,9 +204,11 @@ export function createMineController(options = {}) {
   async function confirmDelete() {
     if (disposed || state.deleteSubmitting) return false
     emit({ deleteDialogVisible: false, deleteSubmitting: true })
+    showDeleteLoading()
 
     try {
       const result = await services.deleteAccount()
+      hideDeleteLoading()
       if (result?.type === 'success') {
         completeDeletion()
         return true
@@ -201,6 +219,7 @@ export function createMineController(options = {}) {
       emit({ deleteSubmitting: false })
       return false
     } catch (error) {
+      hideDeleteLoading()
       if (!isBusinessHandledError(error)) onRequestFailure(error)
       emit({ deleteSubmitting: false })
       return false
@@ -243,6 +262,7 @@ export function createMineController(options = {}) {
     dispose() {
       if (disposed) return
       invalidateRequests()
+      hideDeleteLoading()
       disposed = true
       listeners.clear()
     },
