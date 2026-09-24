@@ -4,7 +4,7 @@ import HomePage from '../features/home/views/HomePage.vue'
 
 const RepaymentPage = () => import('../features/shell/views/RepaymentPage.vue')
 const RoutePlaceholder = () => import('./RoutePlaceholder.vue')
-const MultiPushResultPlaceholder = () => import('./MultiPushResultPlaceholder.vue')
+const MultiPushResultPage = () => import('../features/multiPushResult/views/MultiPushResultPage.vue')
 const InformationPage = () => import('../features/information/views/InformationPage.vue')
 const ContactsPage = () => import('../features/contacts/views/ContactsPage.vue')
 const BankPage = () => import('../features/bank/views/BankPage.vue')
@@ -144,8 +144,7 @@ export const router = createRouter({
         {
           path: 'loanSuccessMulti',
           name: 'loanSuccessMulti',
-          component: MultiPushResultPlaceholder,
-          props: (route) => ({ systemTime: route.query.systemTime }),
+          component: MultiPushResultPage,
           beforeEnter: (to) => {
             const systemTime = to.query.systemTime
             const isValidSystemTime = Object.keys(to.query).length === 1

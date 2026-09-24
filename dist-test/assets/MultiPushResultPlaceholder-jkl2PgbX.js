@@ -1,1 +1,0 @@
-import{O as e,c as t,d as n}from"./runtime-core.esm-bundler-Co9tXruv.js";var r={class:`route-placeholder`,"data-development-placeholder":`multi-push-result`,"aria-live":`polite`},i={__name:`MultiPushResultPlaceholder`,props:{systemTime:{type:String,required:!0}},setup(i){return(i,a)=>(e(),n(`main`,r,[...a[0]||=[t(`h1`,null,`Application result`,-1)]]))}};export{i as default};
