@@ -45,7 +45,7 @@ function createHarness(options = {}) {
         return { data: envelope(2000, { ik803hS46CSFXi8: ['o1', 'o2'] }) }
       }
       if (config.protocolId === 'API-003') {
-        return { data: envelope(2000, { aewM: { successList: ['o1', 'o2'] } }) }
+        return { data: envelope(2000, { aewM: ['o1', 'o2'] }) }
       }
       if (config.protocolId === 'API-004') {
         return {

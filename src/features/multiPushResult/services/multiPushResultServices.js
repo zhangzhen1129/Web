@@ -157,7 +157,7 @@ export function createMultiPushResultServices({ client = networkClient, getGloba
     const envelope = readEnvelope(payload)
     if (!envelope.valid) return result('invalid_response')
     if (envelope.returnCode !== 2000) return result('business_failure', { message: envelope.message })
-    const appliedOrderIds = payload?.aewM?.successList
+    const appliedOrderIds = payload?.aewM
     if (!validStringArray(appliedOrderIds)) return result('business_failure', { message: envelope.message })
     return result('success', { orderIds: Object.freeze([...appliedOrderIds]) })
   }

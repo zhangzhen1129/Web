@@ -138,7 +138,7 @@ test('surfaces the business message when the product list request fails business
 test('runs the multi push pre-application and application payloads', async () => {
   const client = createClient({
     'API-002': envelope(2000, { ik803hS46CSFXi8: ['o1', 'o2'] }),
-    'API-003': envelope(2000, { aewM: { successList: ['o1', 'o2'] } }),
+    'API-003': envelope(2000, { aewM: ['o1', 'o2'] }),
   })
   const services = createMultiPushResultServices({ client, getGlobalState: () => globalState })
 
@@ -166,7 +166,7 @@ test('rejects empty or malformed order id lists on the write chain', async () =>
     'business_failure',
   )
 
-  const malformedApply = createClient({ 'API-003': envelope(2000, { aewM: { successList: ['o1', 2] } }) })
+  const malformedApply = createClient({ 'API-003': envelope(2000, { aewM: ['o1', 2] }) })
   assert.equal(
     (await createMultiPushResultServices({ client: malformedApply, getGlobalState: () => globalState }).apply({ orderIds: ['o1'] })).type,
     'business_failure',
@@ -181,6 +181,27 @@ test('rejects empty or malformed order id lists on the write chain', async () =>
   const services = createMultiPushResultServices({ client: createClient({}), getGlobalState: () => globalState })
   assert.equal((await services.preApply({ productIds: [] })).type, 'invalid_response')
   assert.equal((await services.apply({ orderIds: [''] })).type, 'invalid_response')
+})
+
+test('reads the applied order id list from the aewM string array', async () => {
+  const client = createClient({
+    'API-003': envelope(2000, { aewM: ['o1', 'o2'] }),
+  })
+  const result = await createMultiPushResultServices({ client, getGlobalState: () => globalState })
+    .apply({ orderIds: ['o1', 'o2'] })
+  assert.equal(result.type, 'success')
+  assert.deepEqual(result.orderIds, ['o1', 'o2'])
+  assert.equal(client.calls[0].path, multiPushResultProtocolPaths.APPLICATION_PATH)
+  assert.equal(client.calls[0].protocolId, 'API-003')
+})
+
+test('treats a non-array aewM payload as a business failure per the updated response contract', async () => {
+  for (const aewM of [{ successList: ['o1'] }, 'o1', null, 1]) {
+    const client = createClient({ 'API-003': envelope(2000, { aewM }) })
+    const result = await createMultiPushResultServices({ client, getGlobalState: () => globalState })
+      .apply({ orderIds: ['o1'] })
+    assert.equal(result.type, 'business_failure', `aewM=${JSON.stringify(aewM)}`)
+  }
 })
 
 test('loads the order list with the page system time and degrades optional card fields', async () => {
@@ -272,4 +293,49 @@ test('treats a non object response body as an invalid response', async () => {
   assert.equal((await services.loadRecommendedProducts()).type, 'invalid_response')
   assert.equal((await services.loadOrders({ startApplyTime: '1' })).type, 'invalid_response')
   assert.equal((await services.getReviewPromptEnabled()).type, 'invalid_response')
+})
+
+test('keeps every response read on the flat fields declared by the current package protocol', async () => {
+  const client = createClient({
+    'API-001': envelope(2000, {
+      boxeqivkXywlXvshygxTmwx: [
+        { id: 'p1', productName: 'Product One', minAmount: '1500', icon: 'https://cdn.example.com/p1.png' },
+      ],
+    }),
+    'API-002': envelope(2000, { ik803hS46CSFXi8: ['o1'] }),
+    'API-003': envelope(2000, { aewM: ['o1'] }),
+    'API-004': envelope(2000, {
+      qrAbsjzu7WLU: {
+        baIJ: [{
+          productIconImageUrl: 'https://cdn.example.com/icon.png',
+          orderNo: 'order-1',
+          productName: 'Product One',
+          approvalAmount: '1500',
+          orderStatusStr: 'Evaluando',
+        }],
+      },
+    }),
+    'API-005': envelope(2000, { aewM: true }),
+  })
+  const services = createMultiPushResultServices({ client, getGlobalState: () => globalState })
+
+  assert.equal((await services.loadRecommendedProducts()).type, 'success')
+  assert.equal((await services.preApply({ productIds: ['p1'] })).type, 'success')
+  assert.equal((await services.apply({ orderIds: ['o1'] })).type, 'success')
+  assert.equal((await services.loadOrders({ startApplyTime: '123' })).type, 'success')
+  assert.deepEqual(await services.getReviewPromptEnabled(), { type: 'success', enabled: true })
+})
+
+test('does not read undocumented data-wrapped business fields', async () => {
+  const client = createClient({
+    'API-001': envelope(2000, {
+      data: {
+        mergPushProductList: [
+          { id: 'p1', productName: 'Product One', minAmount: '1500', icon: 'https://cdn.example.com/p1.png' },
+        ],
+      },
+    }),
+  })
+  const services = createMultiPushResultServices({ client, getGlobalState: () => globalState })
+  assert.equal((await services.loadRecommendedProducts()).type, 'empty')
 })
