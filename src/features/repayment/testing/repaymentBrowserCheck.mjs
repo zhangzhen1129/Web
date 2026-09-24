@@ -286,7 +286,7 @@ async function main() {
     assert.equal(listMetrics.cardCount, 2, JSON.stringify(listMetrics))
     assert.equal(listMetrics.repayingCount, 1)
     assert.equal(listMetrics.overdueCount, 1)
-    assert.equal(listMetrics.firstStatus, 'Reembolsando')
+    assert.equal(listMetrics.firstStatus, 'Pendiente de pago')
     assert.equal(listMetrics.firstAmount, 'S/ 1500')
     assert.equal(listMetrics.firstDate, '2025-11-20')
     assert.ok(listMetrics.documentWidth <= listMetrics.width)

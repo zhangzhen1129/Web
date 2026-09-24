@@ -4,13 +4,13 @@ import test from 'node:test'
 import { getRepaymentStatusText } from './repaymentText.js'
 
 test('maps repayment order status codes to project messages for the active language', () => {
-  assert.equal(getRepaymentStatusText(80), 'Reembolsando')
+  assert.equal(getRepaymentStatusText(80), 'Pendiente de pago')
   assert.equal(getRepaymentStatusText(90), 'Atrasado')
 })
 
 test('selects repayment order status labels by language', () => {
-  assert.equal(getRepaymentStatusText(80, 'en'), 'Repaying')
-  assert.equal(getRepaymentStatusText(90, 'en'), 'overdue')
+  assert.equal(getRepaymentStatusText(80, 'en'), 'Pending payment')
+  assert.equal(getRepaymentStatusText(90, 'en'), 'Overdue')
   assert.equal(getRepaymentStatusText(80, 'sw'), '')
 })
 

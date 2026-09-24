@@ -10,17 +10,17 @@ import {
 
 test('maps every confirmed order status to the project message for the active language', () => {
   const expected = {
-    10: 'Pendiente de aplicar',
-    20: 'Revisando',
-    21: 'Revisando',
+    10: 'Pendiente',
+    20: 'En revisión',
+    21: 'En revisión',
     30: 'Aprobado',
     40: 'Rechazado',
     70: 'Desembolsando',
-    80: 'Reembolsando',
+    80: 'Pendiente de pago',
     90: 'Atrasado',
     100: 'Completado',
     101: 'Completado',
-    110: 'Fracaso',
+    110: 'Desembolso fallido',
   }
 
   for (const [status, text] of Object.entries(expected)) {
@@ -29,8 +29,41 @@ test('maps every confirmed order status to the project message for the active la
 })
 
 test('selects the order status label by language', () => {
-  assert.equal(getOrderStatusText(30, 'en'), 'Approved')
-  assert.equal(getOrderStatusText(30, 'es'), 'Aprobado')
+  const expected = {
+    en: {
+      10: 'Pending',
+      20: 'Under review',
+      21: 'Under review',
+      30: 'Approved',
+      40: 'Rejected',
+      70: 'Disbursing',
+      80: 'Pending payment',
+      90: 'Overdue',
+      100: 'Completed',
+      101: 'Completed',
+      110: 'Disbursement failed',
+    },
+    es: {
+      10: 'Pendiente',
+      20: 'En revisión',
+      21: 'En revisión',
+      30: 'Aprobado',
+      40: 'Rechazado',
+      70: 'Desembolsando',
+      80: 'Pendiente de pago',
+      90: 'Atrasado',
+      100: 'Completado',
+      101: 'Completado',
+      110: 'Desembolso fallido',
+    },
+  }
+
+  for (const [language, statuses] of Object.entries(expected)) {
+    for (const [status, text] of Object.entries(statuses)) {
+      assert.equal(getOrderStatusText(Number(status), language), text, `${language} status ${status}`)
+    }
+  }
+
   assert.equal(getOrderStatusText(30, 'sw'), '')
 })
 

@@ -47,12 +47,12 @@ const PROJECT_MESSAGES = Object.freeze({
     sw: 'Upakiaji umeshindwa. Tafadhali jaribu tena baadaye.',
   }),
   '50': Object.freeze({
-    en: 'Pending to apply',
-    es: 'Pendiente de aplicar',
+    en: 'Pending',
+    es: 'Pendiente',
   }),
   '51': Object.freeze({
-    en: 'Reviewing',
-    es: 'Revisando',
+    en: 'Under review',
+    es: 'En revisión',
   }),
   '52': Object.freeze({
     en: 'Approved',
@@ -67,20 +67,20 @@ const PROJECT_MESSAGES = Object.freeze({
     es: 'Desembolsando',
   }),
   '55': Object.freeze({
-    en: 'Repaying',
-    es: 'Reembolsando',
+    en: 'Pending payment',
+    es: 'Pendiente de pago',
   }),
   '56': Object.freeze({
-    en: 'overdue',
+    en: 'Overdue',
     es: 'Atrasado',
   }),
   '57': Object.freeze({
-    en: 'Done',
+    en: 'Completed',
     es: 'Completado',
   }),
   '58': Object.freeze({
-    en: 'Failed',
-    es: 'Fracaso',
+    en: 'Disbursement failed',
+    es: 'Desembolso fallido',
   }),
 })
 

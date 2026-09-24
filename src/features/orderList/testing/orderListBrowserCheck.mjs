@@ -93,17 +93,17 @@ async function createProtocolClient(webSocketUrl) {
 }
 
 const STATUS_TEXT = Object.freeze({
-  10: 'Pendiente de aplicar',
-  20: 'Revisando',
-  21: 'Revisando',
+  10: 'Pendiente',
+  20: 'En revisión',
+  21: 'En revisión',
   30: 'Aprobado',
   40: 'Rechazado',
   70: 'Desembolsando',
-  80: 'Reembolsando',
+  80: 'Pendiente de pago',
   90: 'Atrasado',
   100: 'Completado',
   101: 'Completado',
-  110: 'Fracaso',
+  110: 'Desembolso fallido',
 })
 
 function order(orderNo, orderStatus, overrides = {}) {
@@ -324,7 +324,7 @@ async function main() {
       { text: 'Revisión', active: false },
       { text: 'Historial', active: false },
     ])
-    assert.deepEqual(results.list.cards.map((card) => card.status), ['Reembolsando', 'Atrasado'])
+    assert.deepEqual(results.list.cards.map((card) => card.status), ['Pendiente de pago', 'Atrasado'])
     assert.equal(results.list.horizontalOverflow, false)
     for (const card of results.list.cards) {
       assert.ok(card.titleRight <= card.badgeLeft + 1, `title overlaps badge: ${card.product}`)
@@ -342,7 +342,7 @@ async function main() {
     await screenshot('order-list-reviewing-375x812')
     assert.deepEqual(
       results.reviewing.cards.map((card) => card.status),
-      ['Pendiente de aplicar', 'Revisando', 'Revisando', 'Aprobado', 'Rechazado', 'Desembolsando', 'Fracaso'],
+      ['Pendiente', 'En revisión', 'En revisión', 'Aprobado', 'Rechazado', 'Desembolsando', 'Desembolso fallido'],
     )
     assert.deepEqual(results.reviewing.filters, [false, true, false])
     assert.deepEqual(
@@ -351,15 +351,23 @@ async function main() {
         'rgb(255, 188, 65)',
         'rgb(241, 37, 168)',
         'rgb(241, 37, 168)',
-        'rgb(4, 202, 28)',
+        'rgb(4, 202, 162)',
         'rgb(246, 71, 5)',
         'rgb(21, 93, 252)',
-        'rgb(246, 71, 5)',
+        'rgb(202, 4, 4)',
       ],
     )
     for (const card of results.reviewing.cards) {
       assert.ok(card.titleRight <= card.badgeLeft + 1, `title overlaps badge: ${card.product}`)
     }
+    await evaluate(`(() => {
+      const page = document.querySelector('.order-list-page__refresh')
+      page.scrollTop = page.scrollHeight
+      return true
+    })()`)
+    await wait(150)
+    await screenshot('order-list-reviewing-bottom-375x812')
+    await evaluate(`document.querySelector('.order-list-page__refresh').scrollTop = 0`)
 
     await evaluate(`document.querySelectorAll('.order-list-filter')[2].click()`)
     await wait(150)
@@ -374,7 +382,7 @@ async function main() {
     await evaluate(`document.querySelectorAll('.order-list-filter')[0].click()`)
     await wait(150)
     results.backToPending = await evaluate(layoutProbe)
-    assert.deepEqual(results.backToPending.cards.map((card) => card.status), ['Reembolsando', 'Atrasado'])
+    assert.deepEqual(results.backToPending.cards.map((card) => card.status), ['Pendiente de pago', 'Atrasado'])
 
     results.overdue = results.backToPending.cards[1]
     results.overdueStyle = await evaluate(`(() => {
