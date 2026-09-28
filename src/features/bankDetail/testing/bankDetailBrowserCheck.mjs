@@ -1,4 +1,4 @@
-﻿import assert from 'node:assert/strict'
+import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
@@ -384,11 +384,11 @@ async function main() {
     await waitForExpression(`location.hash === '#/addPaymentMethod'`)
     const addRoute = await evaluate(`({
       hash: location.hash,
-      title: document.querySelector('.route-placeholder h1')?.textContent.trim() ?? '',
+      title: document.querySelector('.add-payment-header h1')?.textContent.trim() ?? '',
       query: location.hash.includes('?'),
     })`)
     assert.equal(addRoute.hash, '#/addPaymentMethod')
-    assert.equal(addRoute.title, 'Add payment method')
+    assert.equal(addRoute.title, 'A\u00f1adir m\u00e9todo de pago')
     assert.equal(addRoute.query, false)
     results.scenarios.addPaymentMethod = addRoute
 

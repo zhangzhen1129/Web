@@ -9,6 +9,7 @@ const InformationPage = () => import('../features/information/views/InformationP
 const ContactsPage = () => import('../features/contacts/views/ContactsPage.vue')
 const BankPage = () => import('../features/bank/views/BankPage.vue')
 const BankDetailPage = () => import('../features/bankDetail/views/BankDetailPage.vue')
+const AddPaymentMethodPage = () => import('../features/addPaymentMethod/views/AddPaymentMethodPage.vue')
 const LoanConfirmPage = () => import('../features/loanConfirm/views/LoanConfirmPage.vue')
 const LoanSuccessPage = () => import('../features/loanSuccess/views/LoanSuccessPage.vue')
 const LoanFailPage = () => import('../features/loanFail/views/LoanFailPage.vue')
@@ -76,8 +77,7 @@ export const router = createRouter({
         {
           path: 'addPaymentMethod',
           name: 'addPaymentMethod',
-          component: RoutePlaceholder,
-          props: { title: 'Add payment method' },
+          component: AddPaymentMethodPage,
           beforeEnter: (to) => (Object.keys(to.query).length === 0 ? true : { name: 'home' }),
         },
         {
