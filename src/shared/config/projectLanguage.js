@@ -46,6 +46,11 @@ const PROJECT_MESSAGES = Object.freeze({
     es: 'Carga fallida, inténtelo más tarde.',
     sw: 'Upakiaji umeshindwa. Tafadhali jaribu tena baadaye.',
   }),
+  '60': Object.freeze({
+    en: 'Bank card linked successfully',
+    es: 'Vinculación de la tarjeta bancaria con éxito',
+    sw: 'Kadi ya benki imeunganishwa kwa mafanikio',
+  }),
   '50': Object.freeze({
     en: 'Pending',
     es: 'Pendiente',

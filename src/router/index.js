@@ -8,6 +8,7 @@ const MultiPushResultPage = () => import('../features/multiPushResult/views/Mult
 const InformationPage = () => import('../features/information/views/InformationPage.vue')
 const ContactsPage = () => import('../features/contacts/views/ContactsPage.vue')
 const BankPage = () => import('../features/bank/views/BankPage.vue')
+const BankDetailPage = () => import('../features/bankDetail/views/BankDetailPage.vue')
 const LoanConfirmPage = () => import('../features/loanConfirm/views/LoanConfirmPage.vue')
 const LoanSuccessPage = () => import('../features/loanSuccess/views/LoanSuccessPage.vue')
 const LoanFailPage = () => import('../features/loanFail/views/LoanFailPage.vue')
@@ -30,6 +31,7 @@ export const ROUTE_PATH = Object.freeze({
   HELP_CENTER: '/helpCenter',
   COMPLAIN_HOME: '/complainHome',
   SETTINGS: '/settings',
+  ADD_PAYMENT_METHOD: '/addPaymentMethod',
   DEFER_DETAIL: '/deferDetail',
   DEFER_HISTORY: '/deferHistory',
   BANK_DETAIL: '/bankDetail',
@@ -72,6 +74,13 @@ export const router = createRouter({
         { path: 'complainHome', name: 'complainHome', component: RoutePlaceholder, props: { title: 'Complaints' } },
         { path: 'settings', name: 'settings', component: RoutePlaceholder, props: { title: 'Settings' } },
         {
+          path: 'addPaymentMethod',
+          name: 'addPaymentMethod',
+          component: RoutePlaceholder,
+          props: { title: 'Add payment method' },
+          beforeEnter: (to) => (Object.keys(to.query).length === 0 ? true : { name: 'home' }),
+        },
+        {
           path: 'deferDetail',
           name: 'deferDetail',
           component: OrderDeferralPage,
@@ -104,8 +113,7 @@ export const router = createRouter({
         {
           path: 'bankDetail',
           name: 'bankDetail',
-          component: RoutePlaceholder,
-          props: { title: 'Update bank account' },
+          component: BankDetailPage,
           beforeEnter: (to) => {
             const allowedKeys = ['orderId']
             const orderId = to.query.orderId
