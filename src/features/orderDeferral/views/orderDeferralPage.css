@@ -1,0 +1,334 @@
+.order-deferral-page {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 100dvh;
+  min-height: 100vh;
+  flex-direction: column;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  background: #f8f9fc;
+  color: #374151;
+  font-family: Roboto, Arial, sans-serif;
+}
+
+.order-deferral-hero {
+  flex: 0 0 auto;
+  min-height: 7.02564rem;
+  padding-top: var(--app-safe-area-top);
+  padding-bottom: .41026rem;
+  background: #155dfc;
+}
+
+.order-deferral-header {
+  position: relative;
+  display: flex;
+  height: 1.64103rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0 .41026rem;
+}
+
+.order-deferral-header h1 {
+  max-width: 5.89744rem;
+  margin: 0;
+  overflow: hidden;
+  color: #fff;
+  font-size: .46154rem;
+  font-weight: 900;
+  line-height: .61538rem;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.order-deferral-header__back,
+.order-deferral-header__help {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.order-deferral-header__back {
+  top: .25641rem;
+  left: .41026rem;
+  width: 1.12821rem;
+  height: 1.12821rem;
+  border-radius: .30769rem;
+  background: #fff;
+  box-shadow: 0 .05128rem .10256rem rgb(0 0 0 / 8%);
+}
+
+.order-deferral-header__help {
+  top: 50%;
+  right: .41026rem;
+  width: .51282rem;
+  height: .51282rem;
+  transform: translateY(-50%);
+}
+
+.order-deferral-header__back img,
+.order-deferral-header__help img {
+  display: block;
+  width: .51282rem;
+  height: .51282rem;
+}
+
+.order-deferral-header__back:disabled,
+.order-deferral-header__help:disabled,
+.order-deferral-submit:disabled {
+  opacity: .65;
+}
+
+.order-deferral-summary {
+  display: flex;
+  width: calc(100% - .82051rem);
+  min-height: 3.38462rem;
+  flex-direction: column;
+  align-items: center;
+  gap: .10256rem;
+  margin: 0 .41026rem;
+  padding: .41026rem 0;
+  border-radius: .41026rem;
+  background: #fff;
+  text-align: center;
+}
+
+.order-deferral-summary__icon {
+  position: relative;
+  width: 1.02564rem;
+  height: 1.02564rem;
+  flex: 0 0 auto;
+}
+
+.order-deferral-summary__icon img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.order-deferral-summary__icon span {
+  position: absolute;
+  top: .66667rem;
+  left: 50%;
+  color: #fff;
+  font-size: .41026rem;
+  font-weight: 700;
+  line-height: .51282rem;
+  letter-spacing: -.02564rem;
+  transform: translate(-50%, -50%);
+}
+
+.order-deferral-summary h2 {
+  margin: 0;
+  color: #333;
+  font-size: .41026rem;
+  font-weight: 900;
+  line-height: .61538rem;
+  overflow-wrap: anywhere;
+}
+
+.order-deferral-summary p {
+  margin: 0;
+  color: #333;
+  font-size: .30769rem;
+  font-weight: 400;
+  line-height: .41026rem;
+  overflow-wrap: anywhere;
+}
+
+.order-deferral-content {
+  display: flex;
+  flex-direction: column;
+  padding: .41026rem .41026rem 0;
+}
+
+.order-deferral-date-card {
+  display: flex;
+  align-items: flex-start;
+  gap: .41026rem;
+  margin-bottom: .20513rem;
+  padding: .41026rem;
+  border: .02564rem solid #e5e7eb;
+  border-radius: .41026rem;
+  background: #fff;
+}
+
+.order-deferral-timeline {
+  position: relative;
+  width: .51282rem;
+  height: 1.4359rem;
+  flex: 0 0 auto;
+}
+
+.order-deferral-timeline img {
+  position: absolute;
+  left: 0;
+  display: block;
+  width: .51282rem;
+  height: .51282rem;
+}
+
+.order-deferral-timeline img:first-child {
+  top: 0;
+}
+
+.order-deferral-timeline img:last-child {
+  top: .92308rem;
+}
+
+.order-deferral-timeline span {
+  position: absolute;
+  top: .30769rem;
+  left: .20513rem;
+  width: .10256rem;
+  height: .92308rem;
+  background: #d9d9d9;
+}
+
+.order-deferral-date-rows {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: .41026rem;
+}
+
+.order-deferral-date-row {
+  display: flex;
+  min-width: 0;
+  height: .51282rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: .20513rem;
+  color: #374151;
+  font-size: .35897rem;
+  line-height: .51282rem;
+}
+
+.order-deferral-date-row span:first-child {
+  min-width: 0;
+}
+
+.order-deferral-date-row span:last-child {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.order-deferral-fee-card {
+  display: flex;
+  flex-direction: column;
+  gap: .35897rem;
+  padding: .41026rem;
+  border: .02564rem solid #e5e7eb;
+  border-radius: .41026rem;
+  background: #fff;
+}
+
+.order-deferral-fee-trigger {
+  display: flex;
+  width: 100%;
+  min-height: .51282rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: .20513rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #374151;
+  font-size: .35897rem;
+  line-height: .51282rem;
+  text-align: left;
+}
+
+.order-deferral-fee-trigger img {
+  display: block;
+  width: .17094rem;
+  height: .29912rem;
+  flex: 0 0 auto;
+}
+
+.order-deferral-fee-trigger__icon--expanded {
+  transform: rotate(90deg);
+}
+
+.order-deferral-cost-detail {
+  display: flex;
+  min-height: 2.05128rem;
+  flex-direction: column;
+  gap: .20513rem;
+  padding: .41026rem;
+  border: .02564rem solid #e5e7eb;
+  border-radius: .41026rem;
+  background: #f8f9fc;
+}
+
+.order-deferral-cost-row {
+  display: flex;
+  min-width: 0;
+  min-height: .51282rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: .20513rem;
+  color: #374151;
+  font-size: .35897rem;
+  line-height: .51282rem;
+}
+
+.order-deferral-cost-row span:first-child {
+  min-width: 0;
+}
+
+.order-deferral-cost-row span:last-child {
+  min-width: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.order-deferral-notice {
+  margin-top: .41026rem;
+  color: #999;
+  font-size: .30769rem;
+  line-height: .46154rem;
+  overflow-wrap: anywhere;
+}
+
+.order-deferral-notice p {
+  margin: 0;
+}
+
+.order-deferral-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 4;
+  margin-top: auto;
+  padding: .41026rem .41026rem calc(.61538rem + env(safe-area-inset-bottom));
+  background: #f8f9fc;
+}
+
+.order-deferral-submit {
+  display: block;
+  width: 100%;
+  height: 1.4359rem;
+  border: 0;
+  border-radius: .41026rem;
+  background: #155dfc;
+  color: #fff;
+  font-size: .41026rem;
+  font-weight: 900;
+  line-height: .61538rem;
+  text-align: center;
+}
+
+.order-deferral-header__back:focus-visible,
+.order-deferral-header__help:focus-visible,
+.order-deferral-fee-trigger:focus-visible,
+.order-deferral-submit:focus-visible {
+  outline: .07692rem solid #111827;
+  outline-offset: .05128rem;
+}

@@ -14,6 +14,8 @@ const LoanFailPage = () => import('../features/loanFail/views/LoanFailPage.vue')
 const OrderDetailPage = () => import('../features/orderDetail/views/OrderDetailPage.vue')
 const MinePage = () => import('../features/mine/views/MinePage.vue')
 const OrderListPage = () => import('../features/orderList/views/OrderListPage.vue')
+const OrderDeferralPage = () => import('../features/orderDeferral/views/OrderDeferralPage.vue')
+const DeferHistoryPage = () => import('../features/deferHistory/views/DeferHistoryPage.vue')
 
 export const ROUTE_PATH = Object.freeze({
   HOME: '/home',
@@ -72,8 +74,7 @@ export const router = createRouter({
         {
           path: 'deferDetail',
           name: 'deferDetail',
-          component: RoutePlaceholder,
-          props: { title: 'Deferral detail' },
+          component: OrderDeferralPage,
           beforeEnter: (to) => {
             const orderId = to.query.orderId
             const isValidOrderId = Object.keys(to.query).length === 1
@@ -85,8 +86,7 @@ export const router = createRouter({
         {
           path: 'deferHistory',
           name: 'deferHistory',
-          component: RoutePlaceholder,
-          props: { title: 'Deferral history' },
+          component: DeferHistoryPage,
           beforeEnter: (to) => {
             const allowedKeys = ['orderId', 'productId', 'orderStatus']
             const orderId = to.query.orderId

@@ -1,0 +1,16 @@
+export const ORDER_DEFERRAL_TEXT = Object.freeze({
+  pageTitle: 'Detalles del pedido',
+  backLabel: 'Volver',
+  helpLabel: 'Atención al cliente',
+  summaryTitleTemplate: 'Retraso de {days} días',
+  summaryDescriptionTemplate: 'Sólo necesita pagar {amount} hoy y luego puedes aplazar el pago durante {days} días',
+  applicationDate: 'Fecha de aplicacion',
+  dueDate: 'Fecha de vencimiento',
+  detailsTrigger: 'Ver el historial de prórrogas',
+  serviceFee: 'Tarifa de servicio',
+  overdueFee: 'Tarifa vencida',
+  noticeLabel: 'Nota:',
+  noticeTemplate: 'Después de pagar la comisión por prórroga, la fecha de vencimiento se extenderá {days} días. Al finalizar este plazo, deberá pagar el capital principal, los nuevos intereses y la tarifa de servicio.',
+  submitAction: 'Prórroga',
+  detailsRegionLabel: 'Detalle de costos',
+})
