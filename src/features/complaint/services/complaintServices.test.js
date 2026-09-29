@@ -2,9 +2,11 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  buildComplaintFeedbackRequestBody,
   buildComplaintRequestBody,
   complaintProtocolPaths,
   createComplaintServices,
+  mapComplaintFeedbackResponse,
   mapComplaintRedDotResponse,
 } from './complaintServices.js'
 
@@ -187,4 +189,147 @@ test('requires getGlobalState', () => {
     () => createComplaintServices({ client: createClient(() => response()) }),
     /getGlobalState is required/,
   )
+})
+test('builds the exact complaint feedback body without image fields', () => {
+  assert.deepEqual(buildComplaintFeedbackRequestBody({
+    ...globalState,
+    userId: 'user-fixture',
+  }, {
+    agency: 'RBI',
+    question: 'Recordatorio de problemas de pago',
+    details: 'Controlled details',
+  }), {
+    cvgH: 'af-fixture',
+    rsbhpZ3X: { pwtL: 'ga-fixture' },
+    bgU88QMO: { eybE: 'fb-fixture' },
+    amHasFw: 'FixtureApp',
+    mmNUCmQdMioQ2O: { ux9jYLcC8H: '1.2.3' },
+    qkNsXozI1oC5g3: { tf69g5Spk5: '2' },
+    uxzfxbBMxhB: 'fixture.package',
+    ulG: '',
+    vqfH0gehfvNYrW: { rpryc7q8rm: '' },
+    yjDnG: 'token-fixture',
+    tn10zMNurs: { exMykk: 'user-fixture' },
+    vaGLDIESiMEPCVK0Oyncl: { udxCuzvJ9DvGtMBRF: 'RBI' },
+    hvwxtAujGLm: 'Recordatorio de problemas de pago',
+    hgCYz1AtCaH1Bg: 'Controlled details',
+  })
+})
+
+test('maps complaint feedback success strictly by integer return code 2000 without extra data gates', () => {
+  for (const data of [response(2000), response(2000, { data: {}, ignored: 'allowed' })]) {
+    assert.deepEqual(mapComplaintFeedbackResponse(data), { type: 'success' })
+  }
+})
+
+test('maps complaint feedback business failures and invalid structures', () => {
+  assert.deepEqual(mapComplaintFeedbackResponse(response(2001, {
+    pl9xRlV: 'Controlled failure',
+  })), {
+    type: 'business_failure',
+    message: 'Controlled failure',
+  })
+  for (const message of ['', '   ', null, 42, '<unsafe>']) {
+    assert.deepEqual(mapComplaintFeedbackResponse(response(2001, { pl9xRlV: message })), {
+      type: 'business_failure',
+      message: null,
+    })
+  }
+
+  for (const data of [null, [], {}, response('2000'), response(2000.5)]) {
+    assert.deepEqual(mapComplaintFeedbackResponse(data), { type: 'invalid_response' })
+  }
+})
+
+test('saves complaint feedback once through the public client and omits timeout overrides', async () => {
+  const client = createClient(() => response(2000))
+  const services = createComplaintServices({
+    client,
+    getGlobalState: () => ({ ...globalState, userId: 'user-fixture' }),
+  })
+  const signal = new AbortController().signal
+
+  const mapped = await services.saveComplaintFeedback({
+    agency: 'RBI',
+    question: 'Recordatorio de problemas de pago',
+    details: 'Controlled details',
+    signal,
+  })
+
+  assert.deepEqual(mapped, { type: 'success' })
+  assert.equal(client.calls.length, 1)
+  const request = client.calls[0]
+  assert.deepEqual(request, {
+    method: 'POST',
+    path: complaintProtocolPaths.COMPLAINT_FEEDBACK_PATH,
+    data: buildComplaintFeedbackRequestBody({
+      ...globalState,
+      userId: 'user-fixture',
+    }, {
+      agency: 'RBI',
+      question: 'Recordatorio de problemas de pago',
+      details: 'Controlled details',
+    }),
+    signal,
+    protocolId: 'API-001',
+  })
+  assert.equal(request.path, '/ntn/zwjv/wfzjKtqupfmsx0ihswh')
+  assert.equal(request.path.includes('://'), false)
+  assert.equal(Object.hasOwn(request.data, 'bebcdw6U0YpUcYdbGbWKFoD'), false)
+  assert.equal(Object.hasOwn(request.data, 'ibcDnsMBaveUaHeIrbrr'), false)
+  assert.equal(Object.hasOwn(request.data, 'wnXdSy1WV0kW708dBdRMAqy'), false)
+  assert.equal(Object.hasOwn(request, 'timeoutMs'), false)
+  assert.equal(Object.hasOwn(request, 'retry'), false)
+})
+
+test('falls back safely for missing or non-string feedback request fields', () => {
+  assert.deepEqual(buildComplaintFeedbackRequestBody({
+    afId: 1,
+    gaId: null,
+    fbId: {},
+    appName: [],
+    appVersion: 2,
+    packageName: true,
+    token: undefined,
+    userId: false,
+  }, {
+    agency: 1,
+    question: {},
+    details: null,
+  }), {
+    cvgH: '',
+    rsbhpZ3X: { pwtL: '' },
+    bgU88QMO: { eybE: '' },
+    amHasFw: '',
+    mmNUCmQdMioQ2O: { ux9jYLcC8H: '' },
+    qkNsXozI1oC5g3: { tf69g5Spk5: '2' },
+    uxzfxbBMxhB: '',
+    ulG: '',
+    vqfH0gehfvNYrW: { rpryc7q8rm: '' },
+    yjDnG: '',
+    tn10zMNurs: { exMykk: '' },
+    vaGLDIESiMEPCVK0Oyncl: { udxCuzvJ9DvGtMBRF: '' },
+    hvwxtAujGLm: '',
+    hgCYz1AtCaH1Bg: '',
+  })
+})
+
+test('propagates feedback transport errors without retry or conversion', async () => {
+  const httpError = new Error('HTTP 500')
+  const client = createClient(() => httpError)
+  const services = createComplaintServices({
+    client,
+    getGlobalState: () => globalState,
+  })
+
+  await assert.rejects(
+    () => services.saveComplaintFeedback({
+      agency: 'RBI',
+      question: 'Recordatorio de problemas de pago',
+      details: 'Controlled details',
+      signal: 'fixture-signal',
+    }),
+    (error) => error === httpError,
+  )
+  assert.equal(client.calls.length, 1)
 })

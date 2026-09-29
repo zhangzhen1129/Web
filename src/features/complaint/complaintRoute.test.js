@@ -17,11 +17,12 @@ test('complainHome replaces the placeholder with a dynamic real page', () => {
   assert.doesNotMatch(routerSource, /title: 'Complaints'/)
 })
 
-test('complainEdit is a guarded dynamic placeholder with the confirmed query contract', () => {
+test('complainEdit replaces the placeholder with a guarded dynamic real page', () => {
   const routeBlock = routerSource.match(/name: 'complainEdit'[\s\S]*?name: 'complainList'/)?.[0] ?? ''
+  assert.match(routerSource, /const ComplaintEditPage = \(\) => import\('\.\.\/features\/complaint\/views\/ComplaintEditPage\.vue'\)/)
   assert.match(routerSource, /COMPLAIN_EDIT: '\/complainEdit'/)
-  assert.match(routeBlock, /component: RoutePlaceholder/)
-  assert.match(routeBlock, /props: \{ title: 'Complaint edit' \}/)
+  assert.match(routeBlock, /component: ComplaintEditPage/)
+  assert.doesNotMatch(routeBlock, /RoutePlaceholder|props:/)
   assert.match(routeBlock, /const allowedKeys = \['type', 'question'\]/)
   assert.match(routeBlock, /queryKeys\.length === 2/)
   assert.match(routeBlock, /typeof to\.query\.type === 'string'/)

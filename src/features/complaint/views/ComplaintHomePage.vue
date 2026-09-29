@@ -16,7 +16,7 @@ import './complaintHomePage.css'
 
 defineOptions({ name: 'ComplaintHomePage' })
 
-const DEFAULT_AGENCY_INDEX = 1
+
 const router = useRouter()
 const globalStore = useGlobalStore()
 const state = ref(null)
@@ -32,14 +32,10 @@ const unsubscribe = controller.subscribe((nextState) => {
   state.value = nextState
 })
 
-function isAgencySelected(agency, index) {
+function isAgencySelected(agency) {
   const selectedAgency = state.value?.selectedAgency
-  if (selectedAgency && typeof selectedAgency.value === 'string') {
-    return selectedAgency.value === agency.value
-  }
-  return index === DEFAULT_AGENCY_INDEX
+  return Boolean(selectedAgency && typeof selectedAgency.value === 'string' && selectedAgency.value === agency.value)
 }
-
 function handleQuestionPopupVisibility(visible) {
   if (!visible) controller.closeQuestionPopup()
 }
@@ -94,13 +90,13 @@ onBeforeUnmount(() => {
         :aria-label="COMPLAINT_CONTENT.agencySelectorLabel"
       >
         <button
-          v-for="(agency, index) in COMPLAINT_CONTENT.agencyOptions"
+          v-for="agency in COMPLAINT_CONTENT.agencyOptions"
           :key="agency.value"
           class="complaint-agency__option"
-          :class="{ 'complaint-agency__option--selected': isAgencySelected(agency, index) }"
+          :class="{ 'complaint-agency__option--selected': isAgencySelected(agency) }"
           type="button"
           :aria-label="agency.label"
-          :aria-pressed="isAgencySelected(agency, index)"
+          :aria-pressed="isAgencySelected(agency)"
           :disabled="!state.active || state.navigationLocked"
           @click="controller.selectAgency(agency.value)"
         >

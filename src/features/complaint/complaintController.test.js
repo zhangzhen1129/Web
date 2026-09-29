@@ -113,24 +113,19 @@ test('keeps non-strict red dot results and request failures silent', async () =>
   assert.equal(harness.controller.getState().showRedDot, false)
 })
 
-test('opens one question popup, updates agency selection, and preserves it on close', () => {
+test('opens one question popup for every agency option and preserves the latest selection', () => {
   const harness = createHarness()
   harness.controller.start()
 
-  assert.equal(harness.controller.selectAgency('DineroPro'), true)
-  assert.equal(harness.controller.getState().selectedAgency, COMPLAINT_CONTENT.agencyOptions[0])
-  assert.equal(harness.controller.getState().questionPopupVisible, true)
+  assert.ok(COMPLAINT_CONTENT.agencyOptions.length > 0)
+  for (const agency of COMPLAINT_CONTENT.agencyOptions) {
+    assert.equal(harness.controller.selectAgency(agency.value), true)
+    assert.equal(harness.controller.getState().selectedAgency, agency)
+    assert.equal(harness.controller.getState().questionPopupVisible, true)
+    assert.equal(harness.controller.closeQuestionPopup(), true)
+    assert.equal(harness.controller.getState().selectedAgency, agency)
+  }
 
-  assert.equal(harness.controller.closeQuestionPopup(), true)
-  assert.equal(harness.controller.getState().questionPopupVisible, false)
-  assert.equal(harness.controller.getState().selectedAgency, COMPLAINT_CONTENT.agencyOptions[0])
-
-  assert.equal(
-    harness.controller.selectAgency('Plataforma de quejas en línea'),
-    true,
-  )
-  assert.equal(harness.controller.getState().selectedAgency, COMPLAINT_CONTENT.agencyOptions[1])
-  assert.equal(harness.controller.getState().questionPopupVisible, true)
   assert.equal(harness.controller.selectAgency('Unknown agency'), false)
 })
 

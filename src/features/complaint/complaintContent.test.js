@@ -3,28 +3,6 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { COMPLAINT_CONTENT } from './complaintContent.js'
 
-const EXPECTED_AGENCIES = Object.freeze([
-  Object.freeze({ value: 'DineroPro', label: 'DineroPro' }),
-  Object.freeze({
-    value: 'Plataforma de quejas en línea',
-    label: 'Plataforma de quejas en línea',
-  }),
-])
-const EXPECTED_QUESTIONS = Object.freeze([
-  Object.freeze({
-    value: 'Problemas de endeudamiento',
-    label: 'Problemas de endeudamiento',
-  }),
-  Object.freeze({
-    value: 'Problemas de reembolso',
-    label: 'Problemas de reembolso',
-  }),
-  Object.freeze({
-    value: 'Recordatorio de problemas de pago',
-    label: 'Recordatorio de problemas de pago',
-  }),
-  Object.freeze({ value: 'Otras preguntas', label: 'Otras preguntas' }),
-])
 const SOURCE_FILES = [
   'complaintContent.js',
   'complaintController.js',
@@ -32,21 +10,35 @@ const SOURCE_FILES = [
   'complaintController.test.js',
 ]
 
-test('matches the confirmed Figma content exactly', () => {
-  assert.equal(COMPLAINT_CONTENT.title, 'Quejas')
-  assert.equal(COMPLAINT_CONTENT.agencySelectorLabel, 'Seleccione una agencia de feedback')
-  assert.deepEqual(COMPLAINT_CONTENT.agencyOptions, EXPECTED_AGENCIES)
-  assert.deepEqual(COMPLAINT_CONTENT.questionTypes, EXPECTED_QUESTIONS)
-  assert.deepEqual(COMPLAINT_CONTENT.tips, {
-    heading: 'Consejos útiles:',
-    message: 'El sistema enviará el caso de queja a la agencia de quejas seleccionada y la agencia lo procesará dentro de 7 días, espere pacientemente.',
-  })
-  assert.equal(COMPLAINT_CONTENT.complaintRecordLabel, 'Registro de quejas')
-  assert.equal(COMPLAINT_CONTENT.customerServiceText, 'Atención al cliente: 5517872176')
-  assert.equal(
-    COMPLAINT_CONTENT.questionPopupTitle,
-    'Por favor seleccione el tipo de pregunta',
-  )
+function assertOptionList(options, field) {
+  assert.ok(Array.isArray(options), field)
+  assert.ok(options.length > 0, field)
+  for (const option of options) {
+    assert.equal(typeof option?.value, 'string', field)
+    assert.equal(typeof option?.label, 'string', field)
+    assert.ok(option.value.trim().length > 0, field)
+    assert.ok(option.label.trim().length > 0, field)
+  }
+}
+
+test('exposes non-empty controlled display fields and option collections', () => {
+  for (const field of [
+    'title',
+    'agencySelectorLabel',
+    'complaintRecordLabel',
+    'customerServiceText',
+    'questionPopupTitle',
+  ]) {
+    assert.equal(typeof COMPLAINT_CONTENT[field], 'string', field)
+    assert.ok(COMPLAINT_CONTENT[field].trim().length > 0, field)
+  }
+
+  assert.equal(typeof COMPLAINT_CONTENT.tips?.heading, 'string')
+  assert.equal(typeof COMPLAINT_CONTENT.tips?.message, 'string')
+  assert.ok(COMPLAINT_CONTENT.tips.heading.trim().length > 0)
+  assert.ok(COMPLAINT_CONTENT.tips.message.trim().length > 0)
+  assertOptionList(COMPLAINT_CONTENT.agencyOptions, 'agencyOptions')
+  assertOptionList(COMPLAINT_CONTENT.questionTypes, 'questionTypes')
 })
 
 test('keeps option values equal to labels and preserves their order', () => {

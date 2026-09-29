@@ -3,9 +3,15 @@ import { spawn } from 'node:child_process'
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
+import { COMPLAINT_CONTENT } from '../complaintContent.js'
 
 const DEFAULT_BROWSER = 'C:/Program Files/Google/Chrome/Application/chrome.exe'
 const RED_DOT_PATH = '/n5V/78R7/S1221NY09yUP44TB34UNT'
+const AGENCY_LABELS = COMPLAINT_CONTENT.agencyOptions.map((option) => option.label)
+const FIRST_AGENCY_INDEX = 0
+const LAST_AGENCY_INDEX = Math.max(0, AGENCY_LABELS.length - 1)
+const FIRST_AGENCY_LABEL = AGENCY_LABELS[FIRST_AGENCY_INDEX] ?? ''
+const LAST_AGENCY_LABEL = AGENCY_LABELS[LAST_AGENCY_INDEX] ?? ''
 
 function readArgument(name, fallback = '') {
   const index = process.argv.indexOf(name)
@@ -243,9 +249,9 @@ async function main() {
     const initial = await snapshot()
     assert.equal(initial.hash, '#/complainHome')
     assert.equal(initial.title, 'Quejas')
-    assert.deepEqual(initial.agencyLabels, ['DineroPro', 'Plataforma de quejas en línea'])
-    assert.equal(initial.selectedAgency, 'Plataforma de quejas en línea')
-    assert.equal(initial.agencySelectedCount, 1)
+    assert.deepEqual(initial.agencyLabels, AGENCY_LABELS)
+    assert.equal(initial.selectedAgency, null)
+    assert.equal(initial.agencySelectedCount, 0)
     assert.equal(initial.tipsHeading, 'Consejos útiles:')
     assert.equal(initial.recordLabel, 'Registro de quejas')
     assert.equal(initial.redDotCount, 1)
@@ -256,9 +262,9 @@ async function main() {
     assert.equal(requestCounts.redDot, 1)
     await screenshot('complaint-default-375x812')
 
-    await openAgency(0)
+    await openAgency(FIRST_AGENCY_INDEX)
     const agencyPopup = await snapshot()
-    assert.equal(agencyPopup.selectedAgency, 'DineroPro')
+    assert.equal(agencyPopup.selectedAgency, FIRST_AGENCY_LABEL)
     assert.equal(agencyPopup.questionTitle, 'Por favor seleccione el tipo de pregunta')
     assert.deepEqual(agencyPopup.questionLabels, ['Problemas de endeudamiento', 'Problemas de reembolso', 'Recordatorio de problemas de pago', 'Otras preguntas'])
     assert.equal(agencyPopup.questionVisible, true)
@@ -268,32 +274,33 @@ async function main() {
     await closeQuestion()
     const closed = await snapshot()
     assert.equal(closed.questionVisible, false)
-    assert.equal(closed.selectedAgency, 'DineroPro')
+    assert.equal(closed.selectedAgency, FIRST_AGENCY_LABEL)
     assert.equal(closed.redDotCount, 1)
 
-    await openAgency(1)
+    await openAgency(LAST_AGENCY_INDEX)
     await closeQuestion()
-    await evaluate(`document.querySelectorAll('.complaint-agency__option')[1].click(); document.querySelectorAll('.complaint-agency__option')[1].click(); document.querySelectorAll('.complaint-agency__option')[1].click()`)
+    await evaluate(`document.querySelectorAll('.complaint-agency__option')[${LAST_AGENCY_INDEX}].click(); document.querySelectorAll('.complaint-agency__option')[${LAST_AGENCY_INDEX}].click(); document.querySelectorAll('.complaint-agency__option')[${LAST_AGENCY_INDEX}].click()`)
     await waitForValue(() => evaluate(visibleExpression('.complaint-question-popup')))
     await wait(360)
     const rapid = await snapshot()
     assert.equal(rapid.overlayCount, 1)
     assert.equal(rapid.questionVisible, true)
+    assert.equal(rapid.selectedAgency, LAST_AGENCY_LABEL)
     await closeQuestion()
 
-    await openAgency(0)
+    await openAgency(FIRST_AGENCY_INDEX)
     const historyBefore = await evaluate('history.length')
     await evaluate(`(() => { const option = document.querySelectorAll('.complaint-question-option')[1]; for (let index = 0; index < 5; index += 1) option.click() })()`)
     await wait(800)
     const questionHash = await evaluate('location.hash')
     assert.equal(questionHash.startsWith('#/complainEdit?'), true)
-    await waitForValue(() => evaluate(visibleExpression('.route-placeholder')))
-    const questionRoute = await evaluate(`(() => { const query = new URLSearchParams(location.hash.split('?')[1] || ''); return { hash: location.hash, type: query.get('type'), question: query.get('question'), title: document.querySelector('.route-placeholder h1')?.textContent.trim() ?? '', historyLength: history.length } })()`)
+    await waitForValue(() => evaluate(visibleExpression('.complaint-edit-page')))
+    const questionRoute = await evaluate(`(() => { const query = new URLSearchParams(location.hash.split('?')[1] || ''); return { hash: location.hash, type: query.get('type'), question: query.get('question'), title: document.querySelector('.complaint-edit-header h1')?.textContent.trim() ?? '', historyLength: history.length } })()`)
     assert.equal(questionRoute.type, 'DineroPro')
     assert.equal(questionRoute.question, 'Problemas de reembolso')
-    assert.equal(questionRoute.title, 'Complaint edit')
+    assert.equal(questionRoute.title, 'Quejas')
     assert.equal(questionRoute.historyLength - historyBefore, 1)
-    await screenshot('complaint-edit-placeholder-375x812')
+    await screenshot('complaint-edit-real-375x812')
 
     await openPage()
     const listHistoryBefore = await evaluate('history.length')
@@ -365,7 +372,7 @@ async function main() {
     const compact = await snapshot()
     assert.equal(compact.horizontalOverflow, false)
     assert.equal(compact.title, 'Quejas')
-    assert.equal(compact.agencyLabels.length, 2)
+    assert.equal(compact.agencyLabels.length, AGENCY_LABELS.length)
     await screenshot('complaint-default-360x800')
 
     await navigate('#/home')

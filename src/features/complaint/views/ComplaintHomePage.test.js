@@ -52,12 +52,11 @@ test('uses two Vant Popup carriers with default transitions and explicit close b
   assert.match(bottomPopup, /position="bottom"/)
 })
 
-test('shows the second agency as the visual default until controller selection exists', () => {
-  assert.match(pageSource, /const DEFAULT_AGENCY_INDEX = 1/)
-  assert.match(pageSource, /return index === DEFAULT_AGENCY_INDEX/)
+test('starts with no selected agency and reflects only the controller selection', () => {
+  assert.doesNotMatch(pageSource, /DEFAULT_AGENCY_INDEX/)
   assert.match(pageSource, /selectedAgency\.value === agency\.value/)
+  assert.match(pageSource, /:aria-pressed="isAgencySelected\(agency\)"/)
   assert.match(pageSource, /complaint-agency__option--selected/)
-  assert.match(pageSource, /:aria-pressed="isAgencySelected\(agency, index\)"/)
 })
 
 test('shows the red dot only for a strict true controller value', () => {
