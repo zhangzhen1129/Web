@@ -1,0 +1,300 @@
+.complaint-page {
+  display: flex;
+  width: 100%;
+  height: 100dvh;
+  min-height: 100vh;
+  flex-direction: column;
+  padding-top: var(--app-safe-area-top);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  background: #f8f9fc;
+  color: #333;
+  font-family: Roboto, Arial, sans-serif;
+  -webkit-overflow-scrolling: touch;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.complaint-page::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.complaint-page__header {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 1.64103rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  padding: 0 .41026rem;
+  background: #f8f9fc;
+}
+
+.complaint-page__header h1 {
+  max-width: calc(100% - 2.25641rem);
+  margin: 0;
+  overflow: hidden;
+  color: #333;
+  font-size: .46154rem;
+  font-weight: 900;
+  line-height: .61538rem;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.complaint-page__back {
+  position: absolute;
+  left: .41026rem;
+  display: grid;
+  width: 1.12821rem;
+  height: 1.12821rem;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: .30769rem;
+  background: #fff;
+  box-shadow: 0 .05128rem .10256rem rgb(0 0 0 / 8%);
+}
+
+.complaint-page__customer-service {
+  position: absolute;
+  right: .41026rem;
+  display: grid;
+  width: 1.12821rem;
+  height: 1.12821rem;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.complaint-page__back img,
+.complaint-page__customer-service img {
+  display: block;
+  width: .51282rem;
+  height: .51282rem;
+}
+
+.complaint-page__back:focus-visible,
+.complaint-page__customer-service:focus-visible,
+.complaint-agency__option:focus-visible,
+.complaint-record:focus-visible,
+.complaint-customer-close:focus-visible,
+.complaint-question-close:focus-visible,
+.complaint-question-option:focus-visible {
+  outline: .05128rem solid #155dfc;
+  outline-offset: .05128rem;
+}
+
+.complaint-page__content {
+  width: 100%;
+  padding: .69231rem .41026rem 0;
+}
+
+.complaint-agency__label {
+  margin: 0 0 .41026rem;
+  color: #374151;
+  font-size: .35897rem;
+  font-weight: 500;
+  line-height: .51282rem;
+}
+
+.complaint-agency__options {
+  display: grid;
+  gap: .35897rem;
+}
+
+.complaint-agency__option,
+.complaint-question-option {
+  display: flex;
+  width: 100%;
+  height: 1.07692rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0 .41026rem;
+  border: .02564rem solid #999;
+  border-radius: .51282rem;
+  background: #fff;
+  color: #999;
+  font-size: .41026rem;
+  font-weight: 400;
+  line-height: .61538rem;
+  text-align: center;
+}
+
+.complaint-agency__option--selected {
+  border-color: #155dfc;
+  color: #155dfc;
+  font-weight: 700;
+}
+
+.complaint-question-option:focus-visible {
+  border-color: #155dfc;
+  color: #155dfc;
+  font-weight: 700;
+}
+
+.complaint-agency__option:disabled,
+.complaint-record:disabled,
+.complaint-question-option:disabled {
+  opacity: .65;
+}
+
+.complaint-tips {
+  margin-top: .35897rem;
+  color: #999;
+  font-size: .30769rem;
+  font-weight: 400;
+  line-height: .46154rem;
+}
+
+.complaint-tips__heading,
+.complaint-tips__message {
+  margin: 0;
+}
+
+.complaint-record {
+  display: inline-flex;
+  min-height: 1.12821rem;
+  align-self: center;
+  align-items: center;
+  justify-content: center;
+  margin-top: auto;
+  margin-bottom: calc(.61538rem + env(safe-area-inset-bottom));
+  padding: 0 .20513rem;
+  border: 0;
+  background: transparent;
+  color: #155dfc;
+  font-size: .41026rem;
+  font-weight: 900;
+  line-height: .61538rem;
+}
+
+.complaint-record span {
+  text-decoration: underline;
+  text-underline-offset: .05128rem;
+}
+
+.complaint-record__red-dot {
+  display: block;
+  width: .15385rem;
+  height: .15385rem;
+  margin-left: .15385rem;
+  flex: 0 0 auto;
+}
+
+.complaint-popup-overlay {
+  background: rgb(0 0 0 / 70%);
+}
+
+.complaint-customer-popup,
+.complaint-question-popup {
+  background: transparent;
+}
+
+.complaint-customer-popup {
+  top: 44.55%;
+}
+
+.complaint-customer-layer {
+  display: flex;
+  width: 8.76923rem;
+  max-width: calc(100vw - .82051rem);
+  flex-direction: column;
+  align-items: center;
+}
+
+.complaint-customer-card {
+  width: 100%;
+  padding: .61538rem .41026rem;
+  border-radius: .61538rem;
+  background: #000;
+  color: #fff;
+  text-align: center;
+}
+
+.complaint-customer-card__text {
+  margin: 0;
+  color: #fff;
+  font-size: .41026rem;
+  font-weight: 900;
+  line-height: .61538rem;
+  text-align: center;
+}
+
+.complaint-customer-close {
+  display: grid;
+  width: 1.12821rem;
+  height: .66667rem;
+  place-items: center;
+  margin-top: .35897rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.complaint-customer-close img {
+  display: block;
+  width: .61538rem;
+  height: .61538rem;
+}
+
+.complaint-question-close img {
+  display: block;
+  width: .61538rem;
+  height: .66667rem;
+}
+
+.complaint-question-sheet {
+  width: 100%;
+  min-height: 9.84615rem;
+  padding: .61538rem .41026rem calc(.41026rem + env(safe-area-inset-bottom));
+  border-radius: .61538rem .61538rem 0 0;
+  background: #fff;
+}
+
+.complaint-question-header {
+  position: relative;
+  display: flex;
+  min-height: 1.64103rem;
+  align-items: center;
+  justify-content: center;
+}
+
+.complaint-question-header h2 {
+  display: -webkit-box;
+  max-width: calc(100% - 2.25641rem);
+  margin: 0;
+  overflow: hidden;
+  color: #333;
+  font-size: .61538rem;
+  font-weight: 900;
+  line-height: .82051rem;
+  text-align: center;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.complaint-question-close {
+  position: absolute;
+  right: 0;
+  display: grid;
+  width: 1.12821rem;
+  height: .66667rem;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.complaint-question-options {
+  display: grid;
+  gap: .61538rem;
+  margin-top: 1.02564rem;
+}

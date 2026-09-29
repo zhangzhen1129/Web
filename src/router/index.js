@@ -1,6 +1,7 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import MainTabShell from '../features/shell/MainTabShell.vue'
 import HomePage from '../features/home/views/HomePage.vue'
+import { COMPLAINT_CONTENT } from '../features/complaint/complaintContent.js'
 
 const RepaymentPage = () => import('../features/shell/views/RepaymentPage.vue')
 const RoutePlaceholder = () => import('./RoutePlaceholder.vue')
@@ -18,6 +19,8 @@ const MinePage = () => import('../features/mine/views/MinePage.vue')
 const OrderListPage = () => import('../features/orderList/views/OrderListPage.vue')
 const OrderDeferralPage = () => import('../features/orderDeferral/views/OrderDeferralPage.vue')
 const DeferHistoryPage = () => import('../features/deferHistory/views/DeferHistoryPage.vue')
+const HelpCenterPage = () => import('../features/helpCenter/views/HelpCenterPage.vue')
+const ComplaintHomePage = () => import('../features/complaint/views/ComplaintHomePage.vue')
 
 export const ROUTE_PATH = Object.freeze({
   HOME: '/home',
@@ -30,6 +33,8 @@ export const ROUTE_PATH = Object.freeze({
   ADD_BANK: '/addBank',
   ORDER_DETAIL: '/orderDetail',
   HELP_CENTER: '/helpCenter',
+  COMPLAIN_EDIT: '/complainEdit',
+  COMPLAIN_LIST: '/complainList',
   COMPLAIN_HOME: '/complainHome',
   SETTINGS: '/settings',
   ADD_PAYMENT_METHOD: '/addPaymentMethod',
@@ -71,8 +76,38 @@ export const router = createRouter({
             return isValidOrderId ? true : { name: 'home' }
           },
         },
-        { path: 'helpCenter', name: 'helpCenter', component: RoutePlaceholder, props: { title: 'Customer service' } },
-        { path: 'complainHome', name: 'complainHome', component: RoutePlaceholder, props: { title: 'Complaints' } },
+        { path: 'helpCenter', name: 'helpCenter', component: HelpCenterPage },
+        { path: 'complainHome', name: 'complainHome', component: ComplaintHomePage },
+        {
+          path: 'complainEdit',
+          name: 'complainEdit',
+          component: RoutePlaceholder,
+          props: { title: 'Complaint edit' },
+          beforeEnter: (to) => {
+            const allowedKeys = ['type', 'question']
+            const queryKeys = Object.keys(to.query)
+            const agencyValues = COMPLAINT_CONTENT.agencyOptions.map((option) => option.value)
+            const questionValues = COMPLAINT_CONTENT.questionTypes.map((option) => option.value)
+            const isValid = queryKeys.length === 2
+              && queryKeys.every((key) => allowedKeys.includes(key))
+              && typeof to.query.type === 'string'
+              && agencyValues.includes(to.query.type)
+              && typeof to.query.question === 'string'
+              && questionValues.includes(to.query.question)
+            return isValid ? true : { name: 'home' }
+          },
+        },
+        {
+          path: 'complainList',
+          name: 'complainList',
+          component: RoutePlaceholder,
+          props: { title: 'Complaint records' },
+          beforeEnter: (to) => {
+            const queryKeys = Object.keys(to.query)
+            const isValid = queryKeys.length === 1 && to.query.goBack === '1'
+            return isValid ? true : { name: 'home' }
+          },
+        },
         { path: 'settings', name: 'settings', component: RoutePlaceholder, props: { title: 'Settings' } },
         {
           path: 'addPaymentMethod',
