@@ -7,6 +7,7 @@ import {
   complaintProtocolPaths,
   createComplaintServices,
   mapComplaintFeedbackResponse,
+  mapComplaintRecordsResponse,
   mapComplaintRedDotResponse,
 } from './complaintServices.js'
 
@@ -330,6 +331,161 @@ test('propagates feedback transport errors without retry or conversion', async (
       signal: 'fixture-signal',
     }),
     (error) => error === httpError,
+  )
+  assert.equal(client.calls.length, 1)
+})
+
+
+function recordsResponse(records) {
+  return {
+    vaOsuw7s: 0,
+    bgCAmh0f: { dlWr: 0 },
+    cyiUgNvO2EPltj: { atY3WWbXIN: 2000 },
+    pl9xRlV: '',
+    oi: '',
+    qrAbsjzu7WLU: { baIJ: records },
+  }
+}
+
+function record(index, submitStatus) {
+  return {
+    id: `id-${index}`,
+    feedbackMechanism: 'RBI',
+    problemType: 'Recordatorio de problemas de pago',
+    problemContent: `Controlled details ${index}`,
+    submitStatus,
+    firstImageBase64Src: 'ignored-image-1',
+    secondImageBase64Src: 'ignored-image-2',
+    thirdImageBase64Src: 'ignored-image-3',
+    createTime: '2025-11-20',
+  }
+}
+
+test('maps strict complaint records in source order and ignores image fields', () => {
+  const mapped = mapComplaintRecordsResponse(recordsResponse([
+    record(1, 0),
+    { ...record(2, 1), firstImageBase64Src: '' },
+  ]))
+
+  assert.deepEqual(mapped, {
+    type: 'success',
+    records: [
+      {
+        id: 'id-1',
+        feedbackMechanism: 'RBI',
+        problemType: 'Recordatorio de problemas de pago',
+        problemContent: 'Controlled details 1',
+        submitStatus: 0,
+        createTime: '2025-11-20',
+      },
+      {
+        id: 'id-2',
+        feedbackMechanism: 'RBI',
+        problemType: 'Recordatorio de problemas de pago',
+        problemContent: 'Controlled details 2',
+        submitStatus: 1,
+        createTime: '2025-11-20',
+      },
+    ],
+  })
+})
+
+test('keeps a strict success with an empty complaint record list as an empty result', () => {
+  assert.deepEqual(mapComplaintRecordsResponse(recordsResponse([])), {
+    type: 'success',
+    records: [],
+  })
+})
+
+test('maps a business failure without a business payload before validating success data', () => {
+  assert.deepEqual(mapComplaintRecordsResponse({
+    cyiUgNvO2EPltj: { atY3WWbXIN: 2001 },
+    pl9xRlV: 'Controlled failure',
+  }), {
+    type: 'business_failure',
+    message: 'Controlled failure',
+  })
+})
+
+test('maps complaint record business failures without converting code types', () => {
+  assert.deepEqual(mapComplaintRecordsResponse({
+    ...recordsResponse([]),
+    cyiUgNvO2EPltj: { atY3WWbXIN: 2001 },
+    pl9xRlV: 'Controlled failure',
+  }), {
+    type: 'business_failure',
+    message: 'Controlled failure',
+  })
+
+  for (const code of ['2000', 2000.5, null]) {
+    assert.deepEqual(mapComplaintRecordsResponse({
+      ...recordsResponse([]),
+      cyiUgNvO2EPltj: { atY3WWbXIN: code },
+    }), { type: 'invalid_response' })
+  }
+})
+
+test('rejects missing lists and invalid consumed record fields as invalid responses', () => {
+  const invalidRecords = [
+    null,
+    { ...record(1, 0), id: 1 },
+    { ...record(1, 0), feedbackMechanism: null },
+    { ...record(1, 0), problemType: 1 },
+    { ...record(1, 0), problemContent: null },
+    { ...record(1, 0), createTime: 1 },
+    { ...record(1, 2) },
+    { ...record(1, '0') },
+    { ...record(1, 0), submitStatus: undefined },
+  ]
+
+  for (const item of invalidRecords) {
+    assert.deepEqual(mapComplaintRecordsResponse(recordsResponse([item])), {
+      type: 'invalid_response',
+    })
+  }
+
+  assert.deepEqual(mapComplaintRecordsResponse({
+    ...recordsResponse([]),
+    qrAbsjzu7WLU: {},
+  }), { type: 'invalid_response' })
+})
+
+test('loads complaint records once through the public client without timeout overrides', async () => {
+  const client = createClient(() => recordsResponse([record(1, 0)]))
+  const services = createComplaintServices({
+    client,
+    getGlobalState: () => globalState,
+  })
+  const signal = new AbortController().signal
+
+  const mapped = await services.loadComplaintRecords({ signal })
+
+  assert.equal(mapped.type, 'success')
+  assert.equal(mapped.records.length, 1)
+  assert.equal(client.calls.length, 1)
+  assert.deepEqual(client.calls[0], {
+    method: 'POST',
+    path: complaintProtocolPaths.COMPLAINT_RECORD_PATH,
+    data: buildComplaintRequestBody(globalState),
+    signal,
+    protocolId: 'API-001',
+  })
+  assert.equal(client.calls[0].path.includes('://'), false)
+  assert.equal(Object.hasOwn(client.calls[0], 'timeoutMs'), false)
+  assert.equal(Object.hasOwn(client.calls[0], 'retry'), false)
+})
+
+test('propagates complaint record transport errors without retry or conversion', async () => {
+  const transportError = new Error('Network unavailable')
+  const client = createClient(() => transportError)
+  const services = createComplaintServices({
+    client,
+    getGlobalState: () => globalState,
+  })
+
+  await assert.rejects(
+    () => services.loadComplaintRecords({ signal: 'fixture-signal' }),
+    (error) => error === transportError,
   )
   assert.equal(client.calls.length, 1)
 })

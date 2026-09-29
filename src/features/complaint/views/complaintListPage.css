@@ -1,0 +1,236 @@
+.complaint-list-page {
+  display: flex;
+  width: 100%;
+  height: 100dvh;
+  min-height: 100vh;
+  flex-direction: column;
+  padding-top: var(--app-safe-area-top);
+  overflow: hidden;
+  background: #f8f9fc;
+  color: #333;
+  font-family: Roboto, Arial, sans-serif;
+}
+
+.complaint-list-header {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 1.64103rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  padding: 0 .41026rem;
+  background: #f8f9fc;
+}
+
+.complaint-list-header h1 {
+  max-width: calc(100% - 2.25641rem);
+  margin: 0;
+  overflow: hidden;
+  color: #333;
+  font-size: .46154rem;
+  font-weight: 900;
+  line-height: .61538rem;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.complaint-list-back {
+  position: absolute;
+  left: .41026rem;
+  display: grid;
+  width: 1.12821rem;
+  height: 1.12821rem;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: .30769rem;
+  background: #fff;
+  box-shadow: 0 .05128rem .10256rem rgb(0 0 0 / 8%);
+}
+
+.complaint-list-back img {
+  display: block;
+  width: .51282rem;
+  height: .51282rem;
+}
+
+.complaint-list-back:focus-visible {
+  outline: .05128rem solid #155dfc;
+  outline-offset: .05128rem;
+}
+
+.complaint-list-scroll {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.complaint-list-scroll::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.complaint-list-loading-space {
+  min-height: 100%;
+}
+
+.complaint-record-list {
+  width: 100%;
+  padding: .41026rem .41026rem .61538rem;
+}
+
+.complaint-record-item + .complaint-record-item {
+  margin-top: .41026rem;
+}
+
+.complaint-record-meta {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: .41026rem;
+  margin-bottom: .20513rem;
+  color: #364153;
+  font-size: .41026rem;
+  font-weight: 500;
+  line-height: .61538rem;
+  letter-spacing: -.00801rem;
+}
+
+.complaint-record-number,
+.complaint-record-time {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.complaint-record-number {
+  text-align: left;
+}
+
+.complaint-record-time {
+  text-align: right;
+}
+
+.complaint-record-card {
+  display: flex;
+  flex-direction: column;
+  gap: .41026rem;
+  padding: .41026rem;
+  border: .02564rem solid #e5e7eb;
+  border-radius: .41026rem;
+  background: #fff;
+}
+
+.complaint-record-field {
+  display: grid;
+  grid-template-columns: minmax(0, 3.79487rem) minmax(0, 1fr);
+  gap: .41026rem;
+  align-items: start;
+  color: #374151;
+  font-size: .35897rem;
+  font-weight: 400;
+  line-height: .51282rem;
+}
+
+.complaint-record-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.complaint-record-value {
+  min-width: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.complaint-record-details {
+  display: flex;
+  flex-direction: column;
+  gap: .20513rem;
+  color: #374151;
+  font-size: .35897rem;
+  font-weight: 400;
+  line-height: .51282rem;
+}
+
+.complaint-record-details-text {
+  width: 100%;
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.complaint-record-status {
+  display: flex;
+  width: 100%;
+  min-height: .66667rem;
+  align-items: center;
+  justify-content: center;
+  padding: .10256rem .20513rem;
+  border-radius: .20513rem;
+  font-size: .30769rem;
+  font-weight: 900;
+  text-align: center;
+}
+
+.complaint-record-status span {
+  width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.complaint-record-status--processing {
+  background: #fff1d8;
+  color: #ffbc41;
+}
+
+.complaint-record-status--processing span {
+  line-height: .41026rem;
+}
+
+.complaint-record-status--processed {
+  background: #cdf4d2;
+  color: #0bcb23;
+}
+
+.complaint-record-status--processed span {
+  line-height: .46154rem;
+}
+
+.complaint-list-empty {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 1.02564rem;
+}
+
+.complaint-list-empty img {
+  display: block;
+  width: 4.69231rem;
+  height: 2.76923rem;
+  object-fit: cover;
+}
+
+.complaint-list-empty p {
+  margin: .20513rem 0 0;
+  color: #a7a7a7;
+  font-size: .30769rem;
+  font-weight: 400;
+  line-height: .41026rem;
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .complaint-list-page *,
+  .complaint-list-page *::before,
+  .complaint-list-page *::after {
+    scroll-behavior: auto;
+  }
+}

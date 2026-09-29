@@ -22,6 +22,7 @@ const DeferHistoryPage = () => import('../features/deferHistory/views/DeferHisto
 const HelpCenterPage = () => import('../features/helpCenter/views/HelpCenterPage.vue')
 const ComplaintHomePage = () => import('../features/complaint/views/ComplaintHomePage.vue')
 const ComplaintEditPage = () => import('../features/complaint/views/ComplaintEditPage.vue')
+const ComplaintListPage = () => import('../features/complaint/views/ComplaintListPage.vue')
 
 export const ROUTE_PATH = Object.freeze({
   HOME: '/home',
@@ -100,8 +101,7 @@ export const router = createRouter({
         {
           path: 'complainList',
           name: 'complainList',
-          component: RoutePlaceholder,
-          props: { title: 'Complaint records' },
+          component: ComplaintListPage,
           beforeEnter: (to) => {
             const queryKeys = Object.keys(to.query)
             const isValid = queryKeys.length === 0

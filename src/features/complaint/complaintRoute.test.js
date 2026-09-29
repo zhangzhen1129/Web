@@ -32,11 +32,12 @@ test('complainEdit replaces the placeholder with a guarded dynamic real page', (
   assert.match(routeBlock, /return isValid \? true : \{ name: 'home' \}/)
 })
 
-test('complainList is a guarded dynamic placeholder without parameters', () => {
+test('complainList replaces the placeholder with a guarded dynamic real page', () => {
   const routeBlock = routerSource.match(/name: 'complainList'[\s\S]*?name: 'settings'/)?.[0] ?? ''
   assert.match(routerSource, /COMPLAIN_LIST: '\/complainList'/)
-  assert.match(routeBlock, /component: RoutePlaceholder/)
-  assert.match(routeBlock, /props: \{ title: 'Complaint records' \}/)
+  assert.match(routerSource, /const ComplaintListPage = \(\) => import\('\.\.\/features\/complaint\/views\/ComplaintListPage\.vue'\)/)
+  assert.match(routeBlock, /component: ComplaintListPage/)
+  assert.doesNotMatch(routeBlock, /RoutePlaceholder|props:/)
   assert.match(routeBlock, /queryKeys\.length === 0/)
   assert.match(routeBlock, /return isValid \? true : \{ name: 'home' \}/)
 })

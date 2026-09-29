@@ -3,8 +3,17 @@ import { networkClient } from '../../../shared/network/index.js'
 const COMPLAINT_RED_DOT_PATH = '/n5V/78R7/S1221NY09yUP44TB34UNT'
 const COMPLAINT_RED_DOT_PROTOCOL_ID = 'complaint-red-dot'
 const COMPLAINT_FEEDBACK_PATH = '/ntn/zwjv/wfzjKtqupfmsx0ihswh'
+const COMPLAINT_RECORD_PATH = '/veF/RhBg/1LbMax7Kii3zdO2'
 const COMPLAINT_FEEDBACK_PROTOCOL_ID = 'API-001'
+const COMPLAINT_RECORD_PROTOCOL_ID = 'API-001'
 const SUCCESS_CODE = 2000
+const COMPLAINT_RECORD_STRING_FIELDS = Object.freeze([
+  'id',
+  'feedbackMechanism',
+  'problemType',
+  'problemContent',
+  'createTime',
+])
 
 function isRecord(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -22,6 +31,23 @@ function safeMessage(value) {
 
 function result(type, extra = {}) {
   return Object.freeze({ type, ...extra })
+}
+
+function isComplaintRecord(value) {
+  if (!isRecord(value)) return false
+  if (!COMPLAINT_RECORD_STRING_FIELDS.every((field) => typeof value[field] === 'string')) return false
+  return value.submitStatus === 0 || value.submitStatus === 1
+}
+
+function mapComplaintRecord(value) {
+  return Object.freeze({
+    id: value.id,
+    feedbackMechanism: value.feedbackMechanism,
+    problemType: value.problemType,
+    problemContent: value.problemContent,
+    submitStatus: value.submitStatus,
+    createTime: value.createTime,
+  })
 }
 
 export function buildComplaintRequestBody(globalState) {
@@ -92,6 +118,30 @@ export function mapComplaintRedDotResponse(data) {
   return result('success', { showRedDot: data.aewM === true })
 }
 
+export function mapComplaintRecordsResponse(data) {
+  if (!isRecord(data) || !isRecord(data.cyiUgNvO2EPltj)) {
+    return result('invalid_response')
+  }
+
+  const returnCode = data.cyiUgNvO2EPltj.atY3WWbXIN
+  if (!Number.isInteger(returnCode)) return result('invalid_response')
+
+  if (returnCode !== SUCCESS_CODE) {
+    return result('business_failure', { message: safeMessage(data.pl9xRlV) })
+  }
+
+  if (!isRecord(data.qrAbsjzu7WLU)) return result('invalid_response')
+
+  const records = data.qrAbsjzu7WLU.baIJ
+  if (!Array.isArray(records) || !records.every(isComplaintRecord)) {
+    return result('invalid_response')
+  }
+
+  return result('success', {
+    records: records.map(mapComplaintRecord),
+  })
+}
+
 async function post(client, path, protocolId, data, signal) {
   const response = await client.request({
     method: 'POST',
@@ -120,6 +170,17 @@ export function createComplaintServices({ client = networkClient, getGlobalState
       return mapComplaintRedDotResponse(data)
     },
 
+    async loadComplaintRecords({ signal } = {}) {
+      const data = await post(
+        client,
+        COMPLAINT_RECORD_PATH,
+        COMPLAINT_RECORD_PROTOCOL_ID,
+        buildComplaintRequestBody(getGlobalState()),
+        signal,
+      )
+      return mapComplaintRecordsResponse(data)
+    },
+
     async saveComplaintFeedback({ agency, question, details, signal } = {}) {
       const data = await post(
         client,
@@ -140,4 +201,5 @@ export function createComplaintServices({ client = networkClient, getGlobalState
 export const complaintProtocolPaths = Object.freeze({
   COMPLAINT_RED_DOT_PATH,
   COMPLAINT_FEEDBACK_PATH,
+  COMPLAINT_RECORD_PATH,
 })
