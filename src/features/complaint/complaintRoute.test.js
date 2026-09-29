@@ -31,11 +31,11 @@ test('complainEdit is a guarded dynamic placeholder with the confirmed query con
   assert.match(routeBlock, /return isValid \? true : \{ name: 'home' \}/)
 })
 
-test('complainList is a guarded dynamic placeholder with goBack=1 only', () => {
+test('complainList is a guarded dynamic placeholder without parameters', () => {
   const routeBlock = routerSource.match(/name: 'complainList'[\s\S]*?name: 'settings'/)?.[0] ?? ''
   assert.match(routerSource, /COMPLAIN_LIST: '\/complainList'/)
   assert.match(routeBlock, /component: RoutePlaceholder/)
   assert.match(routeBlock, /props: \{ title: 'Complaint records' \}/)
-  assert.match(routeBlock, /queryKeys\.length === 1 && to\.query\.goBack === '1'/)
+  assert.match(routeBlock, /queryKeys\.length === 0/)
   assert.match(routeBlock, /return isValid \? true : \{ name: 'home' \}/)
 })

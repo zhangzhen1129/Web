@@ -177,9 +177,6 @@ export function createComplaintController(options = {}) {
   function openComplaintList() {
     return lockNavigationAndRun(navigate, {
       name: 'complainList',
-      query: {
-        goBack: '1',
-      },
     })
   }
 

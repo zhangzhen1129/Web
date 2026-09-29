@@ -104,7 +104,7 @@ export const router = createRouter({
           props: { title: 'Complaint records' },
           beforeEnter: (to) => {
             const queryKeys = Object.keys(to.query)
-            const isValid = queryKeys.length === 1 && to.query.goBack === '1'
+            const isValid = queryKeys.length === 0
             return isValid ? true : { name: 'home' }
           },
         },

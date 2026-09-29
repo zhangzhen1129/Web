@@ -169,7 +169,7 @@ for (const questionType of COMPLAINT_CONTENT.questionTypes) {
   })
 }
 
-test('navigates to complaint records once with the controlled query', () => {
+test('navigates to complaint records once without a query', () => {
   const harness = createHarness()
   harness.controller.start()
 
@@ -177,7 +177,7 @@ test('navigates to complaint records once with the controlled query', () => {
   assert.equal(harness.controller.openComplaintList(), false)
   assert.equal(harness.controller.getState().navigationLocked, true)
   assert.deepEqual(getNavigationCalls(harness.calls), [
-    ['navigate', { name: 'complainList', query: { goBack: '1' } }],
+    ['navigate', { name: 'complainList' }],
   ])
 })
 

@@ -298,7 +298,7 @@ async function main() {
     await openPage()
     const listHistoryBefore = await evaluate('history.length')
     await evaluate(`document.querySelector('.complaint-record').click()`)
-    await waitForHash('#/complainList?goBack=1')
+    await waitForHash('#/complainList')
     await waitForValue(() => evaluate(visibleExpression('.route-placeholder')))
     const listRoute = await evaluate(`({ hash: location.hash, title: document.querySelector('.route-placeholder h1')?.textContent.trim() ?? '', historyLength: history.length })`)
     assert.equal(listRoute.title, 'Complaint records')
@@ -307,9 +307,9 @@ async function main() {
 
     await navigate('#/complainEdit?type=DineroPro&question=Otras%20preguntas&extra=1')
     await waitForHash('#/home')
-    await navigate('#/complainList?goBack=0')
+    await navigate('#/complainList?extra=1')
     await waitForHash('#/home')
-    await navigate('#/complainList?goBack=1')
+    await navigate('#/complainList')
     await waitForValue(() => evaluate(visibleExpression('.route-placeholder')))
     assert.equal(await evaluate('document.querySelector(".route-placeholder h1")?.textContent.trim()'), 'Complaint records')
 
