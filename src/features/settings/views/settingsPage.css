@@ -1,0 +1,312 @@
+﻿.settings-page {
+  display: flex;
+  width: 100%;
+  height: 100dvh;
+  min-height: 100vh;
+  flex-direction: column;
+  padding-top: var(--app-safe-area-top);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  background: #f8f9fc;
+  color: #364153;
+  font-family: Roboto, Arial, sans-serif;
+  -webkit-overflow-scrolling: touch;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.settings-page::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.settings-page__header {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 1.64103rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  padding: 0 .41026rem;
+  background: #f8f9fc;
+}
+
+.settings-page__header h1 {
+  max-width: calc(100% - 2.25641rem);
+  margin: 0;
+  overflow: hidden;
+  color: #333;
+  font-size: .46154rem;
+  font-weight: 900;
+  line-height: .61538rem;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-page__back {
+  position: absolute;
+  left: .41026rem;
+  display: grid;
+  width: 1.12821rem;
+  height: 1.12821rem;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: .30769rem;
+  background: #fff;
+  box-shadow: 0 .05128rem .10256rem rgb(0 0 0 / 8%);
+}
+
+.settings-page__back img {
+  display: block;
+  width: .51282rem;
+  height: .51282rem;
+}
+
+.settings-page__back:focus-visible,
+.settings-page__row:focus-visible,
+.settings-page__logout:focus-visible,
+.settings-protocol-close:focus-visible,
+.settings-dialog__outline-button:focus-visible,
+.settings-logout-actions__confirm:focus-visible,
+.settings-logout-actions__cancel:focus-visible {
+  outline: .05128rem solid #155dfc;
+  outline-offset: .05128rem;
+}
+
+.settings-page__content {
+  display: grid;
+  width: 100%;
+  gap: .41026rem;
+  padding: .41026rem .41026rem 0;
+}
+
+.settings-page__row {
+  display: flex;
+  width: 100%;
+  height: 1.4359rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: .25641rem;
+  padding: 0 .41026rem;
+  border: .02564rem solid #e5e7eb;
+  border-radius: .41026rem;
+  background: #fff;
+  color: #364153;
+  text-align: left;
+}
+
+.settings-page__row-label {
+  min-width: 0;
+  overflow: hidden;
+  color: #364153;
+  font-size: .41026rem;
+  font-weight: 900;
+  line-height: .61538rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-page__chevron {
+  display: block;
+  width: .17092rem;
+  height: .29912rem;
+  flex: 0 0 auto;
+}
+
+.settings-page__footer {
+  display: flex;
+  width: 100%;
+  flex: 0 0 auto;
+  margin-top: auto;
+  padding: .41026rem .41026rem calc(.61538rem + env(safe-area-inset-bottom));
+}
+
+.settings-page__logout {
+  width: 100%;
+  height: 1.4359rem;
+  padding: 0 .41026rem;
+  border: 0;
+  border-radius: .41026rem;
+  background: #f7430c;
+  color: #fff;
+  font-size: .41026rem;
+  font-weight: 900;
+  line-height: .61538rem;
+  text-align: center;
+}
+
+.settings-page__back:disabled,
+.settings-page__row:disabled,
+.settings-page__logout:disabled,
+.settings-dialog__outline-button:disabled,
+.settings-logout-actions__confirm:disabled,
+.settings-logout-actions__cancel:disabled {
+  opacity: .65;
+}
+
+.settings-popup-overlay {
+  background: rgb(0 0 0 / 70%);
+}
+
+.settings-protocol-popup {
+  background: transparent;
+}
+
+.settings-protocol-popup {
+  top: 46%;
+}
+
+.settings-logout-popup {
+  background: transparent;
+  top: 46.7%;
+  width: 8.76923rem;
+  max-width: calc(100vw - .82051rem);
+}
+
+.settings-protocol-layer {
+  display: flex;
+  width: 8.76923rem;
+  max-width: calc(100vw - .82051rem);
+  flex-direction: column;
+  align-items: center;
+}
+
+.settings-dialog {
+  width: 100%;
+  border-radius: .61538rem;
+  background: #fff;
+}
+
+.settings-dialog--protocol {
+  padding: .61538rem .41026rem;
+}
+
+.settings-dialog__title {
+  margin: 0;
+  color: #333;
+  font-size: .61538rem;
+  font-weight: 900;
+  line-height: .82051rem;
+  text-align: center;
+}
+
+.settings-dialog__actions {
+  display: grid;
+  gap: .41026rem;
+  margin-top: .61538rem;
+}
+
+.settings-dialog__outline-button {
+  display: flex;
+  width: 100%;
+  height: 1.23077rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0 .41026rem;
+  border: .02564rem solid #999;
+  border-radius: .41026rem;
+  background: transparent;
+  color: #999;
+  font-size: .41026rem;
+  font-weight: 600;
+  line-height: .61538rem;
+  text-align: center;
+}
+
+.settings-protocol-close {
+  display: grid;
+  width: .61538rem;
+  height: .61538rem;
+  place-items: center;
+  margin-top: .61538rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.settings-protocol-close img {
+  display: block;
+  width: .61538rem;
+  height: .61538rem;
+}
+
+.settings-dialog--logout {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.02564rem;
+  padding: .61538rem .41026rem;
+}
+
+.settings-logout-content {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  gap: .41026rem;
+}
+
+.settings-logout-content__icon {
+  display: grid;
+  width: 1.4359rem;
+  height: 1.4359rem;
+  place-items: center;
+  border-radius: .41026rem;
+  background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
+}
+
+.settings-logout-content__icon img {
+  display: block;
+  width: .82051rem;
+  height: .82051rem;
+}
+
+.settings-logout-content__message {
+  width: 100%;
+  margin: 0;
+  color: #6b7280;
+  font-size: .41026rem;
+  font-weight: 400;
+  line-height: .51282rem;
+  text-align: center;
+}
+
+.settings-logout-actions {
+  display: grid;
+  width: 100%;
+  gap: .41026rem;
+}
+
+.settings-logout-actions__confirm {
+  width: 100%;
+  height: 1.23077rem;
+  border: 0;
+  border-radius: .41026rem;
+  background: #155dfc;
+  color: #fff;
+  font-size: .41026rem;
+  font-weight: 600;
+  line-height: .61538rem;
+  text-align: center;
+}
+
+.settings-logout-actions__cancel {
+  display: flex;
+  width: 100%;
+  height: .61538rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #999;
+  font-size: .41026rem;
+  font-weight: 400;
+  line-height: .61538rem;
+  text-align: center;
+}

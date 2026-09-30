@@ -2,9 +2,11 @@ import { createRouter, createWebHashHistory } from 'vue-router'
 import MainTabShell from '../features/shell/MainTabShell.vue'
 import HomePage from '../features/home/views/HomePage.vue'
 import { COMPLAINT_CONTENT } from '../features/complaint/complaintContent.js'
+import { SETTINGS_ROUTE_TITLES } from '../features/settings/settingsRouteText.js'
 
 const RepaymentPage = () => import('../features/shell/views/RepaymentPage.vue')
 const RoutePlaceholder = () => import('./RoutePlaceholder.vue')
+const SettingsPage = () => import('../features/settings/views/SettingsPage.vue')
 const MultiPushResultPage = () => import('../features/multiPushResult/views/MultiPushResultPage.vue')
 const InformationPage = () => import('../features/information/views/InformationPage.vue')
 const ContactsPage = () => import('../features/contacts/views/ContactsPage.vue')
@@ -39,6 +41,10 @@ export const ROUTE_PATH = Object.freeze({
   COMPLAIN_LIST: '/complainList',
   COMPLAIN_HOME: '/complainHome',
   SETTINGS: '/settings',
+  CREATE_PASSWORD: '/createPassword',
+  RETRIEVE_PASSWORD: '/retrievePassword',
+  TERMS: '/terms',
+  PRIVACY: '/privacy',
   ADD_PAYMENT_METHOD: '/addPaymentMethod',
   DEFER_DETAIL: '/deferDetail',
   DEFER_HISTORY: '/deferHistory',
@@ -108,7 +114,11 @@ export const router = createRouter({
             return isValid ? true : { name: 'home' }
           },
         },
-        { path: 'settings', name: 'settings', component: RoutePlaceholder, props: { title: 'Settings' } },
+        { path: 'settings', name: 'settings', component: SettingsPage },
+        { path: ROUTE_PATH.CREATE_PASSWORD, name: 'createPassword', component: RoutePlaceholder, props: { title: SETTINGS_ROUTE_TITLES.createPassword } },
+        { path: ROUTE_PATH.RETRIEVE_PASSWORD, name: 'retrievePassword', component: RoutePlaceholder, props: { title: SETTINGS_ROUTE_TITLES.retrievePassword } },
+        { path: ROUTE_PATH.TERMS, name: 'terms', component: RoutePlaceholder, props: { title: SETTINGS_ROUTE_TITLES.terms } },
+        { path: ROUTE_PATH.PRIVACY, name: 'privacy', component: RoutePlaceholder, props: { title: SETTINGS_ROUTE_TITLES.privacy } },
         {
           path: 'addPaymentMethod',
           name: 'addPaymentMethod',
