@@ -13,6 +13,8 @@ export {
   getNativeCachedUserId,
   getNativePersistentCacheRegistrySize,
   nativePersistentCacheBridge,
+  setNativeCachedToken,
+  setNativeCachedUserId,
 } from './nativePersistentCache.js'
 
 export {

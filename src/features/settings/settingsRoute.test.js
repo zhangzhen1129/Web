@@ -8,18 +8,6 @@ const routerSource = readFileSync(new URL('../../router/index.js', import.meta.u
 
 const expectedChildRoutes = Object.freeze([
   Object.freeze({
-    constant: 'CREATE_PASSWORD',
-    path: '/createPassword',
-    name: 'createPassword',
-    textKey: 'createPassword',
-  }),
-  Object.freeze({
-    constant: 'RETRIEVE_PASSWORD',
-    path: '/retrievePassword',
-    name: 'retrievePassword',
-    textKey: 'retrievePassword',
-  }),
-  Object.freeze({
     constant: 'TERMS',
     path: '/terms',
     name: 'terms',
@@ -54,7 +42,7 @@ test('settings replaces only the placeholder component and keeps its route contr
   assert.doesNotMatch(settingsRoute, /RoutePlaceholder|props|beforeEnter|meta|query|params/)
 })
 
-test('registers four dynamic placeholder child routes with controlled titles', () => {
+test('registers two dynamic placeholder child routes with controlled titles', () => {
   assert.match(routerSource, /const RoutePlaceholder = \(\) => import\('\.\/RoutePlaceholder\.vue'\)/)
 
   for (const route of expectedChildRoutes) {
@@ -69,6 +57,26 @@ test('registers four dynamic placeholder child routes with controlled titles', (
     assert.match(childRoute, new RegExp(`props: \\{ title: SETTINGS_ROUTE_TITLES\\.${route.textKey} \\}`))
     assert.doesNotMatch(childRoute, /path: '[^']*:[^']*'|beforeEnter|meta|query|params/)
   }
+})
+
+test('replaces createPassword with the real dynamic page without changing route contract', () => {
+  assert.match(routerSource, /const CreatePasswordPage = \(\) => import\('\.\.\/features\/createPassword\/views\/CreatePasswordPage\.vue'\)/)
+  assert.match(routerSource, /CREATE_PASSWORD: '\/createPassword'/)
+
+  const route = routeLine('createPassword')
+  assert.match(route, /path: ROUTE_PATH\.CREATE_PASSWORD/)
+  assert.match(route, /component: CreatePasswordPage/)
+  assert.doesNotMatch(route, /RoutePlaceholder|props|beforeEnter|meta|query|params/)
+})
+
+test('replaces retrievePassword with the real dynamic page without changing route contract', () => {
+  assert.match(routerSource, /const ChangePasswordPage = \(\) => import\('\.\.\/features\/changePassword\/views\/ChangePasswordPage\.vue'\)/)
+  assert.match(routerSource, /RETRIEVE_PASSWORD: '\/retrievePassword'/)
+
+  const route = routeLine('retrievePassword')
+  assert.match(route, /path: ROUTE_PATH\.RETRIEVE_PASSWORD/)
+  assert.match(route, /component: ChangePasswordPage/)
+  assert.doesNotMatch(route, /RoutePlaceholder|props|beforeEnter|meta|query|params/)
 })
 
 test('uses the live Figma route titles without hardcoding them in the router', () => {

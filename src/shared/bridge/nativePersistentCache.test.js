@@ -8,6 +8,8 @@ import {
   getNativeCachedToken,
   getNativeCachedUserId,
   getNativePersistentCacheRegistrySize,
+  setNativeCachedToken,
+  setNativeCachedUserId,
 } from './nativePersistentCache.js'
 
 function installBridge() {
@@ -35,6 +37,21 @@ function createCacheReply(requestId, status = 'completed', cacheKey = 'Token') {
     cacheKey,
     cacheValue: status === 'completed' ? 'redacted-test-value' : '',
     hit: status === 'completed',
+    storagePolicy: status === 'completed' ? 'persistent' : '',
+    expiresAtMillis: 0,
+  }
+}
+
+function createSetReply(requestId, status = 'completed', cacheKey = 'Token') {
+  return {
+    action: 'persistent_cache_handle',
+    requestId,
+    status,
+    message: status,
+    operation: 'set',
+    cacheKey,
+    cacheValue: '',
+    hit: false,
     storagePolicy: status === 'completed' ? 'persistent' : '',
     expiresAtMillis: 0,
   }
@@ -275,4 +292,100 @@ test('reports exact failures and detaches the token consumer', () => {
   assert.deepEqual(failures, [])
   assert.equal(getNativePersistentCacheRegistrySize(), 0)
   assert.equal(cancelNativeCachedTokenConsumer(requestId), false)
+})
+
+test('stores Token with the persistent policy and omits TTL fields', () => {
+  const calls = installBridge()
+  assert.equal(setNativeCachedToken('redacted-token-value'), true)
+  assert.equal(calls.length, 1)
+
+  const request = calls[0]
+  assert.deepEqual(Object.keys(request).sort(), [
+    'cacheKey',
+    'cacheValue',
+    'operation',
+    'replyHandler',
+    'requestId',
+    'storagePolicy',
+  ])
+  assert.deepEqual({
+    operation: request.operation,
+    cacheKey: request.cacheKey,
+    cacheValue: request.cacheValue,
+    storagePolicy: request.storagePolicy,
+  }, {
+    operation: 'set',
+    cacheKey: 'Token',
+    cacheValue: 'redacted-token-value',
+    storagePolicy: 'persistent',
+  })
+  assert.equal(Object.hasOwn(request, 'ttlMillis'), false)
+  assert.equal(getNativePersistentCacheRegistrySize(), 1)
+
+  const callback = globalThis.window[request.replyHandler.replace('window.', '')]
+  callback(createSetReply(request.requestId))
+  assert.equal(getNativePersistentCacheRegistrySize(), 0)
+  assert.equal(typeof globalThis.window.__dineroProPersistentCacheReply, 'undefined')
+})
+
+test('stores UserId without creating a business callback or crossing shared replies', () => {
+  const calls = installBridge()
+  const results = []
+  const getRequestId = getNativeCachedToken((reply) => results.push(reply))
+  assert.equal(setNativeCachedUserId('redacted-user-id'), true)
+  assert.equal(getNativePersistentCacheRegistrySize(), 2)
+
+  const setRequest = calls.find((request) => request.operation === 'set')
+  const getRequest = calls.find((request) => request.operation === 'get')
+  assert.equal(setRequest.cacheKey, 'UserId')
+  assert.equal(setRequest.storagePolicy, 'persistent')
+  assert.equal(Object.hasOwn(setRequest, 'ttlMillis'), false)
+  assert.equal(setRequest.replyHandler, getRequest.replyHandler)
+
+  const callback = globalThis.window[setRequest.replyHandler.replace('window.', '')]
+  callback(createSetReply(setRequest.requestId, 'completed', 'UserId'))
+  assert.equal(results.length, 0)
+  assert.equal(getNativePersistentCacheRegistrySize(), 1)
+  callback(createCacheReply(getRequestId, 'completed', 'Token'))
+  assert.equal(results.length, 1)
+  assert.equal(getNativePersistentCacheRegistrySize(), 0)
+})
+
+test('rejects invalid or unavailable setters without registering callbacks', () => {
+  globalThis.window = { dispatchEvent() {} }
+  assert.equal(setNativeCachedToken(''), false)
+  assert.equal(setNativeCachedToken('redacted-token-value'), false)
+  assert.equal(setNativeCachedUserId(1), false)
+  assert.equal(getNativePersistentCacheRegistrySize(), 0)
+
+  globalThis.window = {
+    dispatchEvent() {},
+    plahub: {
+      handlePersistentCache(payload) {
+        const request = JSON.parse(payload)
+        return JSON.stringify({
+          action: 'persistent_cache_handle',
+          requestId: request.requestId,
+          status: 'error',
+          message: 'host rejected request',
+        })
+      },
+    },
+  }
+  assert.equal(setNativeCachedUserId('redacted-user-id'), false)
+  assert.equal(getNativePersistentCacheRegistrySize(), 0)
+  assert.equal(typeof globalThis.window.__dineroProPersistentCacheReply, 'undefined')
+})
+
+test('cleans setter records when the callback reports a non-persistent policy', () => {
+  const calls = installBridge()
+  assert.equal(setNativeCachedToken('redacted-token-value'), true)
+  const callback = globalThis.window[calls[0].replyHandler.replace('window.', '')]
+  callback({
+    ...createSetReply(calls[0].requestId),
+    storagePolicy: 'ttl',
+    expiresAtMillis: 1,
+  })
+  assert.equal(getNativePersistentCacheRegistrySize(), 0)
+  assert.equal(typeof globalThis.window.__dineroProPersistentCacheReply, 'undefined')
 })

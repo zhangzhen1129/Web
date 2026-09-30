@@ -51,6 +51,16 @@ const PROJECT_MESSAGES = Object.freeze({
     es: 'Vinculación de la tarjeta bancaria con éxito',
     sw: 'Kadi ya benki imeunganishwa kwa mafanikio',
   }),
+  '61': Object.freeze({
+    en: 'The passwords do not match.',
+    es: 'Las dos contraseñas son incoherentes',
+    sw: 'Nenosiri hazifanani.',
+  }),
+  '62': Object.freeze({
+    en: 'Success',
+    es: 'Éxito',
+    sw: 'Mafanikio',
+  }),
   '50': Object.freeze({
     en: 'Pending',
     es: 'Pendiente',

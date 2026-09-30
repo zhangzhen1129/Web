@@ -9,6 +9,11 @@ const BRIDGE_OBJECT = 'plahub'
 const METHOD = 'handlePersistentCache'
 const CALLBACK_NAME = '__dineroProPersistentCacheReply'
 const CALLBACK_SCOPE = 'shared'
+const OPERATIONS = Object.freeze({
+  get: 'get',
+  set: 'set',
+})
+const PERSISTENT_POLICY = 'persistent'
 const CACHE_KEYS = Object.freeze({
   token: 'Token',
   userId: 'UserId',
@@ -49,9 +54,10 @@ function cleanup(record) {
 }
 
 function notifyFailure(record, code) {
+  if (record.completed) return
   record.completed = true
   cleanup(record)
-  if (record.consumerCanceled) return
+  if (record.operation !== OPERATIONS.get || record.consumerCanceled) return
   deliverBridgeFailure(record.onFailure, code, METHOD, reportDiagnostic)
 }
 
@@ -59,20 +65,26 @@ function notifyImmediateFailure(onFailure, code) {
   deliverBridgeFailure(onFailure, code, METHOD, reportDiagnostic)
 }
 
-function isValidReply(reply, cacheKey) {
-  return reply !== null
+function isValidReply(reply, record) {
+  const valid = reply !== null
     && typeof reply === 'object'
     && !Array.isArray(reply)
     && reply.action === 'persistent_cache_handle'
     && typeof reply.requestId === 'string'
-    && reply.operation === 'get'
-    && reply.cacheKey === cacheKey
+    && reply.operation === record.operation
+    && reply.cacheKey === record.cacheKey
     && (reply.status === 'completed' || reply.status === 'error')
     && typeof reply.message === 'string'
     && typeof reply.cacheValue === 'string'
     && typeof reply.hit === 'boolean'
     && typeof reply.storagePolicy === 'string'
     && Number.isInteger(reply.expiresAtMillis)
+  if (!valid) return false
+  if (record.operation === OPERATIONS.set && reply.status === 'completed') {
+    return reply.storagePolicy === PERSISTENT_POLICY
+      && reply.expiresAtMillis === 0
+  }
+  return true
 }
 
 function handleReply(reply) {
@@ -91,7 +103,7 @@ function handleReply(reply) {
     return
   }
 
-  if (!isValidReply(reply, record.cacheKey)) {
+  if (!isValidReply(reply, record)) {
     notifyFailure(record, BRIDGE_FAILURE_CODES.invalidCallback)
     reportDiagnostic('BRIDGE_CALLBACK_INVALID_PAYLOAD')
     return
@@ -104,7 +116,7 @@ function handleReply(reply) {
     return
   }
   record.completed = true
-  if (record.consumerCanceled) return
+  if (record.operation !== OPERATIONS.get || record.consumerCanceled) return
 
   try {
     record.consumer(reply)
@@ -128,53 +140,60 @@ function ensureSharedCallback() {
   }
 }
 
-function getNativeCachedValue(cacheKey, consumer, options) {
-  const failureOptions = normalizeFailureOptions(options)
-  if (!failureOptions.valid) {
-    reportDiagnostic('BRIDGE_INVALID_OPTIONS')
-    return null
-  }
-  if (typeof consumer !== 'function') {
-    reportDiagnostic('BRIDGE_CALLBACK_INVALID_CONSUMER')
-    notifyImmediateFailure(failureOptions.onFailure, BRIDGE_FAILURE_CODES.invalidArgument)
-    return null
-  }
-
+function resolveBridge() {
   const bridge = typeof window === 'undefined' ? undefined : window[BRIDGE_OBJECT]
   if (!bridge || typeof bridge[METHOD] !== 'function') {
     reportDiagnostic('BRIDGE_METHOD_UNAVAILABLE')
-    notifyImmediateFailure(failureOptions.onFailure, BRIDGE_FAILURE_CODES.unavailable)
-    return null
+    return { bridge: null, failureCode: BRIDGE_FAILURE_CODES.unavailable }
   }
-
   if (!ensureSharedCallback()) {
-    notifyImmediateFailure(failureOptions.onFailure, BRIDGE_FAILURE_CODES.callFailed)
-    return null
+    return { bridge: null, failureCode: BRIDGE_FAILURE_CODES.callFailed }
   }
+  return { bridge, failureCode: null }
+}
 
+function isAcceptedSynchronousResponse(result, requestId) {
+  return result !== null
+    && typeof result === 'object'
+    && !Array.isArray(result)
+    && result.action === 'persistent_cache_handle'
+    && result.requestId === requestId
+    && typeof result.status === 'string'
+    && typeof result.message === 'string'
+}
+
+function sendPersistentCacheRequest({
+  bridge,
+  operation,
+  cacheKey,
+  requestIdPrefix,
+  payload,
+  consumer = null,
+  onFailure = null,
+}) {
   const registryKey = createId('persistent-cache')
-  const requestId = createId('cache-get')
+  const requestId = createId(requestIdPrefix)
   const record = {
     registryKey,
     callbackName: `window.${CALLBACK_NAME}`,
     callbackScope: CALLBACK_SCOPE,
     requestId,
+    operation,
     cacheKey,
     status: 'pending',
     completed: false,
     consumerCanceled: false,
     consumer,
-    onFailure: failureOptions.onFailure,
+    onFailure,
   }
   registry.set(registryKey, record)
 
-  let payload
+  let serializedPayload
   try {
-    payload = JSON.stringify({
+    serializedPayload = JSON.stringify({
       requestId,
       replyHandler: `window.${CALLBACK_NAME}`,
-      operation: 'get',
-      cacheKey,
+      ...payload,
     })
   } catch {
     notifyFailure(record, BRIDGE_FAILURE_CODES.callFailed)
@@ -184,12 +203,8 @@ function getNativeCachedValue(cacheKey, consumer, options) {
 
   try {
     logNativeBridgeCall(METHOD)
-    const synchronousResult = JSON.parse(bridge[METHOD](payload))
-    const accepted = synchronousResult?.action === 'persistent_cache_handle'
-      && synchronousResult.requestId === requestId
-      && typeof synchronousResult.status === 'string'
-      && typeof synchronousResult.message === 'string'
-    if (!accepted) {
+    const synchronousResult = JSON.parse(bridge[METHOD](serializedPayload))
+    if (!isAcceptedSynchronousResponse(synchronousResult, requestId)) {
       notifyFailure(record, BRIDGE_FAILURE_CODES.callFailed)
       reportDiagnostic('BRIDGE_CALL_FAILED')
       return null
@@ -208,10 +223,67 @@ function getNativeCachedValue(cacheKey, consumer, options) {
   return requestId
 }
 
+function getNativeCachedValue(cacheKey, consumer, options) {
+  const failureOptions = normalizeFailureOptions(options)
+  if (!failureOptions.valid) {
+    reportDiagnostic('BRIDGE_INVALID_OPTIONS')
+    return null
+  }
+  if (typeof consumer !== 'function') {
+    reportDiagnostic('BRIDGE_CALLBACK_INVALID_CONSUMER')
+    notifyImmediateFailure(failureOptions.onFailure, BRIDGE_FAILURE_CODES.invalidArgument)
+    return null
+  }
+
+  const { bridge, failureCode } = resolveBridge()
+  if (!bridge) {
+    notifyImmediateFailure(failureOptions.onFailure, failureCode)
+    return null
+  }
+
+  return sendPersistentCacheRequest({
+    bridge,
+    operation: OPERATIONS.get,
+    cacheKey,
+    requestIdPrefix: 'cache-get',
+    payload: {
+      operation: OPERATIONS.get,
+      cacheKey,
+    },
+    consumer,
+    onFailure: failureOptions.onFailure,
+  })
+}
+
+function setNativeCachedValue(cacheKey, value, requestIdPrefix) {
+  if (typeof value !== 'string' || value.length === 0) {
+    reportDiagnostic('BRIDGE_INVALID_ARGUMENT')
+    return false
+  }
+
+  const { bridge } = resolveBridge()
+  if (!bridge) return false
+
+  return sendPersistentCacheRequest({
+    bridge,
+    operation: OPERATIONS.set,
+    cacheKey,
+    requestIdPrefix,
+    payload: {
+      operation: OPERATIONS.set,
+      cacheKey,
+      cacheValue: value,
+      storagePolicy: PERSISTENT_POLICY,
+    },
+  }) !== null
+}
+
 function cancelNativeCachedConsumer(requestId, cacheKey) {
   if (typeof requestId !== 'string' || requestId.length === 0) return false
   const record = [...registry.values()].find((entry) => (
-    entry.requestId === requestId && entry.cacheKey === cacheKey
+    entry.operation === OPERATIONS.get
+    && entry.requestId === requestId
+    && entry.cacheKey === cacheKey
   ))
   if (!record || record.completed) return false
   record.consumerCanceled = true
@@ -233,6 +305,16 @@ export function getNativeCachedUserId(consumer = () => {}, options) {
 /** Query the Android persistent cache entry named LoginPhoneNumber. */
 export function getNativeCachedMobile(consumer = () => {}, options) {
   return getNativeCachedValue(CACHE_KEYS.mobile, consumer, options)
+}
+
+/** Store the Token value with the native persistent policy. */
+export function setNativeCachedToken(value) {
+  return setNativeCachedValue(CACHE_KEYS.token, value, 'cache-set-token')
+}
+
+/** Store the UserId value with the native persistent policy. */
+export function setNativeCachedUserId(value) {
+  return setNativeCachedValue(CACHE_KEYS.userId, value, 'cache-set-user-id')
 }
 
 export function cancelNativeCachedTokenConsumer(requestId) {
@@ -258,4 +340,6 @@ export const nativePersistentCacheBridge = Object.freeze({
   getNativeCachedMobile,
   getNativeCachedToken,
   getNativeCachedUserId,
+  setNativeCachedToken,
+  setNativeCachedUserId,
 })
